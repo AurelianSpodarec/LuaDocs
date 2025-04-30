@@ -88,7 +88,7 @@ export const navigation: Array<INavGroup> = [
       { title: "math.exp()", href: "/docs/functions/math/exp" },
       { title: "math.floor()", href: "/docs/functions/math/floor" },
       { title: "math.fmod()", href: "/docs/functions/math/fmod" },
-      { title: "math.huge()", href: "/docs/functions/math/huge" },
+      { title: "math.huge", href: "/docs/functions/math/huge" },
       { title: "math.log()", href: "/docs/functions/math/log" },
       { title: "math.max()", href: "/docs/functions/math/max" },
       { title: "math.maxinteger()", href: "/docs/functions/math/maxinteger" },
