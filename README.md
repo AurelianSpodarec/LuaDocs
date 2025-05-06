@@ -1,38 +1,26 @@
-# Welcome to Lua Web Docs
+# luadocs.com
 
-**[Lua Web Docs](https://luadocs.com)** is an open-source, collaborative project focused on creating clear and comprehensive documentation for Lua. It features detailed reference materials that are easy to understand and include practical examples.
+This is a Next.js application generated with
+[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
 
-## Mission
+Run development server:
 
-The mission of **[Lua Web Docs](https://luadocs.com)** is to provide a better reference guide for developers. We aim to address the shortcomings of the current official documentation, such as unclear explanations or the lack of examples, by delivering resources that are both practical and user-friendly.
+```bash
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
+```
 
-## Getting Started
+Open http://localhost:3000 with your browser to see the result.
 
-Follow these steps to set up the project locally:
+## Learn More
 
-1. **Install dependencies:**
+To learn more about Next.js and Fumadocs, take a look at the following
+resources:
 
-   ```bash
-   npm install
-   ```
-
-2. **Start the development server:**
-
-   ```bash
-   npm run dev
-   ```
-
-3. **Open the website:**
-
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser to view the site.
-
-## Contributing
-
-Contributions are welcome. Whether it's fixing a typo, adding examples, or improving explanations, any input that enhances the documentation is appreciated.  
-
-Check the repository's contribution guidelines for details on how to get involved.
-
-## Join Discord
-
-Discord Invite Link: https://discord.gg/Jp2HFx3KTH  
-GitHub Lua Discussion: https://github.com/AurelianSpodarec/LuaDocs/discussions
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
+  features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [Fumadocs](https://fumadocs.vercel.app) - learn about Fumadocs
