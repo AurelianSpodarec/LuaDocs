@@ -1,13 +1,70 @@
 ---
 title: Table
-description: Your first document
+description: The `table` object, referred to as arrays in other programming languages, enables the storage of various data types in Lua.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
 
-## What is Next?
+## Description
+In Lua, `table` is the primary data structure for storing data. It can be used as arrays, objects, and even classes.
 
-<Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.vercel.app" />
-</Cards>
+- Tables are indexed starting from 1.
+- You can create multidimensional (2D) arrays.
+- They are highly flexible and can contain mixed data types.
+
+## Constructor
+```
+{}
+```
+
+Creates a new `table` object.
+
+## Functions
+`table` comes with a variety of functions to manipulate data:
+
+### Static Utilities
+
+[`next()`](next)  
+  Allows a program to traverse all fields of a table.  
+
+[`setmetatable()`](setmetatable)  
+  Sets the metatable for the table.  
+
+[`getmetatable()`](getmetatable)  
+  Returns the associated metatable.  
+
+[`rawset()`](rawset)  
+  Sets the value of table[index] directly, bypassing metatables.  
+
+[`rawget()`](rawget)  
+  Returns the value of table[index] directly.  
+
+[`pairs()`](pairs)  
+  Used to iterate over all key-value pairs in the table.  
+
+[`ipairs()`](ipairs)  
+  Iterates numerically over the table.  
+
+
+### Instance Methods  
+Some common instance methods provided by the table library include:  
+
+[`table.insert()`](insert)  
+Adds an element to the table.  
+
+[`table.remove()`](remove)  
+Removes an element from the table.  
+
+[`table.pack()`](pack)  
+Packs elements into a new table.  
+
+[`table.unpack()`](unpack)  
+Unpacks a table into values.  
+
+[`table.concat()`](concat)  
+Combines the elements of a table into a string.  
+
+[`table.sort()`](sort)  
+Sorts the elements in a table.  
+
+[`table.move()`](move)  
+Moves a range of elements from one part of a table to another.  
