@@ -1,0 +1,5 @@
+{
+  "title": "Table Methods",
+  "pages": ["table", "concat", "insert", "move", "pack", "remove", "sort", "unpack"],
+  "defaultOpen": true
+}

@@ -1,0 +1,5 @@
+{
+  "title": "Functions",
+  "pages": ["table", "string", "math", "coroutine", "io", "os", "package", "debug", "utf8"],
+  "defaultOpen": true
+}
