@@ -124,10 +124,10 @@ function SmallPrint() {
         <SocialLink href="#" icon={XIcon}>
           Follow us on X
         </SocialLink>
-        <SocialLink href="#" icon={GitHubIcon}>
+        <SocialLink href="https://github.com/AurelianSpodarec/LuaDocs" icon={GitHubIcon}>
           Follow us on GitHub
         </SocialLink>
-        <SocialLink href="#" icon={DiscordIcon}>
+        <SocialLink href="https://discord.gg/Jp2HFx3KTH" icon={DiscordIcon}>
           Join our Discord server
         </SocialLink>
       </div>
