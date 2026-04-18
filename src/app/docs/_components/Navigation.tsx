@@ -27,14 +27,14 @@ export const navigation: Array<INavGroup> = [
       {
         title: "Table Methods",
         links: [
-          { title: "Table", href: "/docs/functions/table" },
-          { title: "Table.Concat()", href: "/docs/functions/table/concat" },
-          { title: "Table.Insert()", href: "/docs/functions/table/insert" },
-          { title: "Table.Move()", href: "/docs/functions/table/move" },
-          { title: "Table.Pack()", href: "/docs/functions/table/pack" },
-          { title: "Table.Remove()", href: "/docs/functions/table/remove" },
-          { title: "Table.Sort()", href: "/docs/functions/table/sort" },
-          { title: "Table.Unpack()", href: "/docs/functions/table/unpack" }
+          { title: "table", href: "/docs/functions/table" },
+          { title: "table.concat()", href: "/docs/functions/table/concat" },
+          { title: "table.insert()", href: "/docs/functions/table/insert" },
+          { title: "table.move()", href: "/docs/functions/table/move" },
+          { title: "table.pack()", href: "/docs/functions/table/pack" },
+          { title: "table.remove()", href: "/docs/functions/table/remove" },
+          { title: "table.sort()", href: "/docs/functions/table/sort" },
+          { title: "table.unpack()", href: "/docs/functions/table/unpack" }
         ]
       },
       {

@@ -3,36 +3,49 @@ export const metadata = {
   description: '',
 }
 
-`math.huge` is a constant in lua that represents the float value `HUGE_VAL`, which is greater than any other numeric value.
+The `math.fmod` function returns the remainder of the first argument divided by the second one, rounded towards 0. It accepts both integers and floats for any of its parameters.
 
 ### Syntax  
 
 ```lua
-math.huge
+math.fmod(x, y)
 ```
+
+### Parameters  
+
+- **x**: A number.
+- **y**: Any number differing from 0.
 
 ### Return value  
 
-The value of `math.huge` is a positive infinity.
+The remainder of `x` divided by `y`. If any of the arguments its a float, the remainder is returned as a float.
+
+Some special cases include:
+ - When **x** is a given number and **y** is `math.huge`, the function returns **x** as a float
+ - When both **x** and **y** are `math.huge`, the function returns a -NaN
+ - When **x** is different from `math.huge` and **y** is 0, the function is aborted with the error `bad argument #2 to 'fmod' (zero)`
 
 ### Description  
 
-`math.huge` is a special constant that is used to represent positive infinity. It can be utilized in mathematical calculations to signify an unbounded upper limit.
+`math.fmod` computes the remainder of `x` divided by `y`. It rounds the result towards zero, and always keeps the fractional part of the result, if any. 
 
 ### Examples  
 
-#### Using `math.huge`  
+#### Using `math.fmod`  
 
 ```lua
-print(math.huge)               -- inf
-print(math.huge + 1)           -- inf
-print(math.huge * 2)           -- inf
-print(1 / math.huge)           -- 0
-print(math.huge == math.huge)  -- true
+print(math.fmod(10, 5))     -- Output: 0
+print(math.fmod(8.41, 7))   -- Output: 1.41
+print(math.fmod(-67, 20.0)) -- Output: -7.0
+```
+
+#### Execution for uncommon arguments
+```lua
+print(math.fmod(math.huge, 0))         -- Output: -NaN
+print(math.fmod(math.huge, math.huge)) -- Output: -NaN
+print(math.fmod(-4, 0))                -- Output (error): bad argument #2 to 'fmod' (zero)
 ```
 
 ### See also  
 
-- `math.isinf(x)`  
-- `math.isnan(x)`  
-- `math.abs(x)`  
+- `math.huge`
