@@ -1,99 +1,46 @@
 export const metadata = {
-  title: 'math.exp()',
-  description: 'The `math.exp()` function returns the value of e raised to the power of a given number.',
-};
+  title: 'math.deg()',
+  description: '',
+}
 
-# math.exp()
-
-The `math.exp()` function computes the value of the mathematical constant \( e \) (approximately 2.718) raised to the power of a given number. It is commonly used in exponential growth, decay calculations, and other mathematical applications.
+The `math.deg` function converts the angle, in radians, represented by the argument, to its equivalent in degrees. It accepts both integers and floats, positive or negative.
 
 ## Syntax
 
 ```lua
-math.exp(`x`)
+math.deg(`x`)
 ```
 
 ## Parameters
 
 <Properties>
   <Property name="x" type="number">
-    A number representing the exponent to which \( e \) is raised.
+    A number representing an angle in radians.
   </Property>
 </Properties>
 
 ## Return Value
-Returns the result of \( e^x \), where \( e \) is the base of the natural logarithm (approximately 2.718).
+The equivalent angle in degrees.
+When `x` is not a number, the function is aborted with the error `bad argument #1 to 'deg' (number expected, got <data_type>)`, where `data_type` is the type of the object passed as argument to the function.
 
-- If `x` is `0`, the function returns `1` (since \( e^0 = 1 \)).
-- If `x` is a negative number, the function returns the reciprocal of `\( e^{|x|} \)`.
-- If `x` is invalid or non-numeric, the function returns `nil`.
+### Examples
 
-## Examples
-
-### Example 1: Basic Exponentiation
-Compute `\( e^x \)` for a positive number.
-
-<CodeGroup title="Example 1">
+#### Using `math.deg`
 ```lua
-local result = math.exp(1)
-print(result)
-
--- Output: 2.718281828459
+print(math.deg(2))           -- Output: 114.5915...
+print(math.deg(-4))          -- Output: -229.1831...
+print(math.deg(1.54))        -- Output: 88.2355...
+print(math.deg(0.000000007)) -- Output: 4.0107045659158e-07
 ```
-</CodeGroup>
 
-### Example 2: Zero as the Exponent
-Compute \( e^0 \).
-
-<CodeGroup title="Example 2">
+#### Special cases
 ```lua
-local result = math.exp(0)
-print(result)
-
--- Output: 1
+print(math.deg(math.huge))  -- Output: Inf (positive infinity)
+print(math.deg(-math.huge)) -- Output: -Inf (negative infinity)
 ```
-</CodeGroup>
-
-### Example 3: Negative Exponents
-Calculate `\( e^{-x} \)` for a negative number.
-
-<CodeGroup title="Example 3">
-```lua
-local result = math.exp(-1)
-print(result)
-
--- Output: 0.36787944117144
-```
-</CodeGroup>
-
-### Example 4: Exponentiation with Larger Numbers
-Compute `\( e^x \)` for a larger value of `\( x \)`.
-
-<CodeGroup title="Example 4">
-```lua
-local result = math.exp(5)
-print(result)
-
--- Output: 148.41315910258
-```
-</CodeGroup>
-
-### Example 5: Small Values of `\( x \)`
-Compute \( e^x \) for small positive numbers.
-
-<CodeGroup title="Example 5">
-```lua
-local result = math.exp(0.1)
-print(result)
-
--- Output: 1.1051709180756
-```
-</CodeGroup>
 
 ## Use Cases
-- **Exponential Growth and Decay**: Calculate compound growth or decay over time.
-- **Mathematical Modeling**: Solve problems involving the natural exponential function.
-- **Logarithms and Inverses**: Use in conjunction with `math.log()` for inverse operations.
+- **Graphics manipulation**: useful for calculating rotation of textures/shapes.
 
 ## See also
 - **`math.log()`**: Calculates the natural logarithm of a number, the inverse of `math.exp()`.
