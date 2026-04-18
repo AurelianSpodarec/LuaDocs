@@ -31,12 +31,12 @@ The `math.tointeger` function checks whether the provided value `x` can be repre
 ```lua
 print(math.tointeger(42))        -- Output: 42
 print(math.tointeger(3.14))      -- Output: nil (not an integer)
-print(math.tointeger(0))          -- Output: 0
-print(math.tointeger(-100))       -- Output: -100
-print(math.tointeger(1e6))        -- Output: 1000000
-print(math.tointeger(math.huge))  -- Output: nil (not an integer)
-print(math.tointeger(5.0))        -- Output: 5 (5.0 is convertible to 5)
-print(math.tointeger("42"))       -- Output: nil (string is not convertible)
+print(math.tointeger(0))         -- Output: 0
+print(math.tointeger(-100))      -- Output: -100
+print(math.tointeger(1e6))       -- Output: 1000000
+print(math.tointeger(math.huge)) -- Output: nil (not an integer)
+print(math.tointeger(5.0))       -- Output: 5 (5.0 is convertible to 5)
+print(math.tointeger("42"))      -- Output: 42 (the string is convertible to integer)
 ```
 
 ### See also  
