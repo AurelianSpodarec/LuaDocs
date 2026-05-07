@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "PowerShell(git checkout *)",
+      "PowerShell(git *)"
+    ]
+  }
+}
