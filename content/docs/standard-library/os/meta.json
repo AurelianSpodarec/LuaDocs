@@ -1,7 +1,16 @@
 {
   "title": "os",
   "pages": [
-    "index",
-    "..."
+    "clock",
+    "date",
+    "difftime",
+    "execute",
+    "exit",
+    "getenv",
+    "remove",
+    "rename",
+    "setlocale",
+    "time",
+    "tmpname"
   ]
 }

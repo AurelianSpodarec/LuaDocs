@@ -3,8 +3,8 @@
     "index",
     "learn",
     "guides",
-    "language",
     "standard-library",
+    "language",
     "standalone",
     "c-api"
   ]

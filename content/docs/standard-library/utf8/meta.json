@@ -1,7 +1,13 @@
 {
   "title": "utf8",
   "pages": [
-    "index",
-    "..."
+    "---Functions---",
+    "char",
+    "codepoint",
+    "codes",
+    "len",
+    "offset",
+    "---Constants---",
+    "charpattern"
   ]
 }

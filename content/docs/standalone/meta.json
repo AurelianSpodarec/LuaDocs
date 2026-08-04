@@ -1,7 +1,13 @@
 {
   "title": "Standalone interpreter",
   "pages": [
-    "index",
-    "..."
+    "---Concepts---",
+    "command-line-options",
+    "script-execution",
+    "---Constants---",
+    "arg",
+    "lua-path",
+    "lua-cpath",
+    "lua-init"
   ]
 }

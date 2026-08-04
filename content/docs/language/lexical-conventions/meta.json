@@ -1,7 +1,9 @@
 {
   "title": "Lexical conventions",
   "pages": [
-    "index",
-    "..."
+    "comments",
+    "identifiers-and-keywords",
+    "numeric-literals",
+    "string-literals"
   ]
 }

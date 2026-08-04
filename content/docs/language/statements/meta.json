@@ -1,7 +1,19 @@
 {
   "title": "Statements",
   "pages": [
-    "index",
-    "..."
+    "assignment",
+    "local-declarations",
+    "global-declarations",
+    "if",
+    "while",
+    "repeat",
+    "numeric-for",
+    "generic-for",
+    "break",
+    "goto",
+    "return",
+    "do-blocks",
+    "function-declarations",
+    "to-be-closed-variables"
   ]
 }

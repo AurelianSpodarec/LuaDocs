@@ -1,7 +1,26 @@
 {
   "title": "table",
   "pages": [
-    "index",
-    "..."
+    "concat",
+    "create",
+    "insert",
+    "move",
+    "pack",
+    "remove",
+    "sort",
+    "unpack",
+    "foreach",
+    "foreachi",
+    "getn",
+    "maxn",
+    "---Related globals---",
+    "[getmetatable()](/docs/standard-library/globals/getmetatable)",
+    "[ipairs()](/docs/standard-library/globals/ipairs)",
+    "[next()](/docs/standard-library/globals/next)",
+    "[pairs()](/docs/standard-library/globals/pairs)",
+    "[rawget()](/docs/standard-library/globals/rawget)",
+    "[rawlen()](/docs/standard-library/globals/rawlen)",
+    "[rawset()](/docs/standard-library/globals/rawset)",
+    "[setmetatable()](/docs/standard-library/globals/setmetatable)"
   ]
 }

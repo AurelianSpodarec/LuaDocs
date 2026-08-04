@@ -1,7 +1,28 @@
 {
   "title": "string",
   "pages": [
-    "index",
-    "..."
+    "---Concepts---",
+    "patterns",
+    "pack-formats",
+    "---Functions---",
+    "byte",
+    "char",
+    "dump",
+    "find",
+    "format",
+    "gmatch",
+    "gsub",
+    "len",
+    "lower",
+    "match",
+    "pack",
+    "packsize",
+    "rep",
+    "reverse",
+    "sub",
+    "unpack",
+    "upper",
+    "---Related globals---",
+    "[tostring()](/docs/standard-library/globals/tostring)"
   ]
 }

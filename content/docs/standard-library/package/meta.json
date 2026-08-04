@@ -1,7 +1,21 @@
 {
   "title": "package",
   "pages": [
-    "index",
-    "..."
+    "---Functions---",
+    "loadlib",
+    "searchpath",
+    "seeall",
+    "---Constants---",
+    "config",
+    "cpath",
+    "loaded",
+    "path",
+    "preload",
+    "searchers",
+    "loaders",
+    "---Related globals---",
+    "[dofile()](/docs/standard-library/globals/dofile)",
+    "[loadfile()](/docs/standard-library/globals/loadfile)",
+    "[require()](/docs/standard-library/globals/require)"
   ]
 }

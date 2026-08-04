@@ -1,7 +1,15 @@
 {
   "title": "C API",
   "pages": [
-    "index",
-    "..."
+    "types-and-values",
+    "stack-manipulation",
+    "calling",
+    "error-handling",
+    "references-and-registry",
+    "userdata",
+    "coroutines",
+    "debug-interface",
+    "auxiliary-library",
+    "constants"
   ]
 }

@@ -1,7 +1,9 @@
 {
   "title": "Error handling",
   "pages": [
-    "index",
-    "..."
+    "error-objects",
+    "protected-calls",
+    "error-levels",
+    "warnings"
   ]
 }

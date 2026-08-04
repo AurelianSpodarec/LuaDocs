@@ -1,7 +1,9 @@
 {
   "title": "Garbage collection",
   "pages": [
-    "index",
-    "..."
+    "incremental-mode",
+    "generational-mode",
+    "weak-tables",
+    "finalizers"
   ]
 }

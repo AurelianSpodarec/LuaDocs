@@ -1,7 +1,9 @@
 {
   "title": "Guides",
   "pages": [
-    "index",
-    "..."
+    "lua-in-the-wild",
+    "luarocks-and-the-ecosystem",
+    "how-metatables-work",
+    "history-of-lua"
   ]
 }

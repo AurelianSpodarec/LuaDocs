@@ -1,7 +1,18 @@
 {
   "title": "Expressions",
   "pages": [
-    "index",
-    "..."
+    "arithmetic-operators",
+    "bitwise-operators",
+    "relational-operators",
+    "logical-operators",
+    "concatenation",
+    "length-operator",
+    "operator-precedence",
+    "table-constructors",
+    "function-calls",
+    "method-calls",
+    "anonymous-functions",
+    "varargs",
+    "multiple-results"
   ]
 }

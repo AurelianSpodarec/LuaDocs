@@ -1,7 +1,10 @@
 {
   "title": "Variables and scope",
   "pages": [
-    "index",
-    "..."
+    "global-variables",
+    "local-variables",
+    "upvalues-and-closures",
+    "scope-rules",
+    "variable-attributes"
   ]
 }

@@ -1,7 +1,15 @@
 {
   "title": "Standard Library",
   "pages": [
-    "index",
-    "..."
+    "globals",
+    "string",
+    "table",
+    "math",
+    "io",
+    "os",
+    "coroutine",
+    "utf8",
+    "package",
+    "debug"
   ]
 }

@@ -1,7 +1,13 @@
 {
   "title": "coroutine",
   "pages": [
-    "index",
-    "..."
+    "close",
+    "create",
+    "isyieldable",
+    "resume",
+    "running",
+    "status",
+    "wrap",
+    "yield"
   ]
 }

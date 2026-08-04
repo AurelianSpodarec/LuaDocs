@@ -1,7 +1,14 @@
 {
   "title": "Values and types",
   "pages": [
-    "index",
-    "..."
+    "nil",
+    "boolean",
+    "number",
+    "string",
+    "table",
+    "function",
+    "userdata",
+    "thread",
+    "type-coercion"
   ]
 }

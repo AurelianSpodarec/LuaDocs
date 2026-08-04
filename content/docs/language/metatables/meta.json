@@ -1,7 +1,30 @@
 {
   "title": "Metatables and metamethods",
   "pages": [
-    "index",
-    "..."
+    "index-metamethod",
+    "newindex",
+    "call",
+    "tostring",
+    "len",
+    "eq",
+    "lt",
+    "le",
+    "concat",
+    "unm",
+    "gc",
+    "close",
+    "mode",
+    "name",
+    "metatable",
+    "pairs",
+    "ipairs",
+    "arithmetic-metamethods",
+    "bitwise-metamethods",
+    "---Related globals---",
+    "[getmetatable()](/docs/standard-library/globals/getmetatable)",
+    "[rawget()](/docs/standard-library/globals/rawget)",
+    "[rawlen()](/docs/standard-library/globals/rawlen)",
+    "[rawset()](/docs/standard-library/globals/rawset)",
+    "[setmetatable()](/docs/standard-library/globals/setmetatable)"
   ]
 }

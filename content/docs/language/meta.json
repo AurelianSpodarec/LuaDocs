@@ -1,7 +1,15 @@
 {
   "title": "Language",
   "pages": [
-    "index",
-    "..."
+    "values-and-types",
+    "lexical-conventions",
+    "variables-and-scope",
+    "statements",
+    "expressions",
+    "metatables",
+    "environments",
+    "error-handling",
+    "garbage-collection",
+    "coroutines"
   ]
 }

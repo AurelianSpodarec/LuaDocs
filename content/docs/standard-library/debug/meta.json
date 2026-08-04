@@ -1,7 +1,23 @@
 {
   "title": "debug",
   "pages": [
-    "index",
-    "..."
+    "debug",
+    "gethook",
+    "getinfo",
+    "getlocal",
+    "getmetatable",
+    "getregistry",
+    "getupvalue",
+    "getuservalue",
+    "sethook",
+    "setlocal",
+    "setmetatable",
+    "setupvalue",
+    "setuservalue",
+    "traceback",
+    "upvalueid",
+    "upvaluejoin",
+    "getfenv",
+    "setfenv"
   ]
 }
