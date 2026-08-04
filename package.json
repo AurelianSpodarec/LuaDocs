@@ -9,6 +9,7 @@
     "start": "serve .output/public --config serve.json",
     "preview": "vite preview",
     "test": "vitest run",
+    "content:scaffold": "tsx scripts/scaffold-content.ts",
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "serve": "^14.2.6",
     "srvx": "^0.12.4",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.5",
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "vitest": "^4.1.10"

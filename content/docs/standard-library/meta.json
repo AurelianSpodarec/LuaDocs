@@ -1,4 +1,7 @@
 {
   "title": "Standard Library",
-  "pages": ["index", "..."]
+  "pages": [
+    "index",
+    "..."
+  ]
 }

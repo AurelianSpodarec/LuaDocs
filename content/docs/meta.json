@@ -1,0 +1,11 @@
+{
+  "pages": [
+    "index",
+    "learn",
+    "guides",
+    "language",
+    "standard-library",
+    "standalone",
+    "c-api"
+  ]
+}

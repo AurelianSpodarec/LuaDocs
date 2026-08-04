@@ -1,4 +1,7 @@
 {
   "title": "string",
-  "pages": ["index", "..."]
+  "pages": [
+    "index",
+    "..."
+  ]
 }

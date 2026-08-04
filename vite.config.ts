@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { nitro } from 'nitro/vite';
+import { CONTENT_TREE } from './src/content-tree/manifest';
+import { contentTreeUrls } from './src/content-tree/scaffold';
 
 export default defineConfig({
   server: {
@@ -22,18 +24,11 @@ export default defineConfig({
       },
 
       pages: [
-        {
-          path: '/docs',
-        },
-        {
-          path: '/api/search',
-        },
-        {
-          path: 'llms-full.txt',
-        },
-        {
-          path: 'llms.txt',
-        },
+        { path: '/docs' },
+        { path: '/api/search' },
+        { path: 'llms-full.txt' },
+        { path: 'llms.txt' },
+        ...contentTreeUrls(CONTENT_TREE).map((path) => ({ path })),
       ],
     }),
     react(),
