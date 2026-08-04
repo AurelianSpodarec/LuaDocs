@@ -21,9 +21,16 @@ export interface Source {
 export interface Entry {
   /** URL and filename segment — the bare member name, never the dotted form. */
   slug: string;
-  /** Frontmatter title — the symbol as a reader writes it (`string.format`, `__index`). */
+  /**
+   * Frontmatter title — the symbol as a reader writes it, fully qualified and
+   * parenthesised when callable (`string.format()`, `math.pi`, `__index`). Dotted
+   * means library member, bare means global, which is what makes a cross-linked
+   * `Related globals` row legible next to a native one (ADR 0006).
+   */
   title: string;
   type: EntryType;
+  /** Sidebar group this entry belongs to. Entries sharing one are shown together. */
+  group: string;
   source: Source;
 }
 
@@ -42,14 +49,33 @@ export function sourceUrl(source: Source): string {
   return `${MANUAL_BASE}/${source.version}/manual.html#${source.anchor}`;
 }
 
+/** The group an entry falls into when its helper does not say otherwise. */
+const GROUP_BY_TYPE: Record<EntryType, string> = {
+  function: 'Functions',
+  constant: 'Constants',
+  construct: 'Concepts',
+  guide: 'Guides',
+  overview: 'Overview',
+};
+
+/**
+ * A callable's title carries its parentheses, as MDN's do (`Math.abs()`). The title
+ * is the page heading, the breadcrumb and the search result, not just a sidebar row,
+ * so the distinction between `math.abs()` and `math.pi` belongs in the data.
+ */
+function call(name: string, type: EntryType): string {
+  return type === 'function' ? `${name}()` : name;
+}
+
 export function entry(
   slug: string,
   title: string,
   type: EntryType,
   anchor: string,
   version: LuaVersion = '5.5',
+  group: string = GROUP_BY_TYPE[type],
 ): Entry {
-  return { slug, title, type, source: { version, anchor } };
+  return { slug, title: call(title, type), type, group, source: { version, anchor } };
 }
 
 /** A language construct, whose anchor is a manual section number like `3.3.5`. */
@@ -72,10 +98,13 @@ function build(
   type: EntryType,
   version: LuaVersion,
   sep = '.',
+  group?: string,
 ): Entry[] {
   return split(names).map((slug) => {
-    const title = lib ? `${lib}${sep}${slug}` : slug;
-    return entry(slug, title, type, `pdf-${title}`, version);
+    // The bare name, because the manual anchors `pdf-string.format`, never
+    // `pdf-string.format()`. `entry` adds the parentheses to the title only.
+    const name = lib ? `${lib}${sep}${slug}` : slug;
+    return entry(slug, name, type, `pdf-${name}`, version, group);
   });
 }
 
@@ -249,10 +278,10 @@ export const CONTENT_TREE: Section[] = [
     section('coroutine', 'coroutine', '6.3',
       fns('coroutine', 'close create isyieldable resume running status wrap yield')),
     section('package', 'package', '6.4', [
-      ...consts('package', 'config cpath loaded path preload searchers'),
       ...fns('package', 'loadlib searchpath'),
-      ...constsFrom('5.1', 'package', 'loaders'),
       ...fnsFrom('5.1', 'package', 'seeall'),
+      ...consts('package', 'config cpath loaded path preload searchers'),
+      ...constsFrom('5.1', 'package', 'loaders'),
     ]),
     section('string', 'string', '6.5', [
       ...fns('string', 'byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper'),

@@ -52,7 +52,7 @@ describe('the content tree', () => {
   it('builds a manual URL from a source', () => {
     const string = all.find((s) => s.slug === 'string')!;
     const format = string.entries.find((e) => e.slug === 'format')!;
-    expect(format.title).toBe('string.format');
+    expect(format.title).toBe('string.format()');
     expect(sourceUrl(format.source)).toBe(
       'https://www.lua.org/manual/5.5/manual.html#pdf-string.format',
     );
@@ -71,6 +71,51 @@ describe('the content tree', () => {
       '/docs/standard-library/string/format',
       '/docs/standard-library/string/upper',
     ]);
+  });
+});
+
+describe('entry groups', () => {
+  it('groups every entry by kind', () => {
+    const math = all.find((s) => s.slug === 'math')!;
+    expect(math.entries.find((e) => e.slug === 'abs')?.group).toBe('Functions');
+    expect(math.entries.find((e) => e.slug === 'pi')?.group).toBe('Constants');
+  });
+
+  it("keeps a section's entries contiguous by group", () => {
+    for (const s of all) {
+      const seen = new Set<string>();
+      let last: string | null = null;
+      for (const e of s.entries) {
+        if (e.group !== last) {
+          expect(seen.has(e.group), `${s.slug} revisits ${e.group}`).toBe(false);
+          seen.add(e.group);
+          last = e.group;
+        }
+      }
+    }
+  });
+});
+
+describe('callable titles', () => {
+  it('parenthesises a function and leaves a constant bare', () => {
+    const math = all.find((s) => s.slug === 'math')!;
+    expect(math.entries.find((e) => e.slug === 'abs')?.title).toBe('math.abs()');
+    expect(math.entries.find((e) => e.slug === 'pi')?.title).toBe('math.pi');
+  });
+
+  it('keeps the parentheses out of the manual anchor', () => {
+    const math = all.find((s) => s.slug === 'math')!;
+    expect(sourceUrl(math.entries.find((e) => e.slug === 'abs')!.source)).toBe(
+      'https://www.lua.org/manual/5.5/manual.html#pdf-math.abs',
+    );
+  });
+
+  it('leaves constructs, constants and guides unparenthesised', () => {
+    const statements = all.find((s) => s.slug === 'statements')!;
+    expect(statements.entries.find((e) => e.slug === 'goto')?.title).toBe('goto');
+
+    const standalone = all.find((s) => s.slug === 'standalone')!;
+    expect(standalone.entries.find((e) => e.slug === 'lua-path')?.title).toBe('LUA_PATH');
   });
 });
 
@@ -95,13 +140,13 @@ describe('the standard library', () => {
 
   it('titles a bare global without a library prefix', () => {
     const basic = all.find((s) => s.slug === 'basic')!;
-    expect(basic.entries.find((e) => e.slug === 'pcall')?.title).toBe('pcall');
+    expect(basic.entries.find((e) => e.slug === 'pcall')?.title).toBe('pcall()');
     expect(basic.entries.find((e) => e.slug === '_g')?.title).toBe('_G');
   });
 
   it('titles a file method with a colon', () => {
     const file = all.find((s) => s.slug === 'file-methods')!;
-    expect(file.entries.find((e) => e.slug === 'read')?.title).toBe('file:read');
+    expect(file.entries.find((e) => e.slug === 'read')?.title).toBe('file:read()');
   });
 
   it('sources a symbol 5.5 dropped to the newest manual that has it', () => {
