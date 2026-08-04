@@ -385,9 +385,9 @@ export const CONTENT_TREE: Section[] = [
     construct('command-line-options', 'Command-line options', '7'),
     construct('script-execution', 'Script execution', '7'),
     entry('arg', 'arg', 'constant', '7'),
-    entry('lua-path', 'LUA_PATH', 'constant', '6.4'),
     entry('lua-cpath', 'LUA_CPATH', 'constant', '6.4'),
     entry('lua-init', 'LUA_INIT', 'constant', '7'),
+    entry('lua-path', 'LUA_PATH', 'constant', '6.4'),
   ]),
   // Entries, not folders: none of these has content yet, and a folder wrapping a
   // lone overview is an accordion that opens onto itself (ADR 0006). They become

@@ -6,8 +6,8 @@
     "script-execution",
     "---Constants---",
     "arg",
-    "lua-path",
     "lua-cpath",
-    "lua-init"
+    "lua-init",
+    "lua-path"
   ]
 }

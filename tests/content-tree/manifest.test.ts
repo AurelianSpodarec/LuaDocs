@@ -289,6 +289,43 @@ describe('the remaining sections', () => {
   });
 });
 
+describe('ADR 0006 ordering', () => {
+  /** `math.abs()`, `__index`, `LUA_PATH` — a name you arrive already knowing. */
+  const identifier = (title: string) => /^[a-z_][\w.:]*(\(\))?$/i.test(title);
+
+  it('sorts identifier-named entries alphabetically within their run', () => {
+    // Prose-named entries are curated (rule 2) and exempt. A run is a stretch of
+    // one group at one source version: symbols a later Lua dropped form their own
+    // trailing run rather than being interleaved with current ones.
+    for (const s of all) {
+      let run: string[] = [];
+      let key: string | null = null;
+
+      const check = () => expect(run, `${s.slug} / ${key}`).toEqual([...run].sort());
+
+      for (const e of s.entries) {
+        const next = `${e.group} ${e.source.version}`;
+        if (next !== key) {
+          check();
+          run = [];
+          key = next;
+        }
+        if (identifier(e.title)) run.push(e.slug);
+        else run = [];
+      }
+      check();
+    }
+  });
+
+  it('titles every function with parentheses and nothing else', () => {
+    for (const s of all) {
+      for (const e of s.entries) {
+        expect(e.title.endsWith('()'), `${s.slug}/${e.slug}`).toBe(e.type === 'function');
+      }
+    }
+  });
+});
+
 describe('the frontmatter schema', () => {
   // `defineDocs` is a build-time macro, so the schema's enum cannot import
   // ENTRY_TYPES — it is written out by hand and has to be read back as text.
