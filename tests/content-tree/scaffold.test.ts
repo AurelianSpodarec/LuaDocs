@@ -67,6 +67,24 @@ describe('scaffoldContent', () => {
     expect(await readFile(path, 'utf8')).toContain('Real authored prose.');
   });
 
+  it('never overwrites a hand-edited meta.json', async () => {
+    await scaffoldContent(dir, tree);
+    const path = join(dir, 'standard-library/string/meta.json');
+    const handEdited = JSON.stringify(
+      { title: 'string', pages: ['index', '---Core---', 'format'] },
+      null,
+      2,
+    ) + '\n';
+    await writeFile(path, handEdited, 'utf8');
+
+    const stats = await scaffoldContent(dir, tree);
+
+    // Only the hand-edited meta.json — everything else in this fresh temp dir
+    // is untouched, so it counts as unchanged rather than kept.
+    expect(stats.kept).toBe(1);
+    expect(await readFile(path, 'utf8')).toBe(handEdited);
+  });
+
   it('lists every entry URL for the prerenderer', () => {
     expect(contentTreeUrls(tree)).toEqual([
       '/docs/standard-library',

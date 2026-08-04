@@ -674,7 +674,9 @@ Then:
 git status --short content/docs
 ```
 
-Expected: the only changes are **added** files (`standard-library/index.mdx`, `standard-library/string/index.mdx`, `content/docs/meta.json`). The `meta.json` files and `format.mdx` that Task 1 wrote by hand must be **unmodified** — the generator agreeing with the hand-built result is the point of this step. If `format.mdx` shows as modified, the no-clobber guard is broken; fix it before continuing.
+Expected: the only changes are **added** files (`standard-library/index.mdx`, `standard-library/string/index.mdx`, `content/docs/meta.json`). Nothing Task 1 wrote by hand may be modified — the generator agreeing with the hand-built result is the point of this step. If `format.mdx` shows as modified, the no-clobber guard is broken; fix it before continuing.
+
+Both `meta.json` files are protected by the same rule as `.mdx` stubs: an existing one that differs from the generated form has been hand-edited and is left alone. That matters because `pages` is where a section's authored order lives — Fumadocs supports `---Separator---` items there, and page-structure.md calls for authored sub-groups in overviews. The deliberate cost: once a `meta.json` exists and has been edited, changing that section's `title` or `pages` in the manifest no longer propagates to it, and regenerating means deleting the file. Losing a hand-authored section order is the worse failure.
 
 - [ ] **Step 7: Seed the prerenderer from the manifest**
 

@@ -9,7 +9,7 @@ export const PLACEHOLDER = '{/* Not yet written. */}';
 export interface ScaffoldStats {
   written: number;
   unchanged: number;
-  /** Files left alone because someone had authored a real body into them. */
+  /** Files left alone because someone had hand-edited them (an entry body or a meta.json). */
   kept: number;
 }
 
@@ -52,9 +52,26 @@ async function writeStub(path: string, contents: string, stats: ScaffoldStats): 
   stats.written++;
 }
 
+/**
+ * `meta.json` is where a human hand-orders a section — Fumadocs' `pages` accepts
+ * `---Separator---` items, and a section overview can call for authored sub-groups
+ * that the manifest doesn't know about. So this gets the same no-clobber treatment
+ * as an entry body: a byte-identical file is left alone, and anything that differs
+ * is assumed hand-edited and kept as-is rather than overwritten.
+ *
+ * Consequence: once a section's `meta.json` has been hand-edited, changing that
+ * section's `title` or `pages` in the manifest will not propagate to it —
+ * regenerating requires deleting the file first. That trade is deliberate: losing
+ * a hand-authored section order is worse than a stale title.
+ */
 async function writeMeta(path: string, contents: string, stats: ScaffoldStats): Promise<void> {
-  if (existsSync(path) && (await readFile(path, 'utf8')) === contents) {
-    stats.unchanged++;
+  if (existsSync(path)) {
+    const existing = await readFile(path, 'utf8');
+    if (existing === contents) {
+      stats.unchanged++;
+      return;
+    }
+    stats.kept++;
     return;
   }
   await writeFile(path, contents, 'utf8');
