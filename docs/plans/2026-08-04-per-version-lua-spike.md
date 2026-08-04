@@ -1,5 +1,12 @@
 # Per-Version Lua Runtime Spike — Implementation Plan
 
+> **PARKED 2026-08-04, before Task 2.** Task 1 (the runtime disclosure) shipped as
+> `a40d7e3`. Tasks 2–6 are not started: they need Emscripten, which is not installed,
+> and the work was judged not urgent — the runtime is swappable behind `runLua`, and
+> the version *system* it sits on is already proven. See the reasoning and the
+> bring-it-forward conditions under slice 6 in [ROADMAP.md](ROADMAP.md). This plan is
+> still accurate and ready to run; nothing in it needs rewriting first.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Answer, with working artifacts rather than argument, whether LuaDocs can execute examples in the reader's *selected* Lua version — and what that costs in build complexity, bundle size, and ongoing maintenance.

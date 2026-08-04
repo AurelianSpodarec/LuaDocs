@@ -12,8 +12,8 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | # | Slice | Plan | Status |
 |---|-------|------|--------|
 | 1 | Version slice — prove the risky stack on one page | [2026-08-04-version-slice.md](2026-08-04-version-slice.md) | Done |
-| — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Next |
-| 2 | Page anatomy | — | Not started |
+| — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Parked — see below |
+| 2 | Page anatomy | — | Next |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
 | 5 | Playground | — | Not started |
@@ -69,8 +69,30 @@ WASM builds per minor line, plus the loader that picks one from the selected ver
 The single largest unknown left after the version slice — and the one the version
 slice did **not** prove, so it is being spiked before the slices above it.
 
-See [the spike plan](2026-08-04-per-version-lua-spike.md). Until it reports, the site
-executes Lua 5.4 whatever version the reader selects.
+**Decision, 2026-08-04: parked. The site runs Lua 5.4 for every selected version, and
+says so in the UI.**
+
+It was briefly sequenced ahead of everything else on the grounds that it was the
+largest unretired risk. That was wrong, for three reasons:
+
+- **The runtime is swappable.** It lives entirely behind `runLua(code, opts)` in
+  `src/runner/runLua.ts` and `src/runner/luaWorker.ts`. No other module knows Wasmoon
+  exists. Going from one runtime to five later touches those two files plus a loader.
+- **The load-bearing risk was the version *system*, and that is proven** — one
+  canonical entry plus compat-data deltas driving per-version rendering out of static
+  output. Runtime fidelity sits on top of that, not under it.
+- **Research narrowed it without building anything** (see the spike plan's "What we
+  already know"): Wasmoon's WASM build is version-agnostic, the per-version cost is an
+  exported-symbol list plus binding shims, and 5.3/5.4/5.5 are nearly free. Probably
+  feasible; not urgent.
+
+The honest cost of parking it: examples execute 5.4 semantics whatever the reader
+selects. `RunnableExample` discloses this inline rather than hiding it.
+
+**Bring it forward when** any of these becomes true: a reader-facing complaint about
+wrong output; enough 5.1/5.2-specific entries that static-only examples there are a
+real gap; or Emscripten is already installed for another reason, making the spike
+cheap. The plan is written and ready to run.
 
 ### 7. Contribution surface
 
