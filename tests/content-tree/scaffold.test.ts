@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scaffoldContent, contentTreeUrls, PLACEHOLDER } from '@/content-tree/scaffold';
+import { scaffoldContent, PLACEHOLDER } from '@/content-tree/scaffold';
 import { section, fns, type Section } from '@/content-tree/manifest';
 
 const tree: Section[] = [
@@ -33,7 +33,7 @@ describe('scaffoldContent', () => {
     expect(text).not.toContain('lua-compat');
   });
 
-  it('writes a meta.json using the rest item rather than listing every page', async () => {
+  it('writes a meta.json using the rest item rather than listing every entry', async () => {
     await scaffoldContent(dir, tree);
 
     const meta = JSON.parse(await readFile(join(dir, 'standard-library/string/meta.json'), 'utf8'));
@@ -54,9 +54,10 @@ describe('scaffoldContent', () => {
     const second = await scaffoldContent(dir, tree);
 
     expect(second.written).toBe(0);
+    expect(second.kept).toBe(0);
   });
 
-  it('never overwrites an authored body', async () => {
+  it('never overwrites a file that differs from the stub it would write', async () => {
     await scaffoldContent(dir, tree);
     const path = join(dir, 'standard-library/string/format.mdx');
     await writeFile(path, '---\ntitle: string.format\n---\n\nReal authored prose.\n', 'utf8');
@@ -64,7 +65,32 @@ describe('scaffoldContent', () => {
     const stats = await scaffoldContent(dir, tree);
 
     expect(stats.kept).toBe(1);
+    expect(stats.written).toBe(0);
     expect(await readFile(path, 'utf8')).toContain('Real authored prose.');
+  });
+
+  it('keeps a stub whose frontmatter was filled in but whose body is still the placeholder', async () => {
+    await scaffoldContent(dir, tree);
+    const path = join(dir, 'standard-library/string/format.mdx');
+    const started = [
+      '---',
+      'title: string.format',
+      'description: "Formats a string."',
+      'entry-type: function',
+      'lua-compat: string.format',
+      'source: https://www.lua.org/manual/5.5/manual.html#pdf-string.format',
+      '---',
+      '',
+      PLACEHOLDER,
+      '',
+    ].join('\n');
+    await writeFile(path, started, 'utf8');
+
+    const stats = await scaffoldContent(dir, tree);
+
+    expect(stats.kept).toBe(1);
+    expect(stats.written).toBe(0);
+    expect(await readFile(path, 'utf8')).toBe(started);
   });
 
   it('never overwrites a hand-edited meta.json', async () => {
@@ -85,12 +111,46 @@ describe('scaffoldContent', () => {
     expect(await readFile(path, 'utf8')).toBe(handEdited);
   });
 
-  it('lists every entry URL for the prerenderer', () => {
-    expect(contentTreeUrls(tree)).toEqual([
-      '/docs/standard-library',
-      '/docs/standard-library/string',
-      '/docs/standard-library/string/format',
-      '/docs/standard-library/string/upper',
+  it('reads a CRLF checkout as identical to the LF text it generates', async () => {
+    const first = await scaffoldContent(dir, tree);
+    const paths = ['standard-library/string/format.mdx', 'standard-library/string/meta.json'];
+    for (const rel of paths) {
+      const path = join(dir, rel);
+      const lf = await readFile(path, 'utf8');
+      await writeFile(path, lf.replace(/\n/g, '\r\n'), 'utf8');
+    }
+
+    const stats = await scaffoldContent(dir, tree);
+
+    expect(stats.written).toBe(0);
+    expect(stats.kept).toBe(0);
+    expect(stats.unchanged).toBe(first.written);
+    // The CRLF bytes survive: recognising a file costs nothing, rewriting it would
+    // churn the whole tree on the first run after a clone.
+    expect(await readFile(join(dir, paths[0]), 'utf8')).toContain('\r\n');
+  });
+
+  it('reports a file the manifest no longer calls for, without deleting it', async () => {
+    await scaffoldContent(dir, tree);
+    const stale = join(dir, 'standard-library/string/formatt.mdx');
+    await writeFile(stale, 'renamed slug left this behind\n', 'utf8');
+    await mkdir(join(dir, 'standard-library/strings'), { recursive: true });
+    await writeFile(join(dir, 'standard-library/strings/meta.json'), '{}\n', 'utf8');
+
+    const stats = await scaffoldContent(dir, tree);
+
+    expect(stats.orphans).toEqual([
+      'standard-library/string/formatt.mdx',
+      'standard-library/strings/meta.json',
     ]);
+    expect(await readFile(stale, 'utf8')).toContain('renamed slug left this behind');
+  });
+
+  it('does not call the authored root entry an orphan', async () => {
+    await writeFile(join(dir, 'index.mdx'), '---\ntitle: Lua\n---\n\nAuthored.\n', 'utf8');
+
+    const stats = await scaffoldContent(dir, tree);
+
+    expect(stats.orphans).toEqual([]);
   });
 });

@@ -1,16 +1,25 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { ROOT_PAGES, sourceUrl, type EntryType, type Section, type Source } from './manifest';
 
 /** The entire body of an unwritten entry. A JSX comment — MDX rejects `<!-- -->`. */
 export const PLACEHOLDER = '{/* Not yet written. */}';
 
+/**
+ * Files under the destination that the manifest deliberately does not own.
+ * `index.mdx` is the site's authored root entry: it predates the manifest, belongs
+ * to no section, and must be neither generated nor reported as stale.
+ */
+export const UNMANAGED = ['index.mdx'];
+
 export interface ScaffoldStats {
   written: number;
   unchanged: number;
-  /** Files left alone because someone had hand-edited them (an entry body or a meta.json). */
+  /** Files left alone because they differ from what the generator would write. */
   kept: number;
+  /** Files the manifest does not account for — a renamed slug leaves its old file here. */
+  orphans: string[];
 }
 
 function stub(title: string, type: EntryType, source: Source): string {
@@ -27,99 +36,97 @@ function stub(title: string, type: EntryType, source: Source): string {
   ].join('\n');
 }
 
-function body(text: string): string {
-  return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim();
+function meta(value: unknown): string {
+  return `${JSON.stringify(value, null, 2)}\n`;
 }
 
 /**
- * Writing a stub is only ever safe over nothing, or over another stub. Once an
- * entry has a real body the generator must leave it alone — regenerating the tree
- * is a routine operation and must never be able to destroy authored work.
+ * Every file the manifest calls for, as relative POSIX paths mapped to the exact
+ * text the generator would write. Pure — nothing here reaches the filesystem, so a
+ * caller can use it to check a committed tree against the manifest without writing.
  */
-async function writeStub(path: string, contents: string, stats: ScaffoldStats): Promise<void> {
-  if (existsSync(path)) {
-    const existing = await readFile(path, 'utf8');
-    if (body(existing) !== PLACEHOLDER) {
-      stats.kept++;
-      return;
+export function contentTreeFiles(tree: Section[]): Map<string, string> {
+  const files = new Map<string, string>([['meta.json', meta({ pages: ROOT_PAGES })]]);
+
+  function walk(sec: Section, prefix: string): void {
+    const dir = prefix ? `${prefix}/${sec.slug}` : sec.slug;
+    files.set(`${dir}/meta.json`, meta({ title: sec.title, pages: ['index', '...'] }));
+    files.set(`${dir}/index.mdx`, stub(sec.title, 'overview', sec.source));
+    for (const e of sec.entries) {
+      files.set(`${dir}/${e.slug}.mdx`, stub(e.title, e.type, e.source));
     }
-    if (existing === contents) {
-      stats.unchanged++;
-      return;
-    }
+    for (const child of sec.sections) walk(child, dir);
   }
-  await writeFile(path, contents, 'utf8');
-  stats.written++;
+
+  for (const sec of tree) walk(sec, '');
+  return files;
 }
 
 /**
- * `meta.json` is where a human hand-orders a section — Fumadocs' `pages` accepts
- * `---Separator---` items, and a section overview can call for authored sub-groups
- * that the manifest doesn't know about. So this gets the same no-clobber treatment
- * as an entry body: a byte-identical file is left alone, and anything that differs
- * is assumed hand-edited and kept as-is rather than overwritten.
- *
- * Consequence: once a section's `meta.json` has been hand-edited, changing that
- * section's `title` or `pages` in the manifest will not propagate to it —
- * regenerating requires deleting the file first. That trade is deliberate: losing
- * a hand-authored section order is worse than a stale title.
+ * A fresh clone on Windows checks the tree out with CRLF endings, so a byte
+ * comparison would see every generated file as hand-edited and freeze the whole
+ * tree. The guarantee below must not depend on anyone's git configuration.
  */
-async function writeMeta(path: string, contents: string, stats: ScaffoldStats): Promise<void> {
+function sameText(a: string, b: string): boolean {
+  return a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n');
+}
+
+/**
+ * The generator creates; it never updates. An absent file is `written`. A file whose
+ * text matches what the generator would produce is `unchanged`. A file that differs
+ * in any way — its body, its frontmatter, a hand-ordered `meta.json` — has been
+ * touched by a human and is `kept`, untouched.
+ *
+ * Consequence: a manifest change (a corrected `source` anchor, a retitled entry, a
+ * reordered section) does not propagate into files that already exist; propagating
+ * means deleting them and regenerating. That trade is deliberate. There is no way to
+ * tell a pristine stub from one whose frontmatter an author has started filling in —
+ * `description` is written last, `lua-compat` only appears once an entry has compat
+ * data — so the only safe reading of "differs" is "someone worked on this".
+ */
+async function write(path: string, contents: string, stats: ScaffoldStats): Promise<void> {
   if (existsSync(path)) {
     const existing = await readFile(path, 'utf8');
-    if (existing === contents) {
-      stats.unchanged++;
-      return;
-    }
-    stats.kept++;
+    if (sameText(existing, contents)) stats.unchanged++;
+    else stats.kept++;
     return;
   }
   await writeFile(path, contents, 'utf8');
   stats.written++;
 }
 
-async function walk(sec: Section, parentDir: string, stats: ScaffoldStats): Promise<void> {
-  const dir = join(parentDir, sec.slug);
-  await mkdir(dir, { recursive: true });
-
-  const meta = { title: sec.title, pages: sec.pages ?? ['index', '...'] };
-  await writeMeta(join(dir, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`, stats);
-  const overview = stub(sec.indexTitle ?? sec.title, 'overview', sec.source);
-  await writeStub(join(dir, 'index.mdx'), overview, stats);
-
-  for (const e of sec.entries) {
-    await writeStub(join(dir, `${e.slug}.mdx`), stub(e.title, e.type, e.source), stats);
+/** Every entry and `meta.json` already under `dir`, as relative POSIX paths. */
+export async function listContentFiles(dir: string, prefix = ''): Promise<string[]> {
+  if (!existsSync(dir)) return [];
+  const found: string[] = [];
+  for (const item of await readdir(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.isDirectory()) found.push(...(await listContentFiles(join(dir, item.name), rel)));
+    else if (item.name.endsWith('.mdx') || item.name === 'meta.json') found.push(rel);
   }
-  for (const child of sec.sections) {
-    await walk(child, dir, stats);
-  }
-}
-
-export async function scaffoldContent(destDir: string, tree: Section[]): Promise<ScaffoldStats> {
-  const stats: ScaffoldStats = { written: 0, unchanged: 0, kept: 0 };
-  await mkdir(destDir, { recursive: true });
-
-  const rootMeta = { pages: ROOT_PAGES };
-  await writeMeta(join(destDir, 'meta.json'), `${JSON.stringify(rootMeta, null, 2)}\n`, stats);
-
-  for (const sec of tree) {
-    await walk(sec, destDir, stats);
-  }
-  return stats;
+  return found;
 }
 
 /**
- * Every docs URL the tree produces. The prerenderer discovers pages by crawling
- * links, which cannot see inside a collapsed sidebar folder — so the routes are
- * also listed explicitly, generated from the same source as the files themselves.
+ * Files on disk the manifest no longer calls for. Renaming a slug leaves the old
+ * file behind, where it keeps showing up in the sidebar, the prerender output, the
+ * search index and `llms.txt`. They are reported, never deleted — a stale stub is
+ * cheap to remove by hand, and an over-eager delete could eat authored work.
  */
-export function contentTreeUrls(tree: Section[], prefix = '/docs'): string[] {
-  return tree.flatMap((sec) => {
-    const base = `${prefix}/${sec.slug}`;
-    return [
-      base,
-      ...sec.sections.flatMap((child) => contentTreeUrls([child], base)),
-      ...sec.entries.map((e) => `${base}/${e.slug}`),
-    ];
-  });
+export function orphansOf(onDisk: string[], expected: Map<string, string>): string[] {
+  return onDisk.filter((rel) => !expected.has(rel) && !UNMANAGED.includes(rel)).sort();
+}
+
+export async function scaffoldContent(destDir: string, tree: Section[]): Promise<ScaffoldStats> {
+  const stats: ScaffoldStats = { written: 0, unchanged: 0, kept: 0, orphans: [] };
+  const files = contentTreeFiles(tree);
+
+  for (const [rel, contents] of files) {
+    const path = join(destDir, rel);
+    await mkdir(dirname(path), { recursive: true });
+    await write(path, contents, stats);
+  }
+
+  stats.orphans = orphansOf(await listContentFiles(destDir), files);
+  return stats;
 }
