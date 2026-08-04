@@ -10,7 +10,8 @@ rules govern it:
 2. **Identifier-named entries sort alphabetically. Prose-named entries are
    curated.**
 3. **URL depth is exactly three: Area → Section → Entry.** Runs of entries inside
-   a section are separated by **dividers**, not folders.
+   a section are **groups**: labelled and collapsible, with no page and no URL —
+   structurally identical to MDN's `Static methods`.
 4. **A section's overview is reached by clicking the section itself.** It never
    also appears as a child.
 
@@ -46,17 +47,24 @@ placed. This maps onto the existing `entry-type` field — `function` and
 one exception: metamethods are typed `construct` but named like code, so they
 sort.
 
-### Dividers, not folders
+### Groups, not folders
 
-Separating entries inside a section is a visual need, not a structural one. A
-folder for it costs a URL segment, an overview entry nobody will write, and a
-click that leads somewhere empty. A divider costs nothing and cannot be clicked
-into a dead end.
+Grouping entries inside a section is a presentational need, not a structural one.
+A folder for it costs a URL segment, an overview entry nobody will write, and a
+click that leads somewhere empty. A group costs none of that: it labels a run of
+entries and collapses it, and there is nothing behind it to click into.
 
-MDN's `Math` page is the reference implementation: `Math` is a link, `Static
-methods` and `Static properties` are headings with no page behind them. This is
-what lets `io` separate its file methods without becoming four levels deep, and
-what lets `string` put `Patterns` above its function list without a special case.
+MDN's `Math` page is the reference implementation, and this is a straight copy of
+it. `Math` is a link to the overview. `Static methods` and `Static properties` are
+`<details>`/`<summary>` pairs — collapsible, chevroned, with no page behind them.
+That is what lets `io` group its file methods without becoming four levels deep,
+and what lets `string` put `Patterns` above its function list without a special
+case.
+
+A group is **not** a separator. A separator is a static label or rule between
+items; a group is an interactive disclosure that owns its children and can be
+collapsed. Building a group as a separator would lose the collapse, which on a
+33-entry section like `math` is the whole point.
 
 ### One row per section
 
@@ -121,10 +129,16 @@ when callable.** Under `string`, entries read `format()` and `byte()`, not
 `string.format`. Under `math`, `pi` and `huge` stay bare. Frontmatter titles are
 unaffected — the page is still titled `string.format`.
 
-**Dividers appear only when a section holds more than one kind of entry**, which
-`entry-type` already determines. `table` and `os` are all functions and get none;
-`math` gets Functions and Constants; `io` gets Functions, Constants, and File
-methods.
+**Groups appear only when a section holds more than one kind of entry.** `table`
+and `os` are all functions and get none, exactly as MDN gives a single-kind object
+none. `math` gets Functions and Constants; `io` gets Functions, Constants, and File
+methods; `string` gets Concepts and Functions. Groups are open by default — they
+exist to let a reader collapse noise, not to hide entries from them.
+
+`entry-type` determines the group for `function`, `constant`, and `construct`
+entries, but not for file methods, which are typed `function` and still belong
+apart. Each entry therefore carries its group name explicitly, defaulted from its
+type.
 
 **The sidebar is scoped to one Area at a time**, with a link back up. MDN scopes
 per built-in object because JavaScript has around eighty of them; Lua has ten
@@ -139,19 +153,21 @@ navigating up is worth keeping. Same idea, one notch coarser.
   rule 4. The scaffold must emit the manifest's explicit order and omit `index`.
 - Sections with no entries (`Language > Coroutines`, every C API section as
   currently scaffolded) are entries, not folders, until they have content.
-- `Standard Library > io > File methods` loses its folder and becomes a divider.
+- `Standard Library > io > File methods` loses its folder and becomes a group. Its
+  entries move up into `io`, where five of them (`close`, `flush`, `lines`, `read`,
+  `write`) would collide with `io.*` slugs — so file-method slugs take a `file-`
+  prefix while their titles keep the `file:` form.
 - The rules are mechanically checkable and should be enforced by test, not
   review: URL depth, identifier-named entries in alphabetical order within their
   section, and no section listing its own overview as a child. Without that they
   drift back the first time someone adds an entry by hand.
-- The glossary gains **Divider** for the labelled break. It is not a **Section** —
-  no overview entry, no URL — and "subsection" or "group" would imply the
-  structure it deliberately lacks.
-- Today's tooling happens to express all of this: `fumadocs-core` claims an
-  unlisted `index.mdx` as the folder's own link, and supports `---Label---`
-  entries in `pages` as non-clickable separators. That is convenient, not
-  load-bearing. Per [ADR 0005](0005-platform-fumadocs-on-tanstack-start.md) the
-  UI is ours; if the plumbing stops expressing what the design needs, the
-  plumbing gets replaced, not the design.
+- The glossary gains **Group** for the collapsible run of entries, and **Section**
+  drops "group" from its _Avoid_ list, since the word now names a real thing.
+- Today's tooling expresses part of this and not the rest. `fumadocs-core` claims
+  an unlisted `index.mdx` as the folder's own link, which gives rule 4 for free.
+  It has no group: its `---Label---` `pages` entry is a static separator, which
+  cannot collapse and does not own the entries beneath it. **We build the group
+  ourselves.** Per [ADR 0005](0005-platform-fumadocs-on-tanstack-start.md) the UI
+  is ours anyway; the design is not cut down to what the plumbing already has.
 - Version availability is out of scope here. Dimming unavailable entries rather
   than hiding them is already settled, and is orthogonal to order and grouping.

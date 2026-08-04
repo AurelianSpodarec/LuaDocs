@@ -16,8 +16,9 @@ _Avoid_: page, article, topic, doc
 
 **Section**:
 A named group of entries (e.g. the `string` library, or "Language Basics"). A
-section has its own overview entry that acts as its landing page.
-_Avoid_: category, folder, group
+section has its own overview entry that acts as its landing page. A **group** is the
+weaker thing: a collapsible run of entries *inside* a section, with no overview.
+_Avoid_: category, folder
 
 ### Versioning
 
@@ -87,12 +88,12 @@ _Avoid_: REPL, sandbox, editor
 
 ### Interface elements
 
-**Divider**:
-A labelled break inside a section's entry list in the sidebar — "Functions",
-"Constants", "File methods". It names a run of entries and nothing more: it has no
-overview, no URL, and cannot be clicked. A section that holds only one kind of entry
-has no dividers.
-_Avoid_: group, subsection, category, separator
+**Group**:
+A labelled, collapsible run of entries inside a section of the sidebar — "Functions",
+"Constants", "File methods". It has no overview and no URL: clicking it collapses
+its entries rather than navigating. A section holding only one kind of entry has no
+groups.
+_Avoid_: divider, separator, subsection, category
 
 **Version switcher**:
 The global header control that sets the selected version.
