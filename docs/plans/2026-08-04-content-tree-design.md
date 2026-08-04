@@ -91,9 +91,18 @@ Four decisions embedded here:
 - **`description` is empty**, not invented. An invented description is content,
   and it would survive into search and `llms.txt` unreviewed.
 
-Section overviews (`index.mdx` in each directory) get `entry-type: overview` and
-a plain-text list of the section's entries, per the grouped-index shape in
-page-structure.md. Names become links as entries are authored.
+Section overviews (`index.mdx` in each directory) get `entry-type: overview` and, in
+their authored form, a plain-text list of the section's entries, per the grouped-index
+shape in page-structure.md. Names become links as entries are authored.
+
+**The generator does not write that list.** Overview stubs carry the same bare
+placeholder as every other stub. Two reasons, recorded here because the omission looks
+like an oversight otherwise. First, a generated list is content: it would make all 38
+overviews look authored, in the sidebar, in search, and in `llms.txt`, while nothing
+had been reviewed. Second, the generator creates but never updates — a file that
+differs from what it would write is kept untouched — so a generated list would freeze
+every overview on its first run, and the list would then go stale the moment a section
+gained an entry. An empty overview is honest and stays writable.
 
 ## Version-only symbols
 
@@ -185,6 +194,13 @@ manual can find things where they expect them.
 `to-be-closed-variables` sits under `statements/`, not `garbage-collection/`,
 because the manual makes it §3.3.8 — a statement-level construct that happens to
 involve finalization.
+
+Manual §3.3.6 "Function Calls as Statements" gets **no entry of its own**, and that is
+a decision rather than a gap in the enumeration above. A call in statement position is
+the same construct as a call in expression position, minus the results; it is covered
+by `expressions/function-calls`. A separate entry would be a near-duplicate competing
+with that one for the same lookup, which is exactly what the grouped metamethod
+entries avoid elsewhere. The statement form is a paragraph in `function-calls`.
 
 Metamethod leaves drop the `__` prefix in the slug and keep it in the title
 (`metatables/index` → title `__index`), because a leading double underscore in a
