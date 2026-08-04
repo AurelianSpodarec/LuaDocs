@@ -10,3 +10,21 @@ html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
 }
+
+/*
+ * The notebook layout wraps sidebar `links` in `lg:hidden`, because it expects links
+ * to live in the navbar and shows them in the sidebar only on small screens. The
+ * destinations block is deliberately a sidebar thing (ADR 0007), and `links` is the
+ * only slot rendered *inside* the scroll viewport — which is what makes the block
+ * scroll with the tree instead of pinning a quarter of the panel. So the wrapper is
+ * unhidden here.
+ *
+ * If a fumadocs upgrade changes that markup, the block disappears above `lg` rather
+ * than breaking loudly. `tests/sidebar/destinations.test.ts` pins the selector this
+ * relies on so the pairing is at least written down in two places.
+ */
+/* `block`, not `flex` — the wrapper's only job is to stop hiding. Making it a flex
+ * row shrink-wraps the nav to its longest label and the rows stop spanning the panel. */
+#nd-sidebar div:has(> nav[aria-label='Sections of the site']) {
+  display: block;
+}

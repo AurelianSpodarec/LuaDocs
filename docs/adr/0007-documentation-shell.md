@@ -11,10 +11,10 @@ Five rules govern it:
    in the header. They are never mixed.
 2. **The sidebar has two zones**: a block of destinations at the top, and below it
    the tree belonging to whichever destination is active.
-3. **The block sits above the filter, and the filter directly above the tree**, since
-   the filter acts on the tree and not on the block.
-4. **Only the tree scrolls.** The navbar, not a scrolling sidebar, is what pays for
-   the space the block takes.
+3. **The block scrolls with the tree.** It is links a reader clicks about once a
+   session, and it is not worth a quarter of the panel.
+4. **The filter is pinned.** It is the one thing in the sidebar that stops working
+   when it scrolls out of reach.
 5. **One full-width navbar, and it holds controls rather than navigation** —
    wordmark and selected version on the left, search in the middle, theme, language
    and GitHub on the right.
@@ -66,12 +66,9 @@ Language is the awkward one, because it is a preference that also changes conten
 is grouped with theme rather than with version, which is where MDN puts it and where
 readers already look for it.
 
-### What pays for the block: the navbar, not a scrolling sidebar
+### The block scrolls, the filter is pinned
 
-The block and the filter are both pinned, and the reason is worth recording, because
-the obvious alternative was tried and failed for a reason nobody would guess.
-
-Measuring the first build showed the pinned pair was expensive:
+Measuring the first build, which pinned both, showed how expensive that was:
 
 | | |
 |---|---|
@@ -81,31 +78,29 @@ Measuring the first build showed the pinned pair was expensive:
 | Tree content | 1142px |
 
 The tree had half the panel, and the destinations block alone took more than a third
-of what the tree got, to show five links a reader clicks about once a session. The
-obvious fix was Tailwind's: let the block scroll away with the tree.
+of what the tree got, to show five links a reader clicks about once a session. So the
+block scrolls, as Tailwind's whole sidebar does. What does not transfer is doing the
+same to the filter, because **Tailwind's sidebar contains no controls** — it is links
+all the way down, so nothing stops working when it scrolls off. Ours has an input in
+it, and a filter that scrolls out of reach is gone exactly where it earns its keep,
+which is deep inside `math`.
 
-**It was built, and it was wrong twice over.**
+**The one non-obvious thing this depends on.** Fumadocs's notebook layout wraps
+sidebar `links` in a `lg:hidden` wrapper, because that layout expects links to live in
+the navbar and shows them in the sidebar only on small screens. `links` is also the
+only slot rendered inside the scroll viewport. So "scrolls with the tree" and "visible
+on desktop" are in conflict by default, and `src/styles/app.css` resolves it by
+unhiding that one wrapper.
 
-The first problem was ours. A Section's entry is scrolled into view on arrival, so
-landing anywhere below the fold scrolls the tree immediately — and a block living
-inside that scroll region goes with it, before the reader has seen it once.
+This is written down because it already went wrong once: the block was invisible above
+`lg` for several commits, and the failure is silent — a fumadocs upgrade that changes
+the markup makes the block vanish rather than break. If it ever disappears again, that
+selector is the first place to look, not the scrolling decision.
 
-The second was the layout's, and it is the one worth writing down. Fumadocs's notebook
-layout renders sidebar `links` inside a **`lg:hidden`** wrapper, because that layout
-expects links to live in the navbar and shows them in the sidebar only on small
-screens. Since `links` is also the only slot that renders inside the scroll viewport,
-"scrolls with the tree" and "visible on desktop" are mutually exclusive there. The
-block was invisible above `lg` for as long as that arrangement stood.
-
-So the block is pinned, above the filter — which restores the ordering this ADR wanted
-originally, with the filter directly above the tree it acts on. **The navbar is what
-pays for it.** Moving the wordmark, version, theme and search out of the sidebar buys
-back more than the block costs: against the 362px the tree started with, it now gets
-**502px**, with the block permanently on screen rather than permanently one scroll
-away.
-
-The measurement that started this still stands as the reason the navbar exists. What
-it did not justify was making the block itself disappear.
+The measured result: the sidebar's pinned region is **58px**, just the filter, and the
+tree viewport is **686px** against the 362px it started with. Arriving at a deep entry
+scrolls the tree by ~176px to bring the active row into view, which the 168px block
+survives — it is still on screen after the jump.
 
 The filter and search remain deliberately different jobs, and must not converge into
 one worse thing. **Search takes you somewhere; the filter narrows what is on screen
