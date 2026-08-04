@@ -11,7 +11,8 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 
 | # | Slice | Plan | Status |
 |---|-------|------|--------|
-| 1 | Version slice — prove the risky stack on one page | [2026-08-04-version-slice.md](2026-08-04-version-slice.md) | In progress |
+| 1 | Version slice — prove the risky stack on one page | [2026-08-04-version-slice.md](2026-08-04-version-slice.md) | Done |
+| — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Next |
 | 2 | Page anatomy | — | Not started |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
@@ -63,9 +64,13 @@ native `<select>` for CodeMirror and Base UI (`@base-ui/react`).
 
 ### 6. Per-version Lua runtimes
 
-Wasmoon ships one Lua version. Running an example "as 5.1" requires our own WASM
-builds per minor line, plus the loader that picks one from the selected version. The
-single largest unknown left after the version slice.
+Wasmoon ships one Lua version (5.4). Running an example "as 5.1" requires our own
+WASM builds per minor line, plus the loader that picks one from the selected version.
+The single largest unknown left after the version slice — and the one the version
+slice did **not** prove, so it is being spiked before the slices above it.
+
+See [the spike plan](2026-08-04-per-version-lua-spike.md). Until it reports, the site
+executes Lua 5.4 whatever version the reader selects.
 
 ### 7. Contribution surface
 
