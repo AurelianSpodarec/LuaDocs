@@ -357,9 +357,15 @@ export function methods(receiver: string, names: string): Entry[] {
   return build(receiver, names, 'function', '5.5', ':');
 }
 
-/** Metamethods are all documented together, in §2.4. */
+/**
+ * Metamethods are all documented together, in §2.4. The `__` prefix is dropped from the
+ * slug and kept in the title — except for `__index`, whose bare slug would collide with
+ * the `index.mdx` that a section's own overview occupies.
+ */
 export function metamethods(names: string): Entry[] {
-  return split(names).map((slug) => construct(slug, `__${slug}`, '2.4'));
+  return split(names).map((slug) =>
+    construct(slug === 'index' ? 'index-metamethod' : slug, `__${slug}`, '2.4'),
+  );
 }
 
 export function section(
@@ -889,7 +895,15 @@ describe('the language section', () => {
 
   it('slugs a metamethod without its underscores and titles it with them', () => {
     const meta = all.find((s) => s.slug === 'metatables')!;
-    expect(meta.entries.find((e) => e.slug === 'index')?.title).toBe('__index');
+    expect(meta.entries.find((e) => e.slug === 'newindex')?.title).toBe('__newindex');
+  });
+
+  it('routes __index around the reserved index slug', () => {
+    const meta = all.find((s) => s.slug === 'metatables')!;
+    const slugs = meta.entries.map((e) => e.slug);
+    expect(slugs).toContain('index-metamethod');
+    expect(slugs).not.toContain('index');
+    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
   });
 
   it('groups the arithmetic and bitwise metamethods into one entry each', () => {
