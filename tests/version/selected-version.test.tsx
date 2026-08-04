@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { SelectedVersionProvider, useSelectedVersion } from '@/version/SelectedVersionProvider';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -60,5 +61,20 @@ describe('useSelectedVersion', () => {
     const { result } = renderHook(() => useSelectedVersion(), { wrapper });
     act(() => result.current.setVersion('5.2'));
     expect(new URLSearchParams(window.location.search).get('v')).toBe('5.2');
+  });
+
+  it('renders the default version 5.5 on the server render pass, even when ?v= requests another version', () => {
+    setUrl('?v=5.1');
+    function Probe() {
+      const { version } = useSelectedVersion();
+      return <span>{version}</span>;
+    }
+    const html = renderToString(
+      <SelectedVersionProvider>
+        <Probe />
+      </SelectedVersionProvider>,
+    );
+    expect(html).toContain('5.5');
+    expect(html).not.toContain('5.1');
   });
 });

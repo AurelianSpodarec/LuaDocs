@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useState, type ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { LUA_VERSIONS, type LuaVersion } from '@/compat/schema';
 
 const DEFAULT: LuaVersion = '5.5';
@@ -20,7 +20,14 @@ type Ctx = { version: LuaVersion; setVersion: (v: LuaVersion) => void };
 const SelectedVersion = createContext<Ctx | null>(null);
 
 export function SelectedVersionProvider({ children }: { children: ReactNode }) {
-  const [version, setVersionState] = useState<LuaVersion>(initialVersion);
+  // Always render the default on the initial pass (prerender and the
+  // hydrating client render must match). The real value — from ?v= or
+  // localStorage — is resolved after mount, once we're client-only.
+  const [version, setVersionState] = useState<LuaVersion>(DEFAULT);
+
+  useEffect(() => {
+    setVersionState(initialVersion());
+  }, []);
 
   const setVersion = useCallback((v: LuaVersion) => {
     setVersionState(v);
