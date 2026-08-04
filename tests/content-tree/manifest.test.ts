@@ -109,3 +109,40 @@ describe('the standard library', () => {
     expect(math.entries.find((e) => e.slug === 'abs')?.source.version).toBe('5.5');
   });
 });
+
+describe('the language section', () => {
+  it('has 74 entries in total', () => {
+    const language = all.find((s) => s.slug === 'language')!;
+    const total = walk(language.sections).reduce((n, s) => n + s.entries.length, 0);
+    expect(total).toBe(74);
+  });
+
+  it('gives the coroutines concept an overview but no entries', () => {
+    expect(all.find((s) => s.slug === 'coroutines')?.entries).toHaveLength(0);
+  });
+
+  it('slugs a metamethod without its underscores and titles it with them', () => {
+    const meta = all.find((s) => s.slug === 'metatables')!;
+    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
+  });
+
+  it('exempts only __index from the bare-slug rule, to avoid colliding with the overview', () => {
+    const meta = all.find((s) => s.slug === 'metatables')!;
+    const slugs = meta.entries.map((e) => e.slug);
+    expect(slugs).toContain('index-metamethod');
+    expect(slugs).not.toContain('index');
+    expect(meta.entries.find((e) => e.slug === 'newindex')?.title).toBe('__newindex');
+  });
+
+  it('groups the arithmetic and bitwise metamethods into one entry each', () => {
+    const meta = all.find((s) => s.slug === 'metatables')!;
+    expect(meta.entries).toHaveLength(19);
+    expect(meta.entries.map((e) => e.slug)).toContain('arithmetic-metamethods');
+    expect(meta.entries.map((e) => e.slug)).toContain('bitwise-metamethods');
+  });
+
+  it('puts to-be-closed variables under statements, as the manual does', () => {
+    const statements = all.find((s) => s.slug === 'statements')!;
+    expect(statements.entries.map((e) => e.slug)).toContain('to-be-closed-variables');
+  });
+});

@@ -108,9 +108,15 @@ export function methods(receiver: string, names: string): Entry[] {
   return build(receiver, names, 'function', '5.5', ':');
 }
 
-/** Metamethods are all documented together, in §2.4. */
+/**
+ * Metamethods are all documented together, in §2.4. The `__` prefix is dropped from the
+ * slug and kept in the title — except for `__index`, whose bare slug would collide with
+ * the `index.mdx` that a section's own overview occupies.
+ */
 export function metamethods(names: string): Entry[] {
-  return split(names).map((slug) => construct(slug, `__${slug}`, '2.4'));
+  return split(names).map((slug) =>
+    construct(slug === 'index' ? 'index-metamethod' : slug, `__${slug}`, '2.4'),
+  );
 }
 
 export function section(
@@ -135,6 +141,85 @@ export const ROOT_PAGES = [
 ];
 
 export const CONTENT_TREE: Section[] = [
+  section('language', 'Language', '3', [], [
+    section('lexical-conventions', 'Lexical conventions', '3.1', [
+      construct('comments', 'Comments', '3.1'),
+      construct('identifiers-and-keywords', 'Identifiers and keywords', '3.1'),
+      construct('numeric-literals', 'Numeric literals', '3.1'),
+      construct('string-literals', 'String literals', '3.1'),
+    ]),
+    section('values-and-types', 'Values and types', '2.1', [
+      construct('nil', 'nil', '2.1'),
+      construct('boolean', 'boolean', '2.1'),
+      construct('number', 'number', '2.1'),
+      construct('string', 'string', '2.1'),
+      construct('table', 'table', '2.1'),
+      construct('function', 'function', '2.1'),
+      construct('userdata', 'userdata', '2.1'),
+      construct('thread', 'thread', '2.1'),
+      construct('type-coercion', 'Coercions and conversions', '3.4.3'),
+    ]),
+    section('variables-and-scope', 'Variables and scope', '2.2', [
+      construct('global-variables', 'Global variables', '2.2'),
+      construct('local-variables', 'Local variables', '2.2'),
+      construct('upvalues-and-closures', 'Upvalues and closures', '2.2'),
+      construct('scope-rules', 'Scope', '2.2'),
+      construct('variable-attributes', 'Variable attributes', '3.3.7'),
+    ]),
+    section('statements', 'Statements', '3.3', [
+      construct('assignment', 'Assignment', '3.3.3'),
+      construct('do-blocks', 'do … end blocks', '3.3.1'),
+      construct('if', 'if', '3.3.4'),
+      construct('while', 'while', '3.3.4'),
+      construct('repeat', 'repeat … until', '3.3.4'),
+      construct('numeric-for', 'Numeric for', '3.3.5'),
+      construct('generic-for', 'Generic for', '3.3.5'),
+      construct('break', 'break', '3.3.4'),
+      construct('goto', 'goto', '3.3.4'),
+      construct('return', 'return', '3.3.4'),
+      construct('function-declarations', 'Function declarations', '3.4.11'),
+      construct('local-declarations', 'local declarations', '3.3.7'),
+      construct('global-declarations', 'global declarations', '3.3.7'),
+      construct('to-be-closed-variables', 'To-be-closed variables', '3.3.8'),
+    ]),
+    section('expressions', 'Expressions', '3.4', [
+      construct('arithmetic-operators', 'Arithmetic operators', '3.4.1'),
+      construct('bitwise-operators', 'Bitwise operators', '3.4.2'),
+      construct('relational-operators', 'Relational operators', '3.4.4'),
+      construct('logical-operators', 'Logical operators', '3.4.5'),
+      construct('concatenation', 'Concatenation', '3.4.6'),
+      construct('length-operator', 'Length operator', '3.4.7'),
+      construct('operator-precedence', 'Operator precedence', '3.4.8'),
+      construct('table-constructors', 'Table constructors', '3.4.9'),
+      construct('function-calls', 'Function calls', '3.4.10'),
+      construct('method-calls', 'Method calls', '3.4.10'),
+      construct('anonymous-functions', 'Anonymous functions', '3.4.11'),
+      construct('varargs', 'Varargs', '3.4.11'),
+      construct('multiple-results', 'Multiple results and adjustment', '3.4.12'),
+    ]),
+    section('metatables', 'Metatables and metamethods', '2.4', [
+      ...metamethods('index newindex call tostring len eq lt le concat unm gc close mode name metatable pairs ipairs'),
+      construct('arithmetic-metamethods', 'Arithmetic metamethods', '2.4'),
+      construct('bitwise-metamethods', 'Bitwise metamethods', '2.4'),
+    ]),
+    section('environments', 'Environments', '2.2', [
+      construct('env', '_ENV', '2.2'),
+      construct('the-global-environment', 'The global environment', '2.2'),
+    ]),
+    section('error-handling', 'Error handling', '2.3', [
+      construct('error-objects', 'Error objects', '2.3'),
+      construct('protected-calls', 'Protected calls', '2.3'),
+      construct('error-levels', 'Error levels', '2.3'),
+      construct('warnings', 'Warnings', '2.3'),
+    ]),
+    section('garbage-collection', 'Garbage collection', '2.5', [
+      construct('incremental-mode', 'Incremental mode', '2.5.1'),
+      construct('generational-mode', 'Generational mode', '2.5.2'),
+      construct('weak-tables', 'Weak tables', '2.5.4'),
+      construct('finalizers', 'Finalizers', '2.5.3'),
+    ]),
+    section('coroutines', 'Coroutines', '2.6'),
+  ]),
   section('standard-library', 'Standard Library', '6', [], [
     section('basic', 'Basic functions', '6.2', [
       ...fns('', 'assert collectgarbage dofile error getmetatable ipairs load loadfile next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall'),
