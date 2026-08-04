@@ -76,3 +76,22 @@ A deliberately small set (MDN rejects proliferation):
 - **Change notes render inline** where relevant, are **always shown**, and the note
   matching the reader's selected version is **emphasized** (policy A). All callouts
   and banners are **inline**, never modals.
+
+## Prototype findings
+
+Stress-tested by hand-writing five real entries (one per type) in
+`prototype/`. The anatomy held; three refinements emerged:
+
+1. **Version facts must be data-driven.** In a rich entry the same version fact was
+   hand-repeated 3–4× (Errors + Gotcha + inline note + matrix), which will drift.
+   This is the concrete justification to un-park **F9** (the structured
+   compat-data model) in the technical pass — the version strip, matrix, banners,
+   and sidebar badges should all be *generated from one source*.
+2. **The detailed version matrix is conditional** — show it only when a version
+   actually varies. On unchanged entries (`math.pi`) and overviews (`table`) it
+   just restates the compact top strip and per-entry badges; drop it there.
+3. **Constants use a lighter template** — minimal entries collapse optional
+   sections rather than carrying the full skeleton.
+
+Overviews also read better with **authored sub-groups** than a flat alphabetical
+index.
