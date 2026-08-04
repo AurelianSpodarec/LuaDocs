@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { CONTENT_TREE, ENTRY_TYPES, sourceUrl, type Section } from '@/content-tree/manifest';
 import { LUA_VERSIONS } from '@/compat/schema';
@@ -177,5 +178,15 @@ describe('the remaining sections', () => {
       'standalone',
       'c-api',
     ]);
+  });
+});
+
+describe('the frontmatter schema', () => {
+  const source = readFileSync('src/lib/source.ts', 'utf8');
+
+  it('declares every entry type the manifest can produce', () => {
+    for (const type of ENTRY_TYPES) {
+      expect(source, `entry-type '${type}' missing from source.ts`).toContain(`'${type}'`);
+    }
   });
 });

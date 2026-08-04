@@ -96,12 +96,16 @@ describe('the assembled string.format entry', () => {
 // stand-ins, so the Option-C sidebar behaviour (dimming + version badge) is
 // actually exercised end to end.
 const compatByUrl: Record<string, string> = {
-  '/docs/math.tointeger': 'math.tointeger',
+  '/docs/standard-library/math/tointeger': 'math.tointeger',
   '/docs/standard-library/string/format': 'string.format',
 };
 const SidebarItem = createSidebarItem(compatByUrl);
 
-const mathItem: PageTree.Item = { type: 'page', name: 'math.tointeger', url: '/docs/math.tointeger' };
+const mathItem: PageTree.Item = {
+  type: 'page',
+  name: 'math.tointeger',
+  url: '/docs/standard-library/math/tointeger',
+};
 const stringItem: PageTree.Item = {
   type: 'page',
   name: 'string.format',

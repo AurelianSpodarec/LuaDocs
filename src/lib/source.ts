@@ -14,6 +14,16 @@ export const docs = defineDocs({
     schema: pageSchema.extend({
       /** Key into the compat dataset — the entry's single source of version facts. */
       'lua-compat': z.string().optional(),
+      /**
+       * Which reference template the entry follows (see docs/research/page-structure.md).
+       * Kept in sync with ENTRY_TYPES in src/content-tree/manifest.ts by a test —
+       * `defineDocs` is a macro, so this list cannot be imported.
+       */
+      'entry-type': z
+        .enum(['function', 'construct', 'constant', 'overview', 'guide'])
+        .optional(),
+      /** Attribution link to the manual passage this entry is a rewrite of. */
+      source: z.url().optional(),
     }),
     postprocess: {
       includeProcessedMarkdown: true,

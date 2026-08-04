@@ -1,8 +1,12 @@
 ---
 title: math.tointeger
-description: ""
+description: Convert a value to an integer, or nil if it has no integer representation.
+lua-compat: math.tointeger
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.tointeger
 ---
 
-{/* Not yet written. */}
+Returns the value converted to an integer. If the value has no exact integer
+representation, it returns `nil` instead.
+
+<RunnableExample code={`print(math.tointeger(3.0))\nprint(math.tointeger(3.5))`} />

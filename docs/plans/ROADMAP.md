@@ -13,6 +13,7 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 |---|-------|------|--------|
 | 1 | Version slice — prove the risky stack on one page | [2026-08-04-version-slice.md](2026-08-04-version-slice.md) | Done |
 | — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Parked — see below |
+| 1.5 | Content tree — the blueprint | [2026-08-04-content-tree.md](2026-08-04-content-tree.md) | Done |
 | 2 | Page anatomy | — | Next |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
@@ -42,9 +43,10 @@ the lighter template variant for constants. Includes the conditional compat matr
 
 ### 3. Content pipeline
 
-What it takes to author entries at volume rather than one at a time: the section /
-entry tree and sidebar generation from the page-tree, authoring conventions for
-base+delta content ([ADR 0001](../adr/0001-single-canonical-docs-with-version-deltas.md)),
+What it takes to author entries at volume rather than one at a time: sidebar
+generation from the page-tree (the section/entry tree itself landed early —
+see slice 1.5), authoring conventions for base+delta content
+([ADR 0001](../adr/0001-single-canonical-docs-with-version-deltas.md)),
 compat-data coverage checks in CI, and Vitest-in-CI verification that every runnable
 example actually runs. Blocks any serious porting effort.
 
@@ -105,6 +107,10 @@ contribution terms that match it.
 GitHub Actions build + deploy of the static output. Host is deliberately open
 ([ADR 0004](../adr/0004-self-hosted-on-github-no-third-parties.md)); the output is
 static, so this is a late, cheap decision.
+
+**Blocked on content:** slice 1.5 left ~285 entries as empty stubs. Deploy must not
+ship them — either they are authored, or the build filters unwritten entries out of
+the sidebar, search index and `llms.txt` first.
 
 ## Deliberately unscheduled
 
