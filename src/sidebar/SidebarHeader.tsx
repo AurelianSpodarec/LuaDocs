@@ -17,7 +17,7 @@ import { destinationFor, destinations } from './destinations';
  * destinations, and the scroll boundary is what separates chrome from content.
  */
 const destinationClass =
-  'flex items-center gap-3 rounded px-2 py-1.5 text-sm transition-colors hover:text-fd-foreground';
+  'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-fd-accent/50 hover:text-fd-foreground';
 
 function DestinationRow({
   destination,
@@ -28,7 +28,7 @@ function DestinationRow({
 }) {
   const Icon = destination.icon;
   const className = `${destinationClass} ${
-    active ? 'font-semibold text-fd-foreground' : 'text-fd-muted-foreground'
+    active ? 'bg-fd-primary/10 font-semibold text-fd-primary' : 'text-fd-muted-foreground'
   }`;
 
   const label = (

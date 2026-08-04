@@ -55,7 +55,7 @@ const groupClass = `${row} px-2 py-1 text-xs font-medium text-fd-muted-foregroun
  * the version that introduced them — but stay clickable, so a reader can always
  * reach the page and find out why it is greyed out.
  */
-const itemClassName = `${row} px-2 py-1 text-sm leading-6 text-fd-muted-foreground hover:text-fd-foreground data-[unavailable]:opacity-50 data-[status=active]:bg-fd-accent data-[status=active]:font-medium data-[status=active]:text-fd-accent-foreground`;
+const itemClassName = `${row} px-2 py-1 text-sm leading-6 text-fd-muted-foreground hover:bg-fd-accent/50 hover:text-fd-foreground data-[unavailable]:opacity-50 data-[status=active]:bg-fd-primary/10 data-[status=active]:font-medium data-[status=active]:text-fd-primary`;
 
 export function createSidebarItem(compatByUrl: Record<string, string>) {
   return function SidebarItem({ item }: { item: PageTree.Item }) {

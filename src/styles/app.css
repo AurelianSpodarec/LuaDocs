@@ -2,6 +2,51 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+/*
+ * `neutral` is greyscale from end to end, which leaves nothing on the page to say
+ * "this is the thing you are on". These give the site one accent — Lua's own blue,
+ * the navy of the logo, lifted until it holds contrast on both backgrounds — and
+ * everything fumadocs already paints with `fd-primary` (the active TOC entry, the
+ * focus ring, the primary button) picks it up.
+ *
+ * Unlayered, so these win over the `@theme` values the imports above emit.
+ */
+/*
+ * `fd-card` is the surface every code block sits on — fumadocs's own `<figure>` and
+ * the runnable example both use it. `neutral` sets it 4/255 away from the page, which
+ * is not a difference you can see: a code block read as a rectangle of text with a
+ * hairline round it. Card is now lighter than the page rather than darker, so a block
+ * reads as raised, and the gap is wide enough to survive a dim screen.
+ */
+:root {
+  --color-fd-primary: oklch(0.47 0.2 268);
+  --color-fd-primary-foreground: oklch(0.99 0 0);
+  --color-fd-ring: oklch(0.47 0.2 268);
+  --color-fd-card: hsl(0, 0%, 100%);
+}
+
+.dark {
+  --color-fd-primary: oklch(0.76 0.13 265);
+  --color-fd-primary-foreground: oklch(0.18 0.03 268);
+  --color-fd-ring: oklch(0.76 0.13 265);
+  --color-fd-card: hsl(0, 0%, 12.5%);
+}
+
+/*
+ * Highlighted Lua carries both themes' colours at once — every token span holds a
+ * `--shiki-light` and a `--shiki-dark`, and these two rules are what choose between
+ * them. It is fumadocs's own scheme for MDX code blocks (`lib/shiki.css`), repeated
+ * here because the runnable example renders tokens itself rather than going through
+ * fumadocs's `<CodeBlock>`, and so is outside the `.shiki` selectors.
+ */
+[data-lua-code] span {
+  color: var(--shiki-light);
+}
+
+.dark [data-lua-code] span {
+  color: var(--shiki-dark);
+}
+
 html {
   scrollbar-gutter: stable;
 }
