@@ -3,8 +3,10 @@ import { describe, it, expect } from 'vitest';
 import {
   CONTENT_TREE,
   ENTRY_TYPES,
+  ROOT_PAGES,
   contentTreeUrls,
   fns,
+  relatedGlobals,
   section,
   sourceUrl,
   type Section,
@@ -121,15 +123,15 @@ describe('callable titles', () => {
 
 describe('the standard library', () => {
   const counts: Record<string, number> = {
-    basic: 31,
+    globals: 31,
     coroutine: 8,
     package: 10,
     string: 19,
     utf8: 6,
     table: 12,
     math: 35,
-    io: 14,
-    'file-methods': 7,
+    // 11 io functions + 3 constants + 7 file methods, which no longer nest.
+    io: 21,
     os: 11,
     debug: 18,
   };
@@ -139,14 +141,35 @@ describe('the standard library', () => {
   });
 
   it('titles a bare global without a library prefix', () => {
-    const basic = all.find((s) => s.slug === 'basic')!;
-    expect(basic.entries.find((e) => e.slug === 'pcall')?.title).toBe('pcall()');
-    expect(basic.entries.find((e) => e.slug === '_g')?.title).toBe('_G');
+    const globals = all.find((s) => s.slug === 'globals')!;
+    expect(globals.entries.find((e) => e.slug === 'pcall')?.title).toBe('pcall()');
+    expect(globals.entries.find((e) => e.slug === '_g')?.title).toBe('_G');
   });
 
-  it('titles a file method with a colon', () => {
-    const file = all.find((s) => s.slug === 'file-methods')!;
-    expect(file.entries.find((e) => e.slug === 'read')?.title).toBe('file:read()');
+  it('folds file methods into io, prefixing their slugs to avoid collisions', () => {
+    expect(all.find((s) => s.slug === 'file-methods')).toBeUndefined();
+
+    const io = all.find((s) => s.slug === 'io')!;
+    const read = io.entries.find((e) => e.slug === 'file-read')!;
+    expect(read.title).toBe('file:read()');
+    expect(read.group).toBe('File methods');
+
+    // io.read and file:read now sit side by side and must not collide.
+    expect(io.entries.find((e) => e.slug === 'read')?.title).toBe('io.read()');
+  });
+
+  it('cross-links the globals a reader would look for in a library', () => {
+    const table = all.find((s) => s.slug === 'table')!;
+    expect(table.related?.map((r) => r.title)).toContain('setmetatable()');
+    // The row lives under `table`; the page stays in Globals, because
+    // `table.setmetatable` does not exist.
+    expect(table.related?.find((r) => r.title === 'setmetatable()')?.url).toBe(
+      '/docs/standard-library/globals/setmetatable',
+    );
+  });
+
+  it('refuses to cross-link a global that does not exist', () => {
+    expect(() => relatedGlobals('nosuchthing')).toThrow('no global named "nosuchthing"');
   });
 
   it('sources a symbol 5.5 dropped to the newest manual that has it', () => {
@@ -166,8 +189,10 @@ describe('the language section', () => {
     expect(total).toBe(74);
   });
 
-  it('gives the coroutines concept an overview but no entries', () => {
-    expect(all.find((s) => s.slug === 'coroutines')?.entries).toHaveLength(0);
+  it('makes coroutines an entry of language, not a folder', () => {
+    const language = CONTENT_TREE.find((s) => s.slug === 'language')!;
+    expect(language.sections.map((s) => s.slug)).not.toContain('coroutines');
+    expect(language.entries.map((e) => e.slug)).toContain('coroutines');
   });
 
   it('drops the underscores from a metamethod slug, exempting only __index', () => {
@@ -200,11 +225,28 @@ describe('the remaining sections', () => {
     expect(standalone.entries.find((e) => e.slug === 'lua-path')?.title).toBe('LUA_PATH');
   });
 
-  it('stubs the C API to group level only', () => {
+  it('lists the C API as entries, merging the duplicate types section', () => {
     const cApi = all.find((s) => s.slug === 'c-api')!;
-    expect(cApi.sections).toHaveLength(11);
-    for (const group of cApi.sections) {
-      expect(group.entries, group.slug).toHaveLength(0);
+    expect(cApi.sections).toHaveLength(0);
+    expect(cApi.entries).toHaveLength(10);
+    expect(cApi.entries.map((e) => e.slug)).toContain('types-and-values');
+    expect(cApi.entries.map((e) => e.slug)).not.toContain('types');
+  });
+
+  it('has no section without entries', () => {
+    // An Area may be an empty placeholder (Learn); a Section may not.
+    for (const area of CONTENT_TREE) {
+      for (const s of walk(area.sections)) {
+        expect(s.entries.length, `${s.slug} has no entries`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps URL depth at three: area, section, entry', () => {
+    for (const area of CONTENT_TREE) {
+      for (const s of area.sections) {
+        expect(s.sections, `${area.slug}/${s.slug} nests too deep`).toHaveLength(0);
+      }
     }
   });
 
@@ -214,14 +256,35 @@ describe('the remaining sections', () => {
     for (const g of guides.entries) expect(g.type).toBe('guide');
   });
 
-  it('orders the top-level groups', () => {
+  it('orders the areas', () => {
     expect(CONTENT_TREE.map((s) => s.slug)).toEqual([
       'learn',
       'guides',
-      'language',
       'standard-library',
+      'language',
       'standalone',
       'c-api',
+    ]);
+  });
+
+  it('orders the areas the same way in ROOT_PAGES', () => {
+    expect(ROOT_PAGES).toEqual(['index', ...CONTENT_TREE.map((s) => s.slug)]);
+  });
+
+  it('orders the standard library by how often a reader reaches for it', () => {
+    const lib = CONTENT_TREE.find((s) => s.slug === 'standard-library')!;
+    expect(lib.sections.map((s) => s.slug)).toEqual([
+      'globals', 'string', 'table', 'math', 'io',
+      'os', 'coroutine', 'utf8', 'package', 'debug',
+    ]);
+  });
+
+  it('orders the language sections for learning', () => {
+    const language = CONTENT_TREE.find((s) => s.slug === 'language')!;
+    expect(language.sections.map((s) => s.slug)).toEqual([
+      'values-and-types', 'lexical-conventions', 'variables-and-scope',
+      'statements', 'expressions', 'metatables', 'environments',
+      'error-handling', 'garbage-collection',
     ]);
   });
 });
