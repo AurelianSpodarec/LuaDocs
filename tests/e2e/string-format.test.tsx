@@ -97,12 +97,16 @@ describe('the assembled string.format entry', () => {
 // actually exercised end to end.
 const compatByUrl: Record<string, string> = {
   '/docs/math.tointeger': 'math.tointeger',
-  '/docs/string.format': 'string.format',
+  '/docs/standard-library/string/format': 'string.format',
 };
 const SidebarItem = createSidebarItem(compatByUrl);
 
 const mathItem: PageTree.Item = { type: 'page', name: 'math.tointeger', url: '/docs/math.tointeger' };
-const stringItem: PageTree.Item = { type: 'page', name: 'string.format', url: '/docs/string.format' };
+const stringItem: PageTree.Item = {
+  type: 'page',
+  name: 'string.format',
+  url: '/docs/standard-library/string/format',
+};
 
 function SidebarEntries() {
   return (
