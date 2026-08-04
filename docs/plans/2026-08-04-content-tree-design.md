@@ -61,12 +61,24 @@ cease to exist; nothing is deployed, so no redirects are owed.
 title: string.gsub
 description: ""
 entry-type: function
+source: https://www.lua.org/manual/5.5/manual.html#pdf-string.gsub
 ---
 
-<!-- Not yet written. -->
+{/* Not yet written. */}
 ```
 
-Three decisions embedded here:
+Four decisions embedded here:
+
+- **`source`** is the attribution link back to the manual passage the entry is a
+  rewrite of — item 11 of the section order in
+  [page-structure.md](../research/page-structure.md). The site is a full rewrite of
+  the official manual, so every entry owes one. It points at the **newest manual
+  that still documents the symbol**: 5.5 for anything in the 5.5 index, 5.1 for
+  everything 5.5 dropped (`math.pow`, `loadstring`, `table.maxn`, …), which has no
+  5.5 anchor to point at. Standard-library anchors are derivable (`pdf-string.gsub`,
+  `pdf-file:read`, `pdf-_G`); language constructs use section numbers (`3.3.5`),
+  because the manual has no per-construct anchor. Carrying the field is this work;
+  *rendering* the Source line is slice 2.
 
 - **`entry-type`** is added to the schema in `src/lib/source.ts` as an optional
   enum: `function | construct | constant | overview | guide`. It records the one

@@ -17,6 +17,7 @@
 - **One file per symbol**, whatever its versions. Availability is a delta in compat data, never a per-version file fork (ADR 0001).
 - **Leaf slugs are the bare member name**; the dotted or prefixed form is the `title`. `standard-library/string/format.mdx` has `title: string.format`.
 - **`lua-compat` is never added to a stub.** It is added when the entry is authored.
+- **Every entry and every section carries a `source`** — a link back to the official manual passage it is a rewrite of (page-structure.md, section order item 11). It points at the **newest manual that still documents the symbol**: `5.5` for anything in the 5.5 index, `5.1` for anything the 5.5 manual dropped. Carrying the data is this slice's job; rendering the Source line is slice 2's.
 
 ### Correction to the design doc
 
@@ -29,7 +30,7 @@ The spec's "Stub anatomy" shows an HTML comment, `<!-- Not yet written. -->`. **
 - `src/content-tree/manifest.ts` — the tree as data: `ENTRY_TYPES`, the `Entry`/`Section` types, the builder helpers, and `CONTENT_TREE`. Pure data and pure functions; no I/O.
 - `src/content-tree/scaffold.ts` — `scaffoldContent(destDir, tree)`: walks the tree and writes directories, `meta.json`, and stubs. All filesystem work lives here so it can be tested against a temp directory.
 - `scripts/scaffold-content.ts` — CLI wrapper: calls `scaffoldContent('content/docs', CONTENT_TREE)` and prints a summary.
-- `src/lib/source.ts` — gains the optional `entry-type` frontmatter field (modify).
+- `src/lib/source.ts` — gains the optional `entry-type` and `source` frontmatter fields (modify).
 - `vite.config.ts` — prerender `pages` seeded from the manifest (modify).
 - `tests/content-tree/manifest.test.ts` — tree invariants and the counts the spec commits to.
 - `tests/content-tree/scaffold.test.ts` — generation, idempotency, and the no-clobber guarantee.
@@ -155,7 +156,7 @@ git commit -m "refactor(content): nest string.format under its section"
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `ENTRY_TYPES: readonly EntryType[]`, `type EntryType`, `interface Entry { slug, title, type }`, `interface Section { slug, title, indexTitle?, entries, sections, pages? }`, the builders `entry`, `fns`, `consts`, `methods`, `metamethods`, `section`, and `CONTENT_TREE: Section[]`. Tasks 3–6 all build on these exact names.
+- Produces: `ENTRY_TYPES: readonly EntryType[]`, `type EntryType`, `interface Source { version, anchor }`, `interface Entry { slug, title, type, source }`, `interface Section { slug, title, source, indexTitle?, entries, sections, pages? }`, `MANUAL_BASE`, `sourceUrl(source)`, the builders `entry`, `construct`, `fns`, `fnsFrom`, `consts`, `constsFrom`, `methods`, `metamethods`, `section`, and `CONTENT_TREE: Section[]`. Tasks 3–6 all build on these exact names.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -163,7 +164,8 @@ Create `tests/content-tree/manifest.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { CONTENT_TREE, ENTRY_TYPES, type Section } from '@/content-tree/manifest';
+import { CONTENT_TREE, ENTRY_TYPES, sourceUrl, type Section } from '@/content-tree/manifest';
+import { LUA_VERSIONS } from '@/compat/schema';
 
 function walk(sections: Section[]): Section[] {
   return sections.flatMap((s) => [s, ...walk(s.sections)]);
@@ -207,7 +209,32 @@ describe('the content tree', () => {
     expect(string?.entries).toHaveLength(19);
     expect(string?.entries.find((e) => e.slug === 'format')?.title).toBe('string.format');
   });
+
+  it('points every entry at a manual passage', () => {
+    for (const section of all) {
+      for (const e of section.entries) {
+        expect(e.source.anchor.length, `${section.slug}/${e.slug}`).toBeGreaterThan(0);
+        expect(LUA_VERSIONS).toContain(e.source.version);
+      }
+      expect(section.source.anchor.length, section.slug).toBeGreaterThan(0);
+    }
+  });
+
+  it('builds a manual URL from a source', () => {
+    const string = all.find((s) => s.slug === 'string')!;
+    const format = string.entries.find((e) => e.slug === 'format')!;
+    expect(sourceUrl(format.source)).toBe(
+      'https://www.lua.org/manual/5.5/manual.html#pdf-string.format',
+    );
+  });
 });
+```
+
+The import at the top of the file is:
+
+```ts
+import { CONTENT_TREE, ENTRY_TYPES, sourceUrl, type Section } from '@/content-tree/manifest';
+import { LUA_VERSIONS } from '@/compat/schema';
 ```
 
 - [ ] **Step 2: Run it to make sure it fails**
@@ -226,9 +253,19 @@ Create `src/content-tree/manifest.ts`:
  * compat data. Nothing here touches the filesystem.
  */
 
+import type { LuaVersion } from '../compat/schema';
+
 /** Which section order from `docs/research/page-structure.md` an entry follows. */
 export const ENTRY_TYPES = ['function', 'construct', 'constant', 'overview', 'guide'] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
+
+/** The manual passage an entry is a rewrite of — the attribution link. */
+export interface Source {
+  /** The newest manual that still documents this symbol. */
+  version: LuaVersion;
+  /** Anchor within that manual's `manual.html`, without the leading `#`. */
+  anchor: string;
+}
 
 export interface Entry {
   /** URL and filename segment — the bare member name, never the dotted form. */
@@ -236,12 +273,14 @@ export interface Entry {
   /** Frontmatter title — the symbol as a reader writes it (`string.format`, `__index`). */
   title: string;
   type: EntryType;
+  source: Source;
 }
 
 export interface Section {
   slug: string;
   /** Sidebar label, written to `meta.json`. */
   title: string;
+  source: Source;
   /** Frontmatter title of the section's own `index.mdx`. Defaults to `title`. */
   indexTitle?: string;
   entries: Entry[];
@@ -250,45 +289,87 @@ export interface Section {
   pages?: string[];
 }
 
-export function entry(slug: string, title: string, type: EntryType): Entry {
-  return { slug, title, type };
+export const MANUAL_BASE = 'https://www.lua.org/manual';
+
+export function sourceUrl(source: Source): string {
+  return `${MANUAL_BASE}/${source.version}/manual.html#${source.anchor}`;
+}
+
+export function entry(
+  slug: string,
+  title: string,
+  type: EntryType,
+  anchor: string,
+  version: LuaVersion = '5.5',
+): Entry {
+  return { slug, title, type, source: { version, anchor } };
+}
+
+/** A language construct, whose anchor is a manual section number like `3.3.5`. */
+export function construct(slug: string, title: string, anchor: string): Entry {
+  return entry(slug, title, 'construct', anchor);
 }
 
 function split(names: string): string[] {
   return names.trim().split(/\s+/).filter(Boolean);
 }
 
-function build(lib: string, names: string, type: EntryType, sep = '.'): Entry[] {
-  return split(names).map((slug) => entry(slug, lib ? `${lib}${sep}${slug}` : slug, type));
+/**
+ * The manual anchors every standard-library identifier as `pdf-<title>` — including
+ * the colon forms (`pdf-file:read`) and the underscore ones (`pdf-_G`) — so the whole
+ * library can be built from a list of bare names.
+ */
+function build(
+  lib: string,
+  names: string,
+  type: EntryType,
+  version: LuaVersion,
+  sep = '.',
+): Entry[] {
+  return split(names).map((slug) => {
+    const title = lib ? `${lib}${sep}${slug}` : slug;
+    return entry(slug, title, type, `pdf-${title}`, version);
+  });
 }
 
 /** `fns('string', 'byte char')` → slugs `byte`/`char`, titles `string.byte`/`string.char`. */
 export function fns(lib: string, names: string): Entry[] {
-  return build(lib, names, 'function');
+  return build(lib, names, 'function', '5.5');
+}
+
+/** Functions the 5.5 manual no longer documents — sourced to an older manual. */
+export function fnsFrom(version: LuaVersion, lib: string, names: string): Entry[] {
+  return build(lib, names, 'function', version);
 }
 
 /** Tables, strings and numbers exposed by a library — `math.pi`, `package.loaded`. */
 export function consts(lib: string, names: string): Entry[] {
-  return build(lib, names, 'constant');
+  return build(lib, names, 'constant', '5.5');
+}
+
+/** Constants the 5.5 manual no longer documents. */
+export function constsFrom(version: LuaVersion, lib: string, names: string): Entry[] {
+  return build(lib, names, 'constant', version);
 }
 
 /** `methods('file', 'read seek')` → titles `file:read`, `file:seek`. */
 export function methods(receiver: string, names: string): Entry[] {
-  return build(receiver, names, 'function', ':');
+  return build(receiver, names, 'function', '5.5', ':');
 }
 
-/** `metamethods('index newindex')` → slugs `index`/`newindex`, titles `__index`/`__newindex`. */
+/** Metamethods are all documented together, in §2.4. */
 export function metamethods(names: string): Entry[] {
-  return split(names).map((slug) => entry(slug, `__${slug}`, 'construct'));
+  return split(names).map((slug) => construct(slug, `__${slug}`, '2.4'));
 }
 
 export function section(
   slug: string,
   title: string,
+  anchor: string,
   entries: Entry[] = [],
   sections: Section[] = [],
 ): Section {
-  return { slug, title, entries, sections };
+  return { slug, title, source: { version: '5.5', anchor }, entries, sections };
 }
 
 /** Order of the top-level groups in the sidebar. */
@@ -303,11 +384,11 @@ export const ROOT_PAGES = [
 ];
 
 export const CONTENT_TREE: Section[] = [
-  section('standard-library', 'Standard Library', [], [
-    section('string', 'string', [
+  section('standard-library', 'Standard Library', '6', [], [
+    section('string', 'string', '6.5', [
       ...fns('string', 'byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper'),
-      entry('patterns', 'Patterns', 'construct'),
-      entry('pack-formats', 'Format strings for pack and unpack', 'construct'),
+      construct('patterns', 'Patterns', '6.5.1'),
+      construct('pack-formats', 'Format strings for pack and unpack', '6.5.2'),
     ]),
   ]),
 ];
@@ -358,8 +439,8 @@ import { scaffoldContent, contentTreeUrls, PLACEHOLDER } from '@/content-tree/sc
 import { section, fns, type Section } from '@/content-tree/manifest';
 
 const tree: Section[] = [
-  section('standard-library', 'Standard Library', [], [
-    section('string', 'string', fns('string', 'format upper')),
+  section('standard-library', 'Standard Library', '6', [], [
+    section('string', 'string', '6.5', fns('string', 'format upper')),
   ]),
 ];
 
@@ -380,6 +461,7 @@ describe('scaffoldContent', () => {
     const text = await readFile(join(dir, 'standard-library/string/format.mdx'), 'utf8');
     expect(text).toContain('title: string.format');
     expect(text).toContain('entry-type: function');
+    expect(text).toContain('source: https://www.lua.org/manual/5.5/manual.html#pdf-string.format');
     expect(text).toContain(PLACEHOLDER);
     expect(text).not.toContain('lua-compat');
   });
@@ -397,6 +479,7 @@ describe('scaffoldContent', () => {
     const text = await readFile(join(dir, 'standard-library/index.mdx'), 'utf8');
     expect(text).toContain('entry-type: overview');
     expect(text).toContain('title: Standard Library');
+    expect(text).toContain('source: https://www.lua.org/manual/5.5/manual.html#6');
   });
 
   it('is idempotent — a second run writes nothing', async () => {
@@ -441,7 +524,7 @@ Create `src/content-tree/scaffold.ts`:
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ROOT_PAGES, type EntryType, type Section } from './manifest';
+import { ROOT_PAGES, sourceUrl, type EntryType, type Section, type Source } from './manifest';
 
 /** The entire body of an unwritten entry. A JSX comment — MDX rejects `<!-- -->`. */
 export const PLACEHOLDER = '{/* Not yet written. */}';
@@ -453,8 +536,18 @@ export interface ScaffoldStats {
   kept: number;
 }
 
-function stub(title: string, type: EntryType): string {
-  return `---\ntitle: ${title}\ndescription: ""\nentry-type: ${type}\n---\n\n${PLACEHOLDER}\n`;
+function stub(title: string, type: EntryType, source: Source): string {
+  return [
+    '---',
+    `title: ${title}`,
+    'description: ""',
+    `entry-type: ${type}`,
+    `source: ${sourceUrl(source)}`,
+    '---',
+    '',
+    PLACEHOLDER,
+    '',
+  ].join('\n');
 }
 
 function body(text: string): string {
@@ -497,10 +590,11 @@ async function walk(sec: Section, parentDir: string, stats: ScaffoldStats): Prom
 
   const meta = { title: sec.title, pages: sec.pages ?? ['index', '...'] };
   await writeMeta(join(dir, 'meta.json'), `${JSON.stringify(meta, null, 2)}\n`, stats);
-  await writeStub(join(dir, 'index.mdx'), stub(sec.indexTitle ?? sec.title, 'overview'), stats);
+  const overview = stub(sec.indexTitle ?? sec.title, 'overview', sec.source);
+  await writeStub(join(dir, 'index.mdx'), overview, stats);
 
   for (const e of sec.entries) {
-    await writeStub(join(dir, `${e.slug}.mdx`), stub(e.title, e.type), stats);
+    await writeStub(join(dir, `${e.slug}.mdx`), stub(e.title, e.type, e.source), stats);
   }
   for (const child of sec.sections) {
     await walk(child, dir, stats);
@@ -626,7 +720,7 @@ git commit -m "feat(content-tree): generate the tree from the manifest"
 - Test: `tests/content-tree/manifest.test.ts`
 
 **Interfaces:**
-- Consumes: `section`, `entry`, `fns`, `consts`, `methods` from Task 2.
+- Consumes: `section`, `entry`, `construct`, `fns`, `fnsFrom`, `consts`, `constsFrom`, `methods` from Task 2.
 - Produces: a `standard-library` section with 11 child sections and 171 entries.
 
 - [ ] **Step 1: Write the failing test**
@@ -669,6 +763,15 @@ describe('the standard library', () => {
     const file = all.find((s) => s.slug === 'file-methods')!;
     expect(file.entries.find((e) => e.slug === 'read')?.title).toBe('file:read');
   });
+
+  it('sources a symbol 5.5 dropped to the newest manual that has it', () => {
+    const math = all.find((s) => s.slug === 'math')!;
+    expect(math.entries.find((e) => e.slug === 'pow')?.source).toEqual({
+      version: '5.1',
+      anchor: 'pdf-math.pow',
+    });
+    expect(math.entries.find((e) => e.slug === 'abs')?.source.version).toBe('5.5');
+  });
 });
 ```
 
@@ -680,48 +783,56 @@ Expected: FAIL — every count assertion but `string` fails on `undefined`.
 - [ ] **Step 3: Replace the `standard-library` section in `CONTENT_TREE`**
 
 ```ts
-  section('standard-library', 'Standard Library', [], [
-    section('basic', 'Basic functions', [
-      ...fns('', 'assert collectgarbage dofile error getfenv getmetatable ipairs load loadfile loadstring module next pairs pcall print rawequal rawget rawlen rawset require select setfenv setmetatable tonumber tostring type unpack warn xpcall'),
-      entry('_g', '_G', 'constant'),
-      entry('_version', '_VERSION', 'constant'),
+  section('standard-library', 'Standard Library', '6', [], [
+    section('basic', 'Basic functions', '6.2', [
+      ...fns('', 'assert collectgarbage dofile error getmetatable ipairs load loadfile next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall'),
+      ...fnsFrom('5.1', '', 'getfenv loadstring module setfenv unpack'),
+      entry('_g', '_G', 'constant', 'pdf-_G'),
+      entry('_version', '_VERSION', 'constant', 'pdf-_VERSION'),
     ]),
-    section('coroutine', 'coroutine',
+    section('coroutine', 'coroutine', '6.3',
       fns('coroutine', 'close create isyieldable resume running status wrap yield')),
-    section('package', 'package', [
-      ...consts('package', 'config cpath loaded loaders path preload searchers'),
-      ...fns('package', 'loadlib searchpath seeall'),
+    section('package', 'package', '6.4', [
+      ...consts('package', 'config cpath loaded path preload searchers'),
+      ...fns('package', 'loadlib searchpath'),
+      ...constsFrom('5.1', 'package', 'loaders'),
+      ...fnsFrom('5.1', 'package', 'seeall'),
     ]),
-    section('string', 'string', [
+    section('string', 'string', '6.5', [
       ...fns('string', 'byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper'),
-      entry('patterns', 'Patterns', 'construct'),
-      entry('pack-formats', 'Format strings for pack and unpack', 'construct'),
+      construct('patterns', 'Patterns', '6.5.1'),
+      construct('pack-formats', 'Format strings for pack and unpack', '6.5.2'),
     ]),
-    section('utf8', 'utf8', [
+    section('utf8', 'utf8', '6.6', [
       ...fns('utf8', 'char codepoint codes len offset'),
       ...consts('utf8', 'charpattern'),
     ]),
-    section('table', 'table',
-      fns('table', 'concat create foreach foreachi getn insert maxn move pack remove sort unpack')),
-    section('math', 'math', [
-      ...fns('math', 'abs acos asin atan atan2 ceil cos cosh deg exp floor fmod frexp ldexp log log10 max min modf pow rad random randomseed sin sinh sqrt tan tanh tointeger type ult'),
+    section('table', 'table', '6.7', [
+      ...fns('table', 'concat create insert move pack remove sort unpack'),
+      ...fnsFrom('5.1', 'table', 'foreach foreachi getn maxn'),
+    ]),
+    section('math', 'math', '6.8', [
+      ...fns('math', 'abs acos asin atan ceil cos deg exp floor fmod frexp ldexp log max min modf rad random randomseed sin sqrt tan tointeger type ult'),
+      ...fnsFrom('5.1', 'math', 'atan2 cosh log10 pow sinh tanh'),
       ...consts('math', 'huge maxinteger mininteger pi'),
     ]),
-    section('io', 'io', [
+    section('io', 'io', '6.9', [
       ...fns('io', 'close flush input lines open output popen read tmpfile type write'),
       ...consts('io', 'stderr stdin stdout'),
     ], [
-      section('file-methods', 'File methods',
+      section('file-methods', 'File methods', '6.9',
         methods('file', 'close flush lines read seek setvbuf write')),
     ]),
-    section('os', 'os',
+    section('os', 'os', '6.10',
       fns('os', 'clock date difftime execute exit getenv remove rename setlocale time tmpname')),
-    section('debug', 'debug',
-      fns('debug', 'debug getfenv gethook getinfo getlocal getmetatable getregistry getupvalue getuservalue sethook setfenv setlocal setmetatable setupvalue setuservalue traceback upvalueid upvaluejoin')),
+    section('debug', 'debug', '6.11', [
+      ...fns('debug', 'debug gethook getinfo getlocal getmetatable getregistry getupvalue getuservalue sethook setlocal setmetatable setupvalue setuservalue traceback upvalueid upvaluejoin'),
+      ...fnsFrom('5.1', 'debug', 'getfenv setfenv'),
+    ]),
   ]),
 ```
 
-Every symbol the 5.5 manual omits — `getfenv`, `setfenv`, `loadstring`, `module`, `unpack`, `package.loaders`, `package.seeall`, `table.foreach`, `table.foreachi`, `table.getn`, `table.maxn`, `math.atan2`, `math.cosh`, `math.log10`, `math.pow`, `math.sinh`, `math.tanh`, `debug.getfenv`, `debug.setfenv` — is present on purpose. Those exist in 5.1 or 5.2, and one entry serves every version (ADR 0001).
+The `fnsFrom('5.1', …)` calls are every symbol the 5.5 index omits. They are present on purpose — those exist in 5.1, and one entry serves every version (ADR 0001). Their **source** must point at the 5.1 manual, because the 5.5 manual has no anchor for them; `5.1` is used rather than `5.2` because the 5.1 manual certainly documents all of them, while which of them 5.2 still documents is not something to guess at.
 
 - [ ] **Step 4: Run the tests**
 
@@ -755,7 +866,7 @@ Titles here are prose, not mechanical, so entries are written out one by one rat
 - Test: `tests/content-tree/manifest.test.ts`
 
 **Interfaces:**
-- Consumes: `section`, `entry`, `metamethods` from Task 2.
+- Consumes: `section`, `construct`, `metamethods` from Task 2.
 - Produces: a `language` section with 10 child sections and 74 entries.
 
 - [ ] **Step 1: Write the failing test**
@@ -801,86 +912,88 @@ Expected: FAIL — `language` is not in the tree.
 - [ ] **Step 3: Add the `language` section to `CONTENT_TREE`, before `standard-library`**
 
 ```ts
-  section('language', 'Language', [], [
-    section('lexical-conventions', 'Lexical conventions', [
-      entry('comments', 'Comments', 'construct'),
-      entry('identifiers-and-keywords', 'Identifiers and keywords', 'construct'),
-      entry('numeric-literals', 'Numeric literals', 'construct'),
-      entry('string-literals', 'String literals', 'construct'),
+  section('language', 'Language', '3', [], [
+    section('lexical-conventions', 'Lexical conventions', '3.1', [
+      construct('comments', 'Comments', '3.1'),
+      construct('identifiers-and-keywords', 'Identifiers and keywords', '3.1'),
+      construct('numeric-literals', 'Numeric literals', '3.1'),
+      construct('string-literals', 'String literals', '3.1'),
     ]),
-    section('values-and-types', 'Values and types', [
-      entry('nil', 'nil', 'construct'),
-      entry('boolean', 'boolean', 'construct'),
-      entry('number', 'number', 'construct'),
-      entry('string', 'string', 'construct'),
-      entry('table', 'table', 'construct'),
-      entry('function', 'function', 'construct'),
-      entry('userdata', 'userdata', 'construct'),
-      entry('thread', 'thread', 'construct'),
-      entry('type-coercion', 'Coercions and conversions', 'construct'),
+    section('values-and-types', 'Values and types', '2.1', [
+      construct('nil', 'nil', '2.1'),
+      construct('boolean', 'boolean', '2.1'),
+      construct('number', 'number', '2.1'),
+      construct('string', 'string', '2.1'),
+      construct('table', 'table', '2.1'),
+      construct('function', 'function', '2.1'),
+      construct('userdata', 'userdata', '2.1'),
+      construct('thread', 'thread', '2.1'),
+      construct('type-coercion', 'Coercions and conversions', '3.4.3'),
     ]),
-    section('variables-and-scope', 'Variables and scope', [
-      entry('global-variables', 'Global variables', 'construct'),
-      entry('local-variables', 'Local variables', 'construct'),
-      entry('upvalues-and-closures', 'Upvalues and closures', 'construct'),
-      entry('scope-rules', 'Scope', 'construct'),
-      entry('variable-attributes', 'Variable attributes', 'construct'),
+    section('variables-and-scope', 'Variables and scope', '2.2', [
+      construct('global-variables', 'Global variables', '2.2'),
+      construct('local-variables', 'Local variables', '2.2'),
+      construct('upvalues-and-closures', 'Upvalues and closures', '2.2'),
+      construct('scope-rules', 'Scope', '2.2'),
+      construct('variable-attributes', 'Variable attributes', '3.3.7'),
     ]),
-    section('statements', 'Statements', [
-      entry('assignment', 'Assignment', 'construct'),
-      entry('do-blocks', 'do … end blocks', 'construct'),
-      entry('if', 'if', 'construct'),
-      entry('while', 'while', 'construct'),
-      entry('repeat', 'repeat … until', 'construct'),
-      entry('numeric-for', 'Numeric for', 'construct'),
-      entry('generic-for', 'Generic for', 'construct'),
-      entry('break', 'break', 'construct'),
-      entry('goto', 'goto', 'construct'),
-      entry('return', 'return', 'construct'),
-      entry('function-declarations', 'Function declarations', 'construct'),
-      entry('local-declarations', 'local declarations', 'construct'),
-      entry('global-declarations', 'global declarations', 'construct'),
-      entry('to-be-closed-variables', 'To-be-closed variables', 'construct'),
+    section('statements', 'Statements', '3.3', [
+      construct('assignment', 'Assignment', '3.3.3'),
+      construct('do-blocks', 'do … end blocks', '3.3.1'),
+      construct('if', 'if', '3.3.4'),
+      construct('while', 'while', '3.3.4'),
+      construct('repeat', 'repeat … until', '3.3.4'),
+      construct('numeric-for', 'Numeric for', '3.3.5'),
+      construct('generic-for', 'Generic for', '3.3.5'),
+      construct('break', 'break', '3.3.4'),
+      construct('goto', 'goto', '3.3.4'),
+      construct('return', 'return', '3.3.4'),
+      construct('function-declarations', 'Function declarations', '3.4.11'),
+      construct('local-declarations', 'local declarations', '3.3.7'),
+      construct('global-declarations', 'global declarations', '3.3.7'),
+      construct('to-be-closed-variables', 'To-be-closed variables', '3.3.8'),
     ]),
-    section('expressions', 'Expressions', [
-      entry('arithmetic-operators', 'Arithmetic operators', 'construct'),
-      entry('bitwise-operators', 'Bitwise operators', 'construct'),
-      entry('relational-operators', 'Relational operators', 'construct'),
-      entry('logical-operators', 'Logical operators', 'construct'),
-      entry('concatenation', 'Concatenation', 'construct'),
-      entry('length-operator', 'Length operator', 'construct'),
-      entry('operator-precedence', 'Operator precedence', 'construct'),
-      entry('table-constructors', 'Table constructors', 'construct'),
-      entry('function-calls', 'Function calls', 'construct'),
-      entry('method-calls', 'Method calls', 'construct'),
-      entry('anonymous-functions', 'Anonymous functions', 'construct'),
-      entry('varargs', 'Varargs', 'construct'),
-      entry('multiple-results', 'Multiple results and adjustment', 'construct'),
+    section('expressions', 'Expressions', '3.4', [
+      construct('arithmetic-operators', 'Arithmetic operators', '3.4.1'),
+      construct('bitwise-operators', 'Bitwise operators', '3.4.2'),
+      construct('relational-operators', 'Relational operators', '3.4.4'),
+      construct('logical-operators', 'Logical operators', '3.4.5'),
+      construct('concatenation', 'Concatenation', '3.4.6'),
+      construct('length-operator', 'Length operator', '3.4.7'),
+      construct('operator-precedence', 'Operator precedence', '3.4.8'),
+      construct('table-constructors', 'Table constructors', '3.4.9'),
+      construct('function-calls', 'Function calls', '3.4.10'),
+      construct('method-calls', 'Method calls', '3.4.10'),
+      construct('anonymous-functions', 'Anonymous functions', '3.4.11'),
+      construct('varargs', 'Varargs', '3.4.11'),
+      construct('multiple-results', 'Multiple results and adjustment', '3.4.12'),
     ]),
-    section('metatables', 'Metatables and metamethods', [
+    section('metatables', 'Metatables and metamethods', '2.4', [
       ...metamethods('index newindex call tostring len eq lt le concat unm gc close mode name metatable pairs ipairs'),
-      entry('arithmetic-metamethods', 'Arithmetic metamethods', 'construct'),
-      entry('bitwise-metamethods', 'Bitwise metamethods', 'construct'),
+      construct('arithmetic-metamethods', 'Arithmetic metamethods', '2.4'),
+      construct('bitwise-metamethods', 'Bitwise metamethods', '2.4'),
     ]),
-    section('environments', 'Environments', [
-      entry('env', '_ENV', 'construct'),
-      entry('the-global-environment', 'The global environment', 'construct'),
+    section('environments', 'Environments', '2.2', [
+      construct('env', '_ENV', '2.2'),
+      construct('the-global-environment', 'The global environment', '2.2'),
     ]),
-    section('error-handling', 'Error handling', [
-      entry('error-objects', 'Error objects', 'construct'),
-      entry('protected-calls', 'Protected calls', 'construct'),
-      entry('error-levels', 'Error levels', 'construct'),
-      entry('warnings', 'Warnings', 'construct'),
+    section('error-handling', 'Error handling', '2.3', [
+      construct('error-objects', 'Error objects', '2.3'),
+      construct('protected-calls', 'Protected calls', '2.3'),
+      construct('error-levels', 'Error levels', '2.3'),
+      construct('warnings', 'Warnings', '2.3'),
     ]),
-    section('garbage-collection', 'Garbage collection', [
-      entry('incremental-mode', 'Incremental mode', 'construct'),
-      entry('generational-mode', 'Generational mode', 'construct'),
-      entry('weak-tables', 'Weak tables', 'construct'),
-      entry('finalizers', 'Finalizers', 'construct'),
+    section('garbage-collection', 'Garbage collection', '2.5', [
+      construct('incremental-mode', 'Incremental mode', '2.5.1'),
+      construct('generational-mode', 'Generational mode', '2.5.2'),
+      construct('weak-tables', 'Weak tables', '2.5.4'),
+      construct('finalizers', 'Finalizers', '2.5.3'),
     ]),
-    section('coroutines', 'Coroutines'),
+    section('coroutines', 'Coroutines', '2.6'),
   ]),
 ```
+
+Anchors here are **manual section numbers**, not `pdf-` identifiers — the manual has no per-construct anchor, so several entries share one. `goto` and `break` both land on §3.3.4 because that is genuinely where the manual documents them.
 
 - [ ] **Step 4: Run the tests**
 
@@ -910,7 +1023,7 @@ git commit -m "content: scaffold the language tree"
 - Test: `tests/content-tree/manifest.test.ts`
 
 **Interfaces:**
-- Consumes: `section`, `entry` from Task 2.
+- Consumes: `section`, `entry`, `construct` from Task 2.
 - Produces: the remaining four top-level sections, completing `CONTENT_TREE`.
 
 - [ ] **Step 1: Write the failing test**
@@ -964,38 +1077,42 @@ Expected: FAIL — `standalone` is not in the tree.
 Put `learn` and `guides` first in the array, and `standalone` and `c-api` after `standard-library`:
 
 ```ts
-  section('learn', 'Learn'),
-  section('guides', 'Guides', [
-    entry('lua-in-the-wild', 'Lua in the wild', 'guide'),
-    entry('luarocks-and-the-ecosystem', 'LuaRocks and the ecosystem', 'guide'),
-    entry('how-metatables-work', 'How metatables really work', 'guide'),
-    entry('history-of-lua', 'A history of Lua', 'guide'),
+  section('learn', 'Learn', '1'),
+  section('guides', 'Guides', '1', [
+    entry('lua-in-the-wild', 'Lua in the wild', 'guide', '1'),
+    entry('luarocks-and-the-ecosystem', 'LuaRocks and the ecosystem', 'guide', '1'),
+    entry('how-metatables-work', 'How metatables really work', 'guide', '2.4'),
+    entry('history-of-lua', 'A history of Lua', 'guide', '1'),
   ]),
 ```
 
+Guides are original prose rather than rewrites, so most have no real source passage; `1` (the manual's Introduction) is the honest stand-in until each guide is written and can point somewhere meaningful.
+
 ```ts
-  section('standalone', 'Standalone interpreter', [
-    entry('command-line-options', 'Command-line options', 'construct'),
-    entry('script-execution', 'Script execution', 'construct'),
-    entry('arg', 'arg', 'constant'),
-    entry('lua-path', 'LUA_PATH', 'constant'),
-    entry('lua-cpath', 'LUA_CPATH', 'constant'),
-    entry('lua-init', 'LUA_INIT', 'constant'),
+  section('standalone', 'Standalone interpreter', '7', [
+    construct('command-line-options', 'Command-line options', '7'),
+    construct('script-execution', 'Script execution', '7'),
+    entry('arg', 'arg', 'constant', '7'),
+    entry('lua-path', 'LUA_PATH', 'constant', '6.4'),
+    entry('lua-cpath', 'LUA_CPATH', 'constant', '6.4'),
+    entry('lua-init', 'LUA_INIT', 'constant', '7'),
   ]),
-  section('c-api', 'C API', [], [
-    section('types', 'Types'),
-    section('stack-manipulation', 'Stack manipulation'),
-    section('types-and-values', 'Types and values'),
-    section('calling', 'Calling'),
-    section('error-handling', 'Error handling'),
-    section('references-and-registry', 'References and the registry'),
-    section('userdata', 'Userdata'),
-    section('coroutines', 'Coroutines'),
-    section('debug-interface', 'Debug interface'),
-    section('auxiliary-library', 'Auxiliary library'),
-    section('constants', 'Constants'),
+  section('c-api', 'C API', '4', [], [
+    section('types', 'Types', '4.6'),
+    section('stack-manipulation', 'Stack manipulation', '4.1'),
+    section('types-and-values', 'Types and values', '4.6'),
+    section('calling', 'Calling', '4.5'),
+    section('error-handling', 'Error handling', '4.4'),
+    section('references-and-registry', 'References and the registry', '4.3'),
+    section('userdata', 'Userdata', '4.6'),
+    section('coroutines', 'Coroutines', '4.5'),
+    section('debug-interface', 'Debug interface', '4.7'),
+    section('auxiliary-library', 'Auxiliary library', '5'),
+    section('constants', 'Constants', '4.6'),
   ]),
 ```
+
+`LUA_PATH` and `LUA_CPATH` are documented under the package library (§6.4) rather than §7, which is why their anchors differ from the rest of the group.
 
 - [ ] **Step 4: Run the whole suite**
 
@@ -1020,10 +1137,10 @@ git commit -m "content: scaffold standalone, C API and guides"
 
 ---
 
-## Task 7: Wire `entry-type` into the schema and close out
+## Task 7: Wire `entry-type` and `source` into the schema and close out
 
 **Files:**
-- Modify: `src/lib/source.ts:14-21`, `docs/plans/ROADMAP.md`
+- Modify: `src/lib/source.ts:14-21` (adds `entry-type` and `source`), `docs/plans/ROADMAP.md`
 - Move: `content/docs/math.tointeger.mdx` → `content/docs/standard-library/math/tointeger.mdx`
 - Modify: `tests/e2e/string-format.test.tsx:99`
 - Test: `tests/content-tree/manifest.test.ts`
@@ -1073,6 +1190,8 @@ In `src/lib/source.ts`, extend the schema:
       'entry-type': z
         .enum(['function', 'construct', 'constant', 'overview', 'guide'])
         .optional(),
+      /** Attribution link to the manual passage this entry is a rewrite of. */
+      source: z.url().optional(),
     }),
 ```
 
@@ -1113,6 +1232,24 @@ const mathItem: PageTree.Item = {
   url: '/docs/standard-library/math/tointeger',
 };
 ```
+
+- [ ] **Step 5b: Give the two authored entries their source and entry-type**
+
+The generator never touches an authored file, so these two are the only entries that would otherwise lack the fields every stub has. Add to the frontmatter of `content/docs/standard-library/string/format.mdx`:
+
+```yaml
+entry-type: function
+source: https://www.lua.org/manual/5.5/manual.html#pdf-string.format
+```
+
+and to `content/docs/standard-library/math/tointeger.mdx`:
+
+```yaml
+entry-type: function
+source: https://www.lua.org/manual/5.5/manual.html#pdf-math.tointeger
+```
+
+Leave their existing `title`, `description` and `lua-compat` alone.
 
 - [ ] **Step 6: Prove the generator cannot destroy authored work**
 
