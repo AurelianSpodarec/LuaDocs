@@ -38,6 +38,30 @@ function renderWithVersion(version: LuaVersion) {
 describe('RunnableExample', () => {
   beforeEach(() => {
     mockRunLua.mockReset();
+    // Every example runs itself on mount, so a test that does not care about the run
+    // still needs a result for it — otherwise the mount run resolves `undefined` and
+    // the component reports a TypeError as the example's output.
+    mockRunLua.mockResolvedValue({ output: '', error: null });
+  });
+
+  it('runs the authored example on mount, without being asked', async () => {
+    mockRunLua.mockResolvedValue({ output: '42\n', error: null });
+    renderExample('print(42)');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('output')).toHaveTextContent('42');
+    });
+    expect(mockRunLua).toHaveBeenCalledWith('print(42)');
+  });
+
+  it('runs the authored code on mount, not whatever was typed before', async () => {
+    renderExample('print(1)');
+    await waitFor(() => expect(mockRunLua).toHaveBeenCalledWith('print(1)'));
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'print(2)' } });
+
+    // Editing alone must not re-run: a half-typed line is not a thing to execute.
+    expect(mockRunLua).toHaveBeenCalledTimes(1);
   });
 
   it('renders the returned output in the output panel after clicking Run', async () => {
