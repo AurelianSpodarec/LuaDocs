@@ -14,6 +14,7 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | 1 | Version slice — prove the risky stack on one page | [2026-08-04-version-slice.md](2026-08-04-version-slice.md) | Done |
 | — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Parked — see below |
 | 1.5 | Content tree — the blueprint | [2026-08-04-content-tree.md](2026-08-04-content-tree.md) | Done |
+| 1.6 | Sidebar IA — order, grouping, labels | [2026-08-04-sidebar-ia.md](2026-08-04-sidebar-ia.md) | Done |
 | 2 | Page anatomy | — | Next |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
@@ -29,6 +30,26 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 Static-prerendered Fumadocs-on-TanStack-Start, custom UI, compat-data-driven version
 switching, and a real Wasmoon runnable example, using `string.format` as the vehicle.
 Proves feasibility, not completeness.
+
+### 1.6. Sidebar IA — order, grouping, labels
+
+Implements [ADR 0006](../adr/0006-sidebar-order-and-grouping.md). Slice 1.5 built the
+tree but let `meta.json`'s `"..."` glob sort it alphabetically, and listed each
+section's overview as its own child — so `string` sat below `package`, and opening
+Standard Library gave you Standard Library again.
+
+The sidebar now carries the curated order, one row per section, fully-qualified
+titles with parentheses on callables, and MDN-style collapsible groups. The group is
+**our node, not Fumadocs's**: its `separator` is flat and cannot collapse, so the
+tree transform in `src/sidebar/groupPageTree.ts` folds each separator and the items
+after it into an index-less `PageTree.Folder`, which renders as a collapse trigger
+that is not a link. A section may also end with a `Related globals` group —
+cross-linked rows whose pages stay in `Globals`, because `table.setmetatable` does
+not exist.
+
+Deferred from this slice: the **Area-scoped sidebar**. It is a layout change nothing
+else depends on, and it carries the one deliberate deviation from MDN (MDN scopes
+per built-in object; ADR 0006 scopes per Area). Settle it with slice 2's chrome.
 
 ### 2. Page anatomy — and the bespoke UI
 
