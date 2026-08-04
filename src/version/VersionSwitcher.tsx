@@ -9,7 +9,7 @@ export function VersionSwitcher() {
     // alone would be meaningless.
     <select
       aria-label="Lua version"
-      className="text-sm"
+      className="cursor-pointer rounded-md border bg-fd-secondary px-1.5 py-1 text-xs font-medium text-fd-secondary-foreground tabular-nums transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring"
       value={version}
       onChange={(e) => setVersion(e.target.value as (typeof LUA_VERSIONS)[number])}
     >
