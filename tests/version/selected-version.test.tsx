@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { SelectedVersionProvider, useSelectedVersion } from '@/version/SelectedVersionProvider';
@@ -61,6 +61,32 @@ describe('useSelectedVersion', () => {
     const { result } = renderHook(() => useSelectedVersion(), { wrapper });
     act(() => result.current.setVersion('5.2'));
     expect(new URLSearchParams(window.location.search).get('v')).toBe('5.2');
+  });
+
+  it('falls back to the default version instead of throwing when localStorage.getItem throws', () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('storage blocked', 'SecurityError');
+    });
+    try {
+      expect(() => renderHook(() => useSelectedVersion(), { wrapper })).not.toThrow();
+      const { result } = renderHook(() => useSelectedVersion(), { wrapper });
+      expect(result.current.version).toBe('5.5');
+    } finally {
+      getItemSpy.mockRestore();
+    }
+  });
+
+  it('keeps the in-memory version set even when localStorage.setItem throws', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('storage blocked', 'SecurityError');
+    });
+    try {
+      const { result } = renderHook(() => useSelectedVersion(), { wrapper });
+      expect(() => act(() => result.current.setVersion('5.1'))).not.toThrow();
+      expect(result.current.version).toBe('5.1');
+    } finally {
+      setItemSpy.mockRestore();
+    }
   });
 
   it('renders the default version 5.5 on the server render pass, even when ?v= requests another version', () => {

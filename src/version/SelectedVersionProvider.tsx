@@ -12,7 +12,13 @@ function initialVersion(): LuaVersion {
   if (typeof window === 'undefined') return DEFAULT;
   const url = new URLSearchParams(window.location.search).get('v');
   if (isLuaVersion(url)) return url;
-  const stored = localStorage.getItem(KEY);
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(KEY);
+  } catch {
+    // Storage access can throw (Safari private mode, storage-blocked embeds).
+    // Degrade to the default version rather than breaking the whole page.
+  }
   return isLuaVersion(stored) ? stored : DEFAULT;
 }
 
@@ -32,7 +38,12 @@ export function SelectedVersionProvider({ children }: { children: ReactNode }) {
   const setVersion = useCallback((v: LuaVersion) => {
     setVersionState(v);
     if (typeof window === 'undefined') return;
-    localStorage.setItem(KEY, v);
+    try {
+      localStorage.setItem(KEY, v);
+    } catch {
+      // Storage access can throw (Safari private mode, storage-blocked embeds).
+      // The in-memory version still updates; persistence is best-effort only.
+    }
     const url = new URL(window.location.href);
     if (v === DEFAULT) url.searchParams.delete('v');
     else url.searchParams.set('v', v);
