@@ -25,7 +25,8 @@ import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sideba
 import { groupPageTree } from '@/sidebar/groupPageTree';
 import { scopeToDestination } from '@/sidebar/destinations';
 import { countEntries, filterPageTree } from '@/sidebar/filterPageTree';
-import { SidebarHeader } from '@/sidebar/SidebarHeader';
+import { DestinationsBlock, SidebarFilter } from '@/sidebar/SidebarHeader';
+import { ThemeSwitch } from 'fumadocs-ui/layouts/shared/slots/theme-switch';
 import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
 export const Route = createFileRoute('/docs/$')({
@@ -135,12 +136,30 @@ function Page() {
       <DocsLayout
         {...options}
         // The selected version decides which facts on the page are true, so it is not
-        // a preference and does not belong in a settings menu (ADR 0007).
-        nav={{ ...options.nav, children: <VersionSwitcher /> }}
+        // a preference and does not belong in a settings menu (ADR 0007). Theme joins
+        // it here rather than in the sidebar's own footer bar, which is dropped below.
+        nav={{
+          ...options.nav,
+          children: (
+            <>
+              <VersionSwitcher />
+              <ThemeSwitch mode="light-dark-system" className="border-0 bg-transparent p-0" />
+            </>
+          ),
+        }}
+        // Both of these exist only to feed fumadocs's sidebar footer bar. GitHub is
+        // already the Community destination, and theme moved to the row above, so the
+        // bar has nothing left in it — and fumadocs drops the element entirely when
+        // all three of githubUrl, themeSwitch and languageSelect are absent.
+        githubUrl={undefined}
+        themeSwitch={{ enabled: false }}
+        // A `custom` link renders *inside* the scroll viewport, above the page tree,
+        // which is the only way to make the block scroll with the tree.
+        links={[{ type: 'custom', children: <DestinationsBlock /> }]}
         tree={tree}
         sidebar={{
           banner: (
-            <SidebarHeader
+            <SidebarFilter
               query={query}
               onQueryChange={setQuery}
               resultCount={countEntries(tree)}

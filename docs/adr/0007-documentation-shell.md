@@ -11,9 +11,10 @@ Five rules govern it:
    in the header. They are never mixed.
 2. **The sidebar has two zones**: a block of destinations at the top, and below it
    the tree belonging to whichever destination is active.
-3. **The filter sits between them**, because it acts on the tree and not on the
-   block.
-4. **Only the tree scrolls.** The destinations block and the filter are pinned.
+3. **The block scrolls with the tree.** It is links a reader clicks about once a
+   session, and it is not worth a quarter of the panel.
+4. **The filter is pinned**, in the controls cluster with Search. It is the one thing
+   in the sidebar that stops working when it scrolls away.
 5. **There is no context bar.** The breadcrumb goes in the article column, above the
    `<h1>`.
 
@@ -62,26 +63,49 @@ Language is the awkward one, because it is a preference that also changes conten
 is grouped with theme rather than with version, which is where MDN puts it and where
 readers already look for it.
 
-### The filter belongs to the tree, not to the sidebar
+### The filter is a control, so it is pinned; the block is links, so it is not
 
-MDN's filter sits at the top of its sidebar, and it is tempting to copy the position.
-But MDN's sidebar contains *nothing but* the tree, so top-of-sidebar and top-of-tree
-are the same pixel. Ours has two zones, and a control placed above things it does not
-act on is claiming a scope it does not have. Copying MDN's reasoning rather than its
-coordinates puts the filter directly above the tree.
+This was first written the other way — filter directly below the block, both pinned
+above a scrolling tree — on the reasoning that a control placed above things it does
+not act on claims a scope it does not have. Measuring the built result overturned it:
 
-The filter and search are also deliberately different jobs, and must not converge into
+| | |
+|---|---|
+| Sidebar height | 720px |
+| Pinned block + filter | **184px — 26%** |
+| Tree viewport | **362px** |
+| Tree content | 1142px |
+
+The tree had half the panel, and the destinations block alone took more than a third
+of what the tree got, to show five links a reader clicks about once a session.
+Tailwind scrolls its whole sidebar and is right to; what does not transfer is doing
+the same to the filter, because **Tailwind's sidebar contains no controls.** It is
+links all the way down, so nothing stops working when it scrolls off. Ours has an
+input in it.
+
+So the two are split by what they are rather than by what they point at. The block
+scrolls away with the tree. The filter is pinned, which puts it beside Search — two
+text-entry controls in a chrome cluster, with the scroll boundary separating chrome
+from content. That reads as a controls group rather than as a header for the block,
+which is what the original ordering argument was trying to prevent.
+
+The measured result: the pinned region falls from 184px to 159px while absorbing the
+filter, and the tree viewport goes from 362px to 561px — **55% more tree**.
+
+The filter and search remain deliberately different jobs, and must not converge into
 one worse thing. **Search takes you somewhere; the filter narrows what is on screen
 and keeps you oriented** — preserving the tree, keeping group headings, expanding
 sections that contain matches. On an unscoped tree this is worth more than it is to
 MDN: typing `meta` surfaces `getmetatable()` under Globals *and* `__index` under
 Language › Metatables, each still in place.
 
-### Only the tree scrolls
-
-Tailwind can let its whole sidebar scroll because its tree runs to a few dozen rows.
-Reference is ~295 entries. A filter that scrolls out of reach is unreachable exactly
-where it earns its keep, which is deep inside `math`.
+**The rejected third option** was a filter that scrolls with the block and then sticks
+to the top of the viewport, which would cost nothing at all. It is not buildable on
+today's layout: fumadocs renders `banner` outside the scroll viewport and `links`
+inside it, and a `custom` link item's wrapper is only as tall as its own content, so a
+sticky child has no distance to travel. Getting it would mean reproducing ~200 lines
+of fumadocs's sidebar internals, which drift on upgrade. Worth revisiting when slice 2
+owns the shell outright — the design is right, the plumbing is not there yet.
 
 ### No context bar
 
@@ -129,3 +153,10 @@ active destination is the only bold row in it.
   discovered during v2. i18n itself stays deferred to v2.
 - The destinations block needs an icon per row, which is the first place the site
   commits to icon vocabulary beyond incidental `lucide-react` use.
+- **The sidebar's footer bar is dropped.** It held a GitHub icon and the theme switch.
+  GitHub is already the Community destination, and theme belongs with the other
+  preferences in the header row, so the bar had nothing left to hold — fumadocs
+  removes the element entirely once `githubUrl`, `themeSwitch` and `languageSelect`
+  are all absent. That is another 60px back.
+- **Theme is a three-way control** — light, dark, system — not a two-state toggle.
+  System is what most readers actually want and neither fixed choice expresses it.

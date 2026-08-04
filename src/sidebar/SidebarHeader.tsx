@@ -3,13 +3,18 @@ import { Filter } from 'lucide-react';
 import { destinationFor, destinations } from './destinations';
 
 /**
- * The two things above the tree (ADR 0007): a block of destinations, then the filter.
+ * The two things above the tree (ADR 0007), which live in different places because
+ * they scroll differently.
  *
- * The filter sits **below** the block rather than at the top of the sidebar, because
- * it acts on the tree and not on the block. MDN puts its filter at the very top, but
- * MDN's sidebar contains nothing except the tree, so top-of-sidebar and top-of-tree
- * are the same pixel there. Copying the reasoning rather than the coordinates puts it
- * here.
+ * The **block scrolls with the tree**, Tailwind-style: it is 134px of links a reader
+ * clicks about once a session, and pinning it cost a quarter of the panel. The
+ * **filter stays pinned**, because a control that scrolls out of reach is useless
+ * exactly where it earns its keep, which is deep inside `math`.
+ *
+ * That splits them across fumadocs's slots — `links` renders inside the scroll
+ * viewport, `banner` above it — so the filter now sits above the block rather than
+ * below it. It reads as a controls cluster with Search rather than as a header for the
+ * destinations, and the scroll boundary is what separates chrome from content.
  */
 const destinationClass =
   'flex items-center gap-3 rounded px-2 py-1.5 text-sm transition-colors hover:text-fd-foreground';
@@ -48,7 +53,26 @@ function DestinationRow({
   );
 }
 
-export function SidebarHeader({
+/** Inside the scroll viewport, above the tree — so it scrolls away with it. */
+export function DestinationsBlock() {
+  const { pathname } = useLocation();
+  const active = destinationFor(pathname);
+
+  return (
+    <nav aria-label="Sections of the site" className="flex flex-col gap-0.5">
+      {destinations.map((destination) => (
+        <DestinationRow
+          key={destination.name}
+          destination={destination}
+          active={!destination.external && destination.name === active.name}
+        />
+      ))}
+    </nav>
+  );
+}
+
+/** Pinned above the viewport, beside Search — the one control that must stay reachable. */
+export function SidebarFilter({
   query,
   onQueryChange,
   resultCount,
@@ -57,40 +81,26 @@ export function SidebarHeader({
   onQueryChange: (value: string) => void;
   resultCount: number;
 }) {
-  const { pathname } = useLocation();
-  const active = destinationFor(pathname);
   const empty = query.trim().length > 0 && resultCount === 0;
 
   return (
-    <div className="flex flex-col gap-4">
-      <nav aria-label="Sections of the site" className="flex flex-col gap-0.5">
-        {destinations.map((destination) => (
-          <DestinationRow
-            key={destination.name}
-            destination={destination}
-            active={!destination.external && destination.name === active.name}
-          />
-        ))}
-      </nav>
-
-      <div>
-        <div className="relative">
-          <Filter className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fd-muted-foreground" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Filter"
-            aria-label="Filter entries"
-            className="w-full rounded-lg border bg-fd-background py-1.5 pe-2 ps-8 text-sm outline-none transition-colors placeholder:text-fd-muted-foreground focus-visible:border-fd-ring"
-          />
-        </div>
-        {empty && (
-          <p role="status" className="px-2 pt-2 text-xs text-fd-muted-foreground">
-            No entries match “{query.trim()}”.
-          </p>
-        )}
+    <div>
+      <div className="relative">
+        <Filter className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fd-muted-foreground" />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Filter"
+          aria-label="Filter entries"
+          className="w-full rounded-lg border bg-fd-background py-1.5 pe-2 ps-8 text-sm outline-none transition-colors placeholder:text-fd-muted-foreground focus-visible:border-fd-ring"
+        />
       </div>
+      {empty && (
+        <p role="status" className="px-2 pt-2 text-xs text-fd-muted-foreground">
+          No entries match “{query.trim()}”.
+        </p>
+      )}
     </div>
   );
 }
