@@ -177,10 +177,19 @@ overview says what to reach for. `math` does not cross-link `tonumber()`, and
 The group is always the last thing in a section, and always titled "Related
 globals". Native entries are never behind a disclosure; borrowed ones always are.
 
-**The sidebar is scoped to one Area at a time**, with a link back up. MDN scopes
-per built-in object because JavaScript has around eighty of them; Lua has ten
-standard libraries, and being able to move from `math` to `string` without
-navigating up is worth keeping. Same idea, one notch coarser.
+**The sidebar shows one Section at a time**, with the Area's row above it as the way
+back up — MDN's arrangement exactly, and its `Standard built-in objects` link.
+
+This was first written the other way: scoped per *Area*, so all ten libraries stayed
+listed, on the reasoning that JavaScript has eighty built-in objects and Lua has ten,
+so hopping between them was worth keeping. Building it disproved that. A Section's
+label is a link with no chevron (rule 3), so leaving the siblings on screen meant
+navigating between them silently expanded one and collapsed another — an accordion
+with no affordance to explain it. Dropping the siblings removes the illusion: nothing
+opens or closes, there is simply less of the tree.
+
+The cost is MDN's cost. Reaching `table` from `string` goes up through the Area
+first. Two clicks, and the Area row is always visible.
 
 ## Visual hierarchy
 

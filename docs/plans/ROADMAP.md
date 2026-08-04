@@ -47,9 +47,10 @@ that is not a link. A section may also end with a `Related globals` group —
 cross-linked rows whose pages stay in `Globals`, because `table.setmetatable` does
 not exist.
 
-Deferred from this slice: the **Area-scoped sidebar**. It is a layout change nothing
-else depends on, and it carries the one deliberate deviation from MDN (MDN scopes
-per built-in object; ADR 0006 scopes per Area). Settle it with slice 2's chrome.
+Scoping was deferred at first and then pulled in, because it turned out not to be
+optional. With every Section listed, navigating silently expanded one and collapsed
+another, with no chevron to explain it — so the sidebar now shows one Section at a
+time, exactly as MDN does. See the amendment in ADR 0006.
 
 ### 2. Page anatomy — and the bespoke UI
 
