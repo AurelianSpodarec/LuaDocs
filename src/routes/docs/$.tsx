@@ -14,7 +14,8 @@ import { baseOptions } from '@/lib/layout.shared';
 import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import { Suspense, use, useMemo } from 'react';
+import { Suspense, use, useMemo, type FC } from 'react';
+import type { BreadcrumbProps } from 'fumadocs-ui/layouts/docs/page';
 import { useMDXComponents } from '@/components/mdx';
 import { compatNodeFor } from '@/compat/registry';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
@@ -22,6 +23,7 @@ import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
 import { createSidebarItem } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
+import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -63,10 +65,12 @@ function Content({
   path,
   markdownUrl,
   luaCompat,
+  Breadcrumb,
 }: {
   path: string;
   markdownUrl: string;
   luaCompat: string | null;
+  Breadcrumb: FC<BreadcrumbProps>;
 }) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
@@ -76,7 +80,7 @@ function Content({
   const node = compatNodeFor(luaCompat);
 
   return (
-    <DocsPage toc={toc}>
+    <DocsPage toc={toc} slots={{ breadcrumb: Breadcrumb }}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
@@ -107,12 +111,19 @@ function Page() {
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
   // Separators become collapsible groups before the layout ever sees the tree.
   const tree = useMemo(() => groupPageTree(pageTree), [pageTree]);
+  // The breadcrumb reads the ungrouped tree: a group is not a level of hierarchy.
+  const Breadcrumb = useMemo(() => createBreadcrumb(pageTree), [pageTree]);
 
   return (
     <DocsLayout {...baseOptions()} tree={tree} sidebar={{ components: { Item: SidebarItem } }}>
       <Link to={markdownUrl} hidden />
       <Suspense>
-        <Content path={path} markdownUrl={markdownUrl} luaCompat={luaCompat} />
+        <Content
+          path={path}
+          markdownUrl={markdownUrl}
+          luaCompat={luaCompat}
+          Breadcrumb={Breadcrumb}
+        />
       </Suspense>
     </DocsLayout>
   );

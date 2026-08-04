@@ -85,6 +85,14 @@ describe('groupPageTree', () => {
     );
   });
 
+  it('does not mutate the tree it is given', () => {
+    // The breadcrumb reads the ungrouped tree, because a group is not a level of
+    // hierarchy. That only works while this stays a copy.
+    const before = JSON.stringify(tree);
+    groupPageTree(tree);
+    expect(JSON.stringify(tree)).toBe(before);
+  });
+
   it('leaves a section with no separators untouched', () => {
     const os = {
       name: 'docs',
