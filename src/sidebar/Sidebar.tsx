@@ -1,11 +1,29 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import type * as PageTree from 'fumadocs-core/page-tree';
 import { ChevronDown } from 'lucide-react';
-import { useId, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { compatNodeFor } from '@/compat/registry';
 import { isAvailable } from '@/compat/resolve';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
 import { SidebarLabel, textOf } from './Label';
+
+/**
+ * True while the sidebar filter has a query in it.
+ *
+ * The filter keeps matches in place rather than flattening them into a result list
+ * (ADR 0007), which only works if every ancestor of a match is open. Collapse state is
+ * therefore suspended while filtering rather than cleared: a Section you shut by hand
+ * is still shut when you empty the box.
+ */
+export const FilteringContext = createContext(false);
 
 /**
  * Modelled on MDN's sidebar, measured from its `Math` page, with one deliberate
@@ -42,9 +60,20 @@ const itemClassName = `${row} px-2 py-1 text-sm leading-6 text-fd-muted-foregrou
 export function createSidebarItem(compatByUrl: Record<string, string>) {
   return function SidebarItem({ item }: { item: PageTree.Item }) {
     const { version } = useSelectedVersion();
+    const { pathname } = useLocation();
     const node = compatNodeFor(compatByUrl[item.url]);
     const unavailable = node ? !isAvailable(node, version) : false;
     const addedIn = node?.support.lua.version_added;
+
+    // The tree is ~295 entries and no longer scoped to one Section, so landing on
+    // `debug.sethook` can leave the highlighted row far below the fold. `nearest`
+    // scrolls only when it has to, so arriving at an already-visible row does not
+    // jolt the sidebar.
+    const active = pathname === item.url;
+    const ref = useRef<HTMLAnchorElement>(null);
+    useEffect(() => {
+      if (active) ref.current?.scrollIntoView({ block: 'nearest' });
+    }, [active]);
 
     const label = (
       <>
@@ -72,6 +101,7 @@ export function createSidebarItem(compatByUrl: Record<string, string>) {
 
     return (
       <Link
+        ref={ref}
         to={item.url}
         activeOptions={{ exact: true }}
         data-unavailable={unavailable || undefined}
@@ -107,12 +137,14 @@ export function createSidebarItem(compatByUrl: Record<string, string>) {
  * height. Both were found by clicking the thing and measuring it.
  */
 function SidebarGroup({ item, children }: { item: PageTree.Folder; children: ReactNode }) {
-  const [open, setOpen] = useState(item.defaultOpen ?? true);
+  const filtering = useContext(FilteringContext);
+  const [collapsed, setCollapsed] = useState(!(item.defaultOpen ?? true));
+  const open = filtering || !collapsed;
 
   return (
     <details
       open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
+      onToggle={(e) => setCollapsed(!e.currentTarget.open)}
       className="[&:not([open])>div]:hidden [&::-webkit-details-marker]:hidden"
     >
       <summary className="cursor-pointer list-none marker:content-['']">
@@ -168,6 +200,7 @@ function SidebarSection({
 }) {
   const { pathname } = useLocation();
   const panelId = useId();
+  const filtering = useContext(FilteringContext);
   const inside = pathname === index.url || pathname.startsWith(`${index.url}/`);
 
   const [override, setOverride] = useState<boolean | null>(null);
@@ -176,7 +209,9 @@ function SidebarSection({
     setWasInside(inside);
     setOverride(null);
   }
-  const open = override ?? inside;
+  // A filter only shows what matched, so everything left is worth seeing. Collapse
+  // state is suspended, not discarded — emptying the box restores it.
+  const open = filtering || (override ?? inside);
 
   const isArea = index.url.split('/').filter(Boolean).length === 2;
   const name = textOf(item.name);

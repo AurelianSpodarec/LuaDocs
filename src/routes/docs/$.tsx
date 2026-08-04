@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from '@tanstack/react-router';
+import { createFileRoute, Link, notFound, useLocation } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { createServerFn } from '@tanstack/react-start';
 import { docs, source } from '@/lib/source';
@@ -14,15 +14,18 @@ import { baseOptions } from '@/lib/layout.shared';
 import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import { Suspense, use, useMemo, type FC } from 'react';
+import { Suspense, use, useMemo, useState, type FC } from 'react';
 import type { BreadcrumbProps } from 'fumadocs-ui/layouts/docs/page';
 import { useMDXComponents } from '@/components/mdx';
 import { compatNodeFor } from '@/compat/registry';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
-import { createSidebarItem, SidebarFolderNode } from '@/sidebar/Sidebar';
+import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
+import { scopeToDestination } from '@/sidebar/destinations';
+import { countEntries, filterPageTree } from '@/sidebar/filterPageTree';
+import { SidebarHeader } from '@/sidebar/SidebarHeader';
 import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
 export const Route = createFileRoute('/docs/$')({
@@ -83,13 +86,14 @@ function Content({
     <DocsPage toc={toc} slots={{ breadcrumb: Breadcrumb }}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
+      {/* The version switcher used to sit here. It moved to the header, where it is
+          visible on every page rather than only on entries (ADR 0007). */}
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
           githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
         />
-        <VersionSwitcher />
       </div>
       {node && (
         <div className="flex flex-col gap-3">
@@ -109,28 +113,52 @@ function Page() {
     Route.useLoaderData(),
   );
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
-  // Fold separators into collapsible groups before the layout ever sees the tree.
-  // The tree does not depend on the route: which Sections are open is state inside
-  // the rows, not a different tree per page.
-  const tree = useMemo(() => groupPageTree(pageTree), [pageTree]);
-  // The breadcrumb reads the ungrouped tree: a group is not a level of hierarchy.
+  const { pathname } = useLocation();
+  const [query, setQuery] = useState('');
+
+  // Three transforms, in the only order that works (ADR 0007). Scope to the active
+  // destination first, so Learn's tree never reaches Reference. Fold separators into
+  // collapsible groups next, so the filter sees folders rather than flat labels.
+  // Filter last, so a group emptied by the query disappears with it.
+  const tree = useMemo(
+    () => filterPageTree(groupPageTree(scopeToDestination(pageTree, pathname)), query),
+    [pageTree, pathname, query],
+  );
+  // The breadcrumb reads the ungrouped, unscoped tree: a group is not a level of
+  // hierarchy, and a crumb must resolve whichever destination you are in.
   const Breadcrumb = useMemo(() => createBreadcrumb(pageTree), [pageTree]);
 
+  const options = baseOptions();
+
   return (
-    <DocsLayout
-      {...baseOptions()}
-      tree={tree}
-      sidebar={{ components: { Item: SidebarItem, Folder: SidebarFolderNode } }}
-    >
-      <Link to={markdownUrl} hidden />
-      <Suspense>
-        <Content
-          path={path}
-          markdownUrl={markdownUrl}
-          luaCompat={luaCompat}
-          Breadcrumb={Breadcrumb}
-        />
-      </Suspense>
-    </DocsLayout>
+    <FilteringContext.Provider value={query.trim().length > 0}>
+      <DocsLayout
+        {...options}
+        // The selected version decides which facts on the page are true, so it is not
+        // a preference and does not belong in a settings menu (ADR 0007).
+        nav={{ ...options.nav, children: <VersionSwitcher /> }}
+        tree={tree}
+        sidebar={{
+          banner: (
+            <SidebarHeader
+              query={query}
+              onQueryChange={setQuery}
+              resultCount={countEntries(tree)}
+            />
+          ),
+          components: { Item: SidebarItem, Folder: SidebarFolderNode },
+        }}
+      >
+        <Link to={markdownUrl} hidden />
+        <Suspense>
+          <Content
+            path={path}
+            markdownUrl={markdownUrl}
+            luaCompat={luaCompat}
+            Breadcrumb={Breadcrumb}
+          />
+        </Suspense>
+      </DocsLayout>
+    </FilteringContext.Provider>
   );
 }
