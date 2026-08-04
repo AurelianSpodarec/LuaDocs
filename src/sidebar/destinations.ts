@@ -1,5 +1,12 @@
 import type * as PageTree from 'fumadocs-core/page-tree';
-import { BookOpen, FileText, GraduationCap, MessagesSquare, type LucideIcon } from 'lucide-react';
+import {
+  BookOpen,
+  FileText,
+  GraduationCap,
+  MessagesSquare,
+  SquareTerminal,
+  type LucideIcon,
+} from 'lucide-react';
 import { gitConfig } from '@/lib/shared';
 
 /**
@@ -33,6 +40,9 @@ export const destinations: Destination[] = [
   },
   { name: 'Learn', url: '/docs/learn', icon: GraduationCap, areas: ['/docs/learn'] },
   { name: 'Guides', url: '/docs/guides', icon: FileText, areas: ['/docs/guides'] },
+  // Not a docs area — it is the standalone editor — and it sits here anyway, exactly
+  // as Tailwind's own Playground does. The route arrives in slice 5.
+  { name: 'Playground', url: '/playground', icon: SquareTerminal },
   {
     name: 'Community',
     url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,

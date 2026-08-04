@@ -9,13 +9,15 @@ import {
   DocsTitle,
   MarkdownCopyButton,
   ViewOptionsPopover,
-} from 'fumadocs-ui/layouts/docs/page';
+  // Paired with the notebook layout below — `DocsPage` reads a context its layout
+  // provides, and the `docs` build of it throws under a notebook `DocsLayout`.
+} from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from '@/lib/layout.shared';
 import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense, use, useMemo, useState, type FC } from 'react';
-import type { BreadcrumbProps } from 'fumadocs-ui/layouts/docs/page';
+import type { BreadcrumbProps } from 'fumadocs-ui/layouts/notebook/page';
 import { useMDXComponents } from '@/components/mdx';
 import { compatNodeFor } from '@/compat/registry';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
@@ -165,6 +167,10 @@ function Page() {
         tabs={false}
         tree={tree}
         sidebar={{
+          // Fumadocs collapses the sidebar on desktop by default. The tree is the
+          // primary navigation on a reference site; there is no reason to offer to
+          // hide it, and the trigger was one more control in a row already crowded.
+          collapsible: false,
           banner: (
             <SidebarFilter
               query={query}

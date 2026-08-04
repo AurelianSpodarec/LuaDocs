@@ -17,7 +17,9 @@ describe('VersionSwitcher', () => {
       </SelectedVersionProvider>,
     );
     const options = screen.getAllByRole('option');
-    expect(options.map((o) => o.textContent)).toEqual([...LUA_VERSIONS]);
+    // Displayed as `v5.4`; the value stays bare so compat data keys still match.
+    expect(options.map((o) => o.textContent)).toEqual(LUA_VERSIONS.map((v) => `v${v}`));
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toEqual([...LUA_VERSIONS]);
     expect(options).toHaveLength(5);
   });
 
