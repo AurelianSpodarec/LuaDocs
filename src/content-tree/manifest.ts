@@ -136,10 +136,50 @@ export const ROOT_PAGES = [
 
 export const CONTENT_TREE: Section[] = [
   section('standard-library', 'Standard Library', '6', [], [
+    section('basic', 'Basic functions', '6.2', [
+      ...fns('', 'assert collectgarbage dofile error getmetatable ipairs load loadfile next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall'),
+      ...fnsFrom('5.1', '', 'getfenv loadstring module setfenv unpack'),
+      entry('_g', '_G', 'constant', 'pdf-_G'),
+      entry('_version', '_VERSION', 'constant', 'pdf-_VERSION'),
+    ]),
+    section('coroutine', 'coroutine', '6.3',
+      fns('coroutine', 'close create isyieldable resume running status wrap yield')),
+    section('package', 'package', '6.4', [
+      ...consts('package', 'config cpath loaded path preload searchers'),
+      ...fns('package', 'loadlib searchpath'),
+      ...constsFrom('5.1', 'package', 'loaders'),
+      ...fnsFrom('5.1', 'package', 'seeall'),
+    ]),
     section('string', 'string', '6.5', [
       ...fns('string', 'byte char dump find format gmatch gsub len lower match pack packsize rep reverse sub unpack upper'),
       construct('patterns', 'Patterns', '6.5.1'),
       construct('pack-formats', 'Format strings for pack and unpack', '6.5.2'),
+    ]),
+    section('utf8', 'utf8', '6.6', [
+      ...fns('utf8', 'char codepoint codes len offset'),
+      ...consts('utf8', 'charpattern'),
+    ]),
+    section('table', 'table', '6.7', [
+      ...fns('table', 'concat create insert move pack remove sort unpack'),
+      ...fnsFrom('5.1', 'table', 'foreach foreachi getn maxn'),
+    ]),
+    section('math', 'math', '6.8', [
+      ...fns('math', 'abs acos asin atan ceil cos deg exp floor fmod frexp ldexp log max min modf rad random randomseed sin sqrt tan tointeger type ult'),
+      ...fnsFrom('5.1', 'math', 'atan2 cosh log10 pow sinh tanh'),
+      ...consts('math', 'huge maxinteger mininteger pi'),
+    ]),
+    section('io', 'io', '6.9', [
+      ...fns('io', 'close flush input lines open output popen read tmpfile type write'),
+      ...consts('io', 'stderr stdin stdout'),
+    ], [
+      section('file-methods', 'File methods', '6.9',
+        methods('file', 'close flush lines read seek setvbuf write')),
+    ]),
+    section('os', 'os', '6.10',
+      fns('os', 'clock date difftime execute exit getenv remove rename setlocale time tmpname')),
+    section('debug', 'debug', '6.11', [
+      ...fns('debug', 'debug gethook getinfo getlocal getmetatable getregistry getupvalue getuservalue sethook setlocal setmetatable setupvalue setuservalue traceback upvalueid upvaluejoin'),
+      ...fnsFrom('5.1', 'debug', 'getfenv setfenv'),
     ]),
   ]),
 ];

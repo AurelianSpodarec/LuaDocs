@@ -63,3 +63,49 @@ describe('the content tree', () => {
     );
   });
 });
+
+describe('the standard library', () => {
+  const counts: Record<string, number> = {
+    basic: 31,
+    coroutine: 8,
+    package: 10,
+    string: 19,
+    utf8: 6,
+    table: 12,
+    math: 35,
+    io: 14,
+    'file-methods': 7,
+    os: 11,
+    debug: 18,
+  };
+
+  it.each(Object.entries(counts))('has %s with %i entries', (slug, count) => {
+    expect(all.find((s) => s.slug === slug)?.entries).toHaveLength(count);
+  });
+
+  it('has 171 entries in total', () => {
+    const lib = all.find((s) => s.slug === 'standard-library')!;
+    const total = walk(lib.sections).reduce((n, s) => n + s.entries.length, 0);
+    expect(total).toBe(171);
+  });
+
+  it('titles a bare global without a library prefix', () => {
+    const basic = all.find((s) => s.slug === 'basic')!;
+    expect(basic.entries.find((e) => e.slug === 'pcall')?.title).toBe('pcall');
+    expect(basic.entries.find((e) => e.slug === '_g')?.title).toBe('_G');
+  });
+
+  it('titles a file method with a colon', () => {
+    const file = all.find((s) => s.slug === 'file-methods')!;
+    expect(file.entries.find((e) => e.slug === 'read')?.title).toBe('file:read');
+  });
+
+  it('sources a symbol 5.5 dropped to the newest manual that has it', () => {
+    const math = all.find((s) => s.slug === 'math')!;
+    expect(math.entries.find((e) => e.slug === 'pow')?.source).toEqual({
+      version: '5.1',
+      anchor: 'pdf-math.pow',
+    });
+    expect(math.entries.find((e) => e.slug === 'abs')?.source.version).toBe('5.5');
+  });
+});
