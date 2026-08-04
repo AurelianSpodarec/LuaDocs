@@ -74,8 +74,8 @@ Three decisions embedded here:
   [page-structure.md](../research/page-structure.md) the entry follows. Nothing
   reads it yet; slice 2 switches the template on it instead of re-deriving it.
 - **`lua-compat` is omitted.** The key must resolve into the compat dataset, and
-  ~285 stubs pointing at absent data would either break the version-support strip
-  or demand ~285 empty JSON files. A stub gains the key when it gains content.
+  ~295 stubs pointing at absent data would either break the version-support strip
+  or demand ~295 empty JSON files. A stub gains the key when it gains content.
 - **`description` is empty**, not invented. An invented description is content,
   and it would survive into search and `llms.txt` unreviewed.
 
@@ -115,11 +115,13 @@ the 5.5 changes list (external strings, `luaL_openselectedlibs`, `luaL_makeseed`
 incremental major collections, compact arrays, dump/undump interning) is C API or
 implementation-internal and touches no entry here.
 
-One item stays open: **`__pairs` and `__ipairs`**. Neither appears in §2.4's
-metamethod list in the 5.5 manual, but neither appears in 5.4's §2.4 either —
-they are documented under `pairs` in §6.2, which the fetched manual text truncated
-before reaching. Both keep an entry; confirming whether `__pairs` survives into
-5.5 is a task in the implementation plan and affects compat data, not the tree.
+A second pass over the manual's full identifier index confirmed every library list
+below symbol-for-symbol, and settled two further things:
+
+- **`__pairs` survives into 5.5**; `__ipairs` is the 5.2-only one, removed in 5.3.
+  Both keep an entry, with `__ipairs` carrying the narrower bound. The 19
+  metamethod entries below cover all 29 metamethods in the index exactly.
+- **§7 Lua Standalone was missing entirely** — see `standalone/` below.
 
 ## The tree
 
@@ -130,8 +132,18 @@ content/docs/
 ├─ guides/
 ├─ language/
 ├─ standard-library/
+├─ standalone/
 └─ c-api/
 ```
+
+`standalone/` is a fifth top-level group, one more than the four recorded in
+[luadocs-features.md](../research/luadocs-features.md) F7 (Guides/Learn, Language,
+Standard Library, C API). It is added deliberately: manual §7 documents the `lua`
+interpreter itself — its command-line options, the `arg` table, and the `LUA_PATH`
+/ `LUA_CPATH` / `LUA_INIT` environment variables — and that is lookup-oriented
+reference, not narrative, so it does not belong in Guides. Without it those
+identifiers have no home. F7's grouping predates this enumeration; this is the
+amendment.
 
 ### `learn/` and `guides/`
 
@@ -202,18 +214,36 @@ compat schema meets them.
 `math.pi` and `table.sort` also exist as prototypes and are the models for the
 constant and function entry types.
 
+### `standalone/` — 6 entries
+
+Manual §7, plus the environment variables the index lists separately:
+
+`command-line-options`, `arg`, `lua-path`, `lua-cpath`, `lua-init`, and
+`script-execution`.
+
+The version-suffixed forms (`LUA_PATH_5_5`, `LUA_INIT_5_5`, …) are **not** separate
+entries. They are the same variable under a version-suffixed name, which the
+interpreter checks before the unsuffixed one — a delta on each entry, and one that
+differs per version by construction.
+
 ### `c-api/` — groups only
 
-Stubbed to group level, not leaf level: `stack-manipulation/`, `types-and-values/`,
-`calling/`, `error-handling/`, `references-and-registry/`, `userdata/`,
-`coroutines/`, `debug-interface/`, `auxiliary-library/` — nine overviews and no
-leaves.
+Stubbed to group level, not leaf level: `types/`, `stack-manipulation/`,
+`types-and-values/`, `calling/`, `error-handling/`, `references-and-registry/`,
+`userdata/`, `coroutines/`, `debug-interface/`, `auxiliary-library/`, `constants/`
+— eleven overviews and no leaves.
 
-The C API is ~250 `lua_*`/`luaL_*` functions, more than Language and Standard
-Library combined, and none of it can carry a runnable example. Stubbing its leaves
-would double the tree in exchange for the least-trafficked area of the site. The
-group overviews are enough to prove the shape; leaves arrive when someone authors
-there.
+The C API is ~330 identifiers by the manual's own index, more than Language and
+Standard Library combined, and none of it can carry a runnable example. It is also
+not all functions: 13 types, ~140 `lua_*` functions, 3 auxiliary types, ~80
+`luaL_*` functions, and ~95 constants (`LUA_OP*`, `LUA_T*`, `LUA_GC*`,
+`LUA_RIDX_*`, `LUA_ERR*`, and the `LUA_*LIBNAME` / `LUA_*LIBK` sets). Hence the
+`types/` and `constants/` groups, which a purely function-oriented grouping had no
+slot for.
+
+Stubbing those leaves would more than double the tree in exchange for the
+least-trafficked area of the site. The group overviews are enough to prove the
+shape; leaves arrive when someone authors there.
 
 ## Verification
 
@@ -230,7 +260,7 @@ The tree is structural, so verification is structural:
 
 ## Consequences
 
-- The sidebar becomes ~285 entries of mostly-empty pages. This is fine while
+- The sidebar becomes ~295 entries of mostly-empty pages. This is fine while
   nothing is deployed and is the point of the exercise; slice 8 (deploy) must not
   ship with the tree in this state, and the roadmap should say so.
 - `llms.txt` and the search index will both cover the stubs. Neither is wired to
