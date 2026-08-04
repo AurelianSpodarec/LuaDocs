@@ -108,7 +108,7 @@ GitHub Actions build + deploy of the static output. Host is deliberately open
 ([ADR 0004](../adr/0004-self-hosted-on-github-no-third-parties.md)); the output is
 static, so this is a late, cheap decision.
 
-**Blocked on content:** slice 1.5 left ~285 entries as empty stubs. Deploy must not
+**Blocked on content:** slice 1.5 left 291 entries as empty stubs. Deploy must not
 ship them — either they are authored, or the build filters unwritten entries out of
 the sidebar, search index and `llms.txt` first.
 
