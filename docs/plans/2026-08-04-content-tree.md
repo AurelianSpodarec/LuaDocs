@@ -895,15 +895,15 @@ describe('the language section', () => {
 
   it('slugs a metamethod without its underscores and titles it with them', () => {
     const meta = all.find((s) => s.slug === 'metatables')!;
-    expect(meta.entries.find((e) => e.slug === 'newindex')?.title).toBe('__newindex');
+    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
   });
 
-  it('routes __index around the reserved index slug', () => {
+  it('exempts only __index from the bare-slug rule, to avoid colliding with the overview', () => {
     const meta = all.find((s) => s.slug === 'metatables')!;
     const slugs = meta.entries.map((e) => e.slug);
     expect(slugs).toContain('index-metamethod');
     expect(slugs).not.toContain('index');
-    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
+    expect(meta.entries.find((e) => e.slug === 'newindex')?.title).toBe('__newindex');
   });
 
   it('groups the arithmetic and bitwise metamethods into one entry each', () => {
