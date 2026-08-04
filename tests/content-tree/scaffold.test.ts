@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scaffoldContent, PLACEHOLDER } from '@/content-tree/scaffold';
-import { section, fns, type Section } from '@/content-tree/manifest';
+import { section, fns, consts, relatedGlobals, type Section } from '@/content-tree/manifest';
 
 const tree: Section[] = [
   section('standard-library', 'Standard Library', '6', [], [
@@ -33,11 +33,44 @@ describe('scaffoldContent', () => {
     expect(text).not.toContain('lua-compat');
   });
 
-  it('writes a meta.json using the rest item rather than listing every entry', async () => {
+  it('writes a meta.json listing pages in manifest order, without the index', async () => {
     await scaffoldContent(dir, tree);
 
     const meta = JSON.parse(await readFile(join(dir, 'standard-library/string/meta.json'), 'utf8'));
-    expect(meta).toEqual({ title: 'string', pages: ['index', '...'] });
+    // No `index`: leaving it unlisted lets the loader claim it as the folder's own
+    // link, so the section is one sidebar row rather than two.
+    expect(meta).toEqual({ title: 'string', pages: ['format', 'upper'] });
+  });
+
+  it('separates groups only when a section holds more than one kind of entry', async () => {
+    const mixed: Section[] = [
+      section('standard-library', 'Standard Library', '6', [], [
+        section('math', 'math', '6.8', [...fns('math', 'abs ceil'), ...consts('math', 'pi')]),
+      ]),
+    ];
+    await scaffoldContent(dir, mixed);
+
+    const meta = JSON.parse(await readFile(join(dir, 'standard-library/math/meta.json'), 'utf8'));
+    expect(meta.pages).toEqual(['---Functions---', 'abs', 'ceil', '---Constants---', 'pi']);
+  });
+
+  it('ends a section with its cross-linked globals', async () => {
+    const withRelated: Section[] = [
+      section('standard-library', 'Standard Library', '6', [], [
+        {
+          ...section('table', 'table', '6.7', fns('table', 'insert')),
+          related: relatedGlobals('pairs'),
+        },
+      ]),
+    ];
+    await scaffoldContent(dir, withRelated);
+
+    const meta = JSON.parse(await readFile(join(dir, 'standard-library/table/meta.json'), 'utf8'));
+    expect(meta.pages).toEqual([
+      'insert',
+      '---Related globals---',
+      '[pairs()](/docs/standard-library/globals/pairs)',
+    ]);
   });
 
   it('gives every section an overview entry', async () => {

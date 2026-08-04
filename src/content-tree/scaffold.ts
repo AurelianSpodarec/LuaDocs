@@ -1,7 +1,14 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { ROOT_PAGES, sourceUrl, type EntryType, type Section, type Source } from './manifest';
+import {
+  pagesOf,
+  ROOT_PAGES,
+  sourceUrl,
+  type EntryType,
+  type Section,
+  type Source,
+} from './manifest';
 
 /** The entire body of an unwritten entry. A JSX comment — MDX rejects `<!-- -->`. */
 export const PLACEHOLDER = '{/* Not yet written. */}';
@@ -50,7 +57,7 @@ export function contentTreeFiles(tree: Section[]): Map<string, string> {
 
   function walk(sec: Section, prefix: string): void {
     const dir = prefix ? `${prefix}/${sec.slug}` : sec.slug;
-    files.set(`${dir}/meta.json`, meta({ title: sec.title, pages: ['index', '...'] }));
+    files.set(`${dir}/meta.json`, meta({ title: sec.title, pages: pagesOf(sec) }));
     files.set(`${dir}/index.mdx`, stub(sec.title, 'overview', sec.source));
     for (const e of sec.entries) {
       files.set(`${dir}/${e.slug}.mdx`, stub(e.title, e.type, e.source));
