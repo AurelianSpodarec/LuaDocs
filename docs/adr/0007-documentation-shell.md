@@ -11,10 +11,10 @@ Five rules govern it:
    in the header. They are never mixed.
 2. **The sidebar has two zones**: a block of destinations at the top, and below it
    the tree belonging to whichever destination is active.
-3. **The block scrolls with the tree.** It is links a reader clicks about once a
-   session, and it is not worth a quarter of the panel.
-4. **The filter is pinned**, in the controls cluster with Search. It is the one thing
-   in the sidebar that stops working when it scrolls away.
+3. **The block sits above the filter, and the filter directly above the tree**, since
+   the filter acts on the tree and not on the block.
+4. **Only the tree scrolls.** The navbar, not a scrolling sidebar, is what pays for
+   the space the block takes.
 5. **One full-width navbar, and it holds controls rather than navigation** —
    wordmark and selected version on the left, search in the middle, theme, language
    and GitHub on the right.
@@ -66,11 +66,12 @@ Language is the awkward one, because it is a preference that also changes conten
 is grouped with theme rather than with version, which is where MDN puts it and where
 readers already look for it.
 
-### The filter is a control, so it is pinned; the block is links, so it is not
+### What pays for the block: the navbar, not a scrolling sidebar
 
-This was first written the other way — filter directly below the block, both pinned
-above a scrolling tree — on the reasoning that a control placed above things it does
-not act on claims a scope it does not have. Measuring the built result overturned it:
+The block and the filter are both pinned, and the reason is worth recording, because
+the obvious alternative was tried and failed for a reason nobody would guess.
+
+Measuring the first build showed the pinned pair was expensive:
 
 | | |
 |---|---|
@@ -80,20 +81,31 @@ not act on claims a scope it does not have. Measuring the built result overturne
 | Tree content | 1142px |
 
 The tree had half the panel, and the destinations block alone took more than a third
-of what the tree got, to show five links a reader clicks about once a session.
-Tailwind scrolls its whole sidebar and is right to; what does not transfer is doing
-the same to the filter, because **Tailwind's sidebar contains no controls.** It is
-links all the way down, so nothing stops working when it scrolls off. Ours has an
-input in it.
+of what the tree got, to show five links a reader clicks about once a session. The
+obvious fix was Tailwind's: let the block scroll away with the tree.
 
-So the two are split by what they are rather than by what they point at. The block
-scrolls away with the tree. The filter is pinned, which puts it beside Search — two
-text-entry controls in a chrome cluster, with the scroll boundary separating chrome
-from content. That reads as a controls group rather than as a header for the block,
-which is what the original ordering argument was trying to prevent.
+**It was built, and it was wrong twice over.**
 
-The measured result: the pinned region falls from 184px to 159px while absorbing the
-filter, and the tree viewport goes from 362px to 561px — **55% more tree**.
+The first problem was ours. A Section's entry is scrolled into view on arrival, so
+landing anywhere below the fold scrolls the tree immediately — and a block living
+inside that scroll region goes with it, before the reader has seen it once.
+
+The second was the layout's, and it is the one worth writing down. Fumadocs's notebook
+layout renders sidebar `links` inside a **`lg:hidden`** wrapper, because that layout
+expects links to live in the navbar and shows them in the sidebar only on small
+screens. Since `links` is also the only slot that renders inside the scroll viewport,
+"scrolls with the tree" and "visible on desktop" are mutually exclusive there. The
+block was invisible above `lg` for as long as that arrangement stood.
+
+So the block is pinned, above the filter — which restores the ordering this ADR wanted
+originally, with the filter directly above the tree it acts on. **The navbar is what
+pays for it.** Moving the wordmark, version, theme and search out of the sidebar buys
+back more than the block costs: against the 362px the tree started with, it now gets
+**502px**, with the block permanently on screen rather than permanently one scroll
+away.
+
+The measurement that started this still stands as the reason the navbar exists. What
+it did not justify was making the block itself disappear.
 
 The filter and search remain deliberately different jobs, and must not converge into
 one worse thing. **Search takes you somewhere; the filter narrows what is on screen
@@ -102,11 +114,11 @@ sections that contain matches. On an unscoped tree this is worth more than it is
 MDN: typing `meta` surfaces `getmetatable()` under Globals *and* `__index` under
 Language › Metatables, each still in place.
 
-**The rejected third option** was a filter that scrolls with the block and then sticks
-to the top of the viewport, which would cost nothing at all. It is not buildable on
-today's layout: fumadocs renders `banner` outside the scroll viewport and `links`
-inside it, and a `custom` link item's wrapper is only as tall as its own content, so a
-sticky child has no distance to travel. Getting it would mean reproducing ~200 lines
+**The rejected option** was a block that scrolls and a filter that sticks to the top
+of the viewport, which would cost nothing at all. It is not buildable on today's
+layout: `banner` renders outside the scroll viewport, `links` renders inside it but
+`lg:hidden`, and a `custom` link item's wrapper is only as tall as its own content, so
+a sticky child has no distance to travel. Getting it would mean reproducing ~200 lines
 of fumadocs's sidebar internals, which drift on upgrade. Worth revisiting when slice 2
 owns the shell outright — the design is right, the plumbing is not there yet.
 
@@ -191,7 +203,10 @@ active destination is the only bold row in it.
   which is what supplies `nav.mode: 'top'`. Two couplings in it are worth knowing
   before someone "tidies up" the options: enabling the `themeSwitch` option puts the
   switch in the navbar *and* re-creates the sidebar footer bar, so theme is passed
-  through `nav.children` instead; and a link without `on: 'menu'` renders in the
-  navbar as well as the sidebar, which would put the destinations in both.
+  through `nav.children` instead; and **`links` is unusable for a desktop sidebar
+  block**, because the notebook sidebar wraps them in `lg:hidden`. `banner` is the
+  only sidebar slot that renders above `lg`. Also note `DocsPage` must be imported
+  from `layouts/notebook/page` — the `layouts/docs` build of it throws at runtime
+  under a notebook layout, and the production build still exits 0 when it does.
 - **`tabs` is off.** Left on, fumadocs derives a tab dropdown from the tree's top
   level and offers a second, competing way to switch Area.

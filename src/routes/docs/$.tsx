@@ -158,10 +158,6 @@ function Page() {
           ),
         }}
         themeSwitch={{ enabled: false }}
-        // `on: 'menu'` keeps the destinations out of the navbar. Without it a link is
-        // rendered in both places; the block belongs to the sidebar, and a `custom`
-        // item is what puts it inside the scroll viewport so it scrolls with the tree.
-        links={[{ type: 'custom', on: 'menu', children: <DestinationsBlock /> }]}
         // The tree's top level is Areas, not product tabs. Left on, fumadocs would
         // derive a tab dropdown from it and offer a second, competing way to switch.
         tabs={false}
@@ -171,12 +167,23 @@ function Page() {
           // primary navigation on a reference site; there is no reason to offer to
           // hide it, and the trigger was one more control in a row already crowded.
           collapsible: false,
+          // `banner` is the only sidebar slot the notebook layout renders on desktop.
+          // Its `links` land in a `lg:hidden` wrapper, because that layout expects
+          // links to live in the navbar and shows them in the sidebar only on small
+          // screens — which made the destinations invisible above `lg`.
+          //
+          // So the block is pinned again, above the filter, which is the order ADR
+          // 0007 wanted in the first place: the filter acts on the tree, so it sits
+          // directly above it. The navbar is what pays for the space now.
           banner: (
-            <SidebarFilter
-              query={query}
-              onQueryChange={setQuery}
-              resultCount={countEntries(tree)}
-            />
+            <div className="flex flex-col gap-4">
+              <DestinationsBlock />
+              <SidebarFilter
+                query={query}
+                onQueryChange={setQuery}
+                resultCount={countEntries(tree)}
+              />
+            </div>
           ),
           components: { Item: SidebarItem, Folder: SidebarFolderNode },
         }}
