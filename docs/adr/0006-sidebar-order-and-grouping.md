@@ -13,7 +13,9 @@ rules govern it:
    a section are **groups**: labelled and collapsible, with no page and no URL —
    structurally identical to MDN's `Static methods`.
 4. **A section's overview is reached by clicking the section itself.** It never
-   also appears as a child.
+   also appears as a child. The row carries a chevron beside the label as a second
+   control: the label navigates, the chevron opens and closes, and on the row you
+   are already reading the label opens and closes too.
 
 ## Why
 
@@ -177,19 +179,52 @@ overview says what to reach for. `math` does not cross-link `tonumber()`, and
 The group is always the last thing in a section, and always titled "Related
 globals". Native entries are never behind a disclosure; borrowed ones always are.
 
-**The sidebar shows one Section at a time**, with the Area's row above it as the way
-back up — MDN's arrangement exactly, and its `Standard built-in objects` link.
+**Every Section stays listed, and each one opens and closes.** Reading `math.abs()`
+leaves `string`, `table` and the rest exactly where they were, one click away.
 
-This was first written the other way: scoped per *Area*, so all ten libraries stayed
-listed, on the reasoning that JavaScript has eighty built-in objects and Lua has ten,
-so hopping between them was worth keeping. Building it disproved that. A Section's
-label is a link with no chevron (rule 3), so leaving the siblings on screen meant
-navigating between them silently expanded one and collapsed another — an accordion
-with no affordance to explain it. Dropping the siblings removes the illusion: nothing
-opens or closes, there is simply less of the tree.
+This was written twice the other way first, and the second attempt is worth recording
+because its reasoning was half right.
 
-The cost is MDN's cost. Reaching `table` from `string` goes up through the Area
-first. Two clicks, and the Area row is always visible.
+It began scoped per *Area*: all ten libraries listed, on the grounds that JavaScript
+has eighty built-in objects and Lua has ten, so hopping between them was cheap to
+keep. Building it appeared to disprove that. A Section's label was a link and nothing
+else, so navigating between siblings silently expanded one and collapsed another — an
+accordion with no affordance to explain it. The response was to scope to one Section
+at a time, as MDN does, and let the Area row be the way back up.
+
+That fixed the symptom at the wrong end. The defect was never that the siblings were
+present; it was that a row could expand while saying nothing about being expandable.
+Hiding the siblings made the unexplained motion invisible rather than explained, and
+charged every reader two clicks and a trip through the Area to get from `string` to
+`table` — on a tree with ten libraries, not eighty.
+
+**The chevron is the missing affordance**, and with it the siblings cost nothing. A
+Section row is two controls sharing a line: the label is a link to the overview, the
+chevron is a disclosure carrying `aria-expanded`. It is deliberately not the
+`<details>`/`<summary>` a group uses — a summary toggles on any click inside it,
+which would make the label do two jobs.
+
+The open/closed rule follows from what went wrong before: **navigation opens, a click
+overrides, and crossing the boundary drops the override.** Arriving at `math.abs()`
+opens `math`. Clicking a chevron wins either way, so `string` can be opened while you
+read `math`, and `math` can be shut while you are inside it. Entering or leaving a
+Section clears its override, so the next arrival behaves like the first. Nothing ever
+moves without either a click or a navigation, and the chevron now reports the result
+of both.
+
+Those two rules collide in one place, and the collision is worth naming because the
+first build of this got it wrong. On the row you are already reading, the link has
+nowhere to go and arriving is what opened the Section — so clicking the row a second
+time did nothing at all, and the row read as open-only. **When the label's navigation
+would be a no-op, the label toggles instead.** Modified clicks are exempt, so
+`⌘`-clicking a Section still opens its overview in a new tab.
+
+The chevron is also drawn at a 24px target rather than the icon's 12px. Beside a
+~190px label, a chevron under the minimum target size is one whose clicks land on the
+label — which is how the open-only behaviour was found.
+
+Areas take the same treatment for the same reason. With every Section listed the tree
+is long enough that closing `C API` is worth doing.
 
 ## Visual hierarchy
 
@@ -216,7 +251,9 @@ Ours is unscoped and four deep, so size and case separate the levels that are
 | Entry — `math.abs()` | mono | 14px | 400 | — |
 
 The Area and the Group share a size but never read alike: the Area is uppercase and
-unindented, the Group is sentence case, indented, and carries a chevron.
+unindented, the Group is sentence case and indented. Every level except the Entry
+carries a chevron, so the chevron separates nothing on its own — it says only that a
+row has something under it.
 
 Whether a name is code is decided from its shape, in `src/sidebar/Label.tsx`:
 whitespace means prose; a leading lowercase letter or underscore means an

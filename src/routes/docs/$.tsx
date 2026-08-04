@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useLocation } from '@tanstack/react-router';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { createServerFn } from '@tanstack/react-start';
 import { docs, source } from '@/lib/source';
@@ -23,7 +23,6 @@ import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
 import { createSidebarItem, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
-import { scopeToPath } from '@/sidebar/scopeToPath';
 import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
 export const Route = createFileRoute('/docs/$')({
@@ -110,13 +109,10 @@ function Page() {
     Route.useLoaderData(),
   );
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
-  // Scope to the Section being read, then fold separators into collapsible groups,
-  // before the layout ever sees the tree.
-  const { pathname } = useLocation();
-  const tree = useMemo(
-    () => groupPageTree(scopeToPath(pageTree, pathname)),
-    [pageTree, pathname],
-  );
+  // Fold separators into collapsible groups before the layout ever sees the tree.
+  // The tree does not depend on the route: which Sections are open is state inside
+  // the rows, not a different tree per page.
+  const tree = useMemo(() => groupPageTree(pageTree), [pageTree]);
   // The breadcrumb reads the ungrouped tree: a group is not a level of hierarchy.
   const Breadcrumb = useMemo(() => createBreadcrumb(pageTree), [pageTree]);
 
