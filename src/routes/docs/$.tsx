@@ -21,6 +21,7 @@ import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
 import { createSidebarItem } from '@/sidebar/Sidebar';
+import { groupPageTree } from '@/sidebar/groupPageTree';
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -104,9 +105,11 @@ function Page() {
     Route.useLoaderData(),
   );
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
+  // Separators become collapsible groups before the layout ever sees the tree.
+  const tree = useMemo(() => groupPageTree(pageTree), [pageTree]);
 
   return (
-    <DocsLayout {...baseOptions()} tree={pageTree} sidebar={{ components: { Item: SidebarItem } }}>
+    <DocsLayout {...baseOptions()} tree={tree} sidebar={{ components: { Item: SidebarItem } }}>
       <Link to={markdownUrl} hidden />
       <Suspense>
         <Content path={path} markdownUrl={markdownUrl} luaCompat={luaCompat} />
