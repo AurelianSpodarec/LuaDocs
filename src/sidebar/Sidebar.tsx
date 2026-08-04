@@ -1,13 +1,7 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import type * as PageTree from 'fumadocs-core/page-tree';
-import {
-  SidebarFolder,
-  SidebarFolderContent,
-  SidebarFolderLink,
-  SidebarFolderTrigger,
-  useFolderDepth,
-} from 'fumadocs-ui/components/sidebar/base';
-import type { ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { compatNodeFor } from '@/compat/registry';
 import { isAvailable } from '@/compat/resolve';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
@@ -98,6 +92,43 @@ export function createSidebarItem(compatByUrl: Record<string, string>) {
  *   collapse trigger at weight 400, sans-serif, with the chevron hanging to its left
  *   exactly as MDN's `Static methods` does.
  */
+/**
+ * A group has no page, so collapsing is the only thing it can do — MDN's `Static
+ * methods`, and this is MDN's markup: a native `<details>`/`<summary>`. Fumadocs's
+ * collapsible is driven by an exit transition that left the panel at full height when
+ * toggled shut, and none of its machinery buys anything here — `<summary>` already
+ * carries the disclosure semantics, the keyboard handling and the toggling.
+ *
+ * Two things here look redundant and are not. The flex layout sits on an inner span,
+ * never on the `<summary>` itself — giving a summary a `display` other than its
+ * default stops the browser hiding the panel at all. And the panel is hidden by an
+ * explicit rule rather than left to the user agent, because even with that fixed,
+ * something in this stack kept a closed `<details>`'s content laid out at full
+ * height. Both were found by clicking the thing and measuring it.
+ */
+function SidebarGroup({ item, children }: { item: PageTree.Folder; children: ReactNode }) {
+  const [open, setOpen] = useState(item.defaultOpen ?? true);
+
+  return (
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="[&:not([open])>div]:hidden [&::-webkit-details-marker]:hidden"
+    >
+      <summary className="cursor-pointer list-none marker:content-['']">
+        <span className={groupClass}>
+          <ChevronDown className={`size-3 transition-transform ${open ? '' : '-rotate-90'}`} />
+          {item.icon}
+          <SidebarLabel name={item.name} />
+        </span>
+      </summary>
+      {/* 8px per level, as MDN indents: typeface and weight already say which level
+          you are on. */}
+      <div className="ps-2">{children}</div>
+    </details>
+  );
+}
+
 export function SidebarFolderNode({
   item,
   children,
@@ -106,29 +137,35 @@ export function SidebarFolderNode({
   children: ReactNode;
 }) {
   const { pathname } = useLocation();
-  const depth = useFolderDepth();
   const index = item.index;
-  const active = index ? pathname === index.url : false;
-  const inPath = index ? pathname.startsWith(index.url) : true;
-  // Depth 0 is an Area; anything deeper with an overview is a Section.
-  const linkClass = depth === 0 ? areaClass : sectionClass;
+
+  // A group has no page, so collapsing is the only thing it can do — MDN's `Static
+  // methods`, and this is MDN's markup: a native `<details>`/`<summary>`. Fumadocs's
+  // collapsible is driven by an exit transition that left the panel at full height
+  // when toggled shut, and none of its machinery buys anything here: `<summary>`
+  // already gives us the disclosure semantics, keyboard support and toggling.
+  if (!index) {
+    return <SidebarGroup item={item}>{children}</SidebarGroup>;
+  }
+
+  // An Area or a Section has an overview, so its label is a link and nothing else.
+  // MDN's `Math` has no chevron: you cannot collapse it, and its members are simply
+  // there. Expansion follows navigation rather than being a second thing to click,
+  // which is also what keeps the unscoped tree down to a readable length.
+  const inside = pathname === index.url || pathname.startsWith(`${index.url}/`);
+  const isArea = index.url.split('/').filter(Boolean).length === 2;
 
   return (
-    <SidebarFolder collapsible={item.collapsible} active={inPath} defaultOpen={item.defaultOpen}>
-      {index ? (
-        <SidebarFolderLink href={index.url} active={active} className={linkClass}>
-          {item.icon}
-          <SidebarLabel name={item.name} />
-        </SidebarFolderLink>
-      ) : (
-        <SidebarFolderTrigger className={groupClass}>
-          {item.icon}
-          <SidebarLabel name={item.name} />
-        </SidebarFolderTrigger>
-      )}
-      {/* 8px per level, as MDN indents. It does not need more, because typeface and
-          weight are already saying which level you are on. */}
-      <SidebarFolderContent className="ps-2">{children}</SidebarFolderContent>
-    </SidebarFolder>
+    <div>
+      <Link
+        to={index.url}
+        data-active={pathname === index.url || undefined}
+        className={isArea ? areaClass : sectionClass}
+      >
+        {item.icon}
+        <SidebarLabel name={item.name} />
+      </Link>
+      {inside && <div className="ps-2">{children}</div>}
+    </div>
   );
 }
