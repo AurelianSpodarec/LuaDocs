@@ -3,8 +3,9 @@
 An MDN-style documentation site for the Lua language, rewritten from the official
 manual, with per-version content (5.1–5.5) and runnable examples.
 
-Built on TanStack Start (static prerender) with Fumadocs used headless for the
-content pipeline. See [ADR 0005](docs/adr/0005-platform-fumadocs-on-tanstack-start.md).
+Built on TanStack Start, prerendered to static HTML, with Fumadocs providing the
+content pipeline. The UI currently uses Fumadocs's theme; a bespoke UI is planned.
+See [ADR 0005](docs/adr/0005-platform-fumadocs-on-tanstack-start.md).
 
 ## Development
 

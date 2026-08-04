@@ -28,7 +28,10 @@ Static-prerendered Fumadocs-on-TanStack-Start, custom UI, compat-data-driven ver
 switching, and a real Wasmoon runnable example, using `string.format` as the vehicle.
 Proves feasibility, not completeness.
 
-### 2. Page anatomy
+### 2. Page anatomy — and the bespoke UI
+
+Replaces Fumadocs's theme with our own chrome, which the version slice deferred
+(see the amendment on [ADR 0005](../adr/0005-platform-fumadocs-on-tanstack-start.md)).
 
 The full reference-entry template from
 [page-structure.md](../research/page-structure.md): syntax block, parameters, return
