@@ -87,6 +87,13 @@ _Avoid_: REPL, sandbox, editor
 
 ### Interface elements
 
+**Divider**:
+A labelled break inside a section's entry list in the sidebar — "Functions",
+"Constants", "File methods". It names a run of entries and nothing more: it has no
+overview, no URL, and cannot be clicked. A section that holds only one kind of entry
+has no dividers.
+_Avoid_: group, subsection, category, separator
+
 **Version switcher**:
 The global header control that sets the selected version.
 _Avoid_: version selector, picker, toggle
