@@ -8,9 +8,14 @@ export function RunnableExample({ code }: { code: string }) {
 
   async function run() {
     setRunning(true);
-    const r = await runLua(source);
-    setOutput(r.error ? `error: ${r.error}` : r.output);
-    setRunning(false);
+    try {
+      const r = await runLua(source);
+      setOutput(r.error ? `error: ${r.error}` : r.output);
+    } catch (err) {
+      setOutput(`error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setRunning(false);
+    }
   }
 
   return (

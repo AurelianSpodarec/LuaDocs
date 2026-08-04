@@ -37,6 +37,19 @@ describe('RunnableExample', () => {
     });
   });
 
+  it('returns the button to idle and shows an error when runLua rejects', async () => {
+    mockRunLua.mockRejectedValue(new Error('worker construction failed'));
+    render(<RunnableExample code="print(1)" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /run/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^run$/i })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^run$/i })).not.toBeDisabled();
+    expect(screen.getByLabelText('output')).toHaveTextContent('error: worker construction failed');
+  });
+
   it('restores the original code when Reset is clicked after editing', () => {
     render(<RunnableExample code="print(1)" />);
 
