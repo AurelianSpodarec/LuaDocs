@@ -22,10 +22,13 @@
 
 ## File Structure
 
-- `app.config.ts` / `vite.config.ts` — TanStack Start + Fumadocs MDX + Tailwind + prerender config.
-- `source.config.ts` — Fumadocs MDX collection + Zod frontmatter schema (`lua-compat` key).
-- `src/routes/docs.$.tsx` — the catch-all docs route (loader + custom render).
-- `src/content/docs/string.format.mdx` — the first ported entry.
+- `vite.config.ts` — TanStack Start + Fumadocs MDX + Tailwind + prerender config.
+- `src/lib/source.ts` — Fumadocs MDX collection (`defineDocs`) + Zod frontmatter schema
+  (`lua-compat` key). **Note:** current `fumadocs-mdx` has no `source.config.ts`;
+  `defineDocs` comes from `fumadocs-mdx/macro` and lives in this file.
+- `src/routes/docs/$.tsx` — the catch-all docs route (loader + custom render).
+- `content/docs/string.format.mdx` — the first ported entry. **Note:** content lives at
+  `content/docs/`, not `src/content/docs/`.
 - `src/compat/schema.ts` — Zod schema for a compat node.
 - `src/compat/data/string.format.json` — compat facts for the entry.
 - `src/compat/resolve.ts` — pure version-resolution functions.
@@ -42,8 +45,16 @@
 
 ## Task 1: Scaffold Fumadocs + TanStack Start and prove static prerender
 
+> **DONE — as built (commit `cfa9f56`).** The steps below are kept as the original
+> record; where they disagree with the repo, the repo wins. Differences: the
+> `create-fumadocs-app` CLI is interactive and has no `--no-install`, so the template
+> was extracted from the published tarball; the `tanstack-start-spa` template was used
+> (it already ships the SPA+prerender config of Step 3, so Step 3 was a no-op); there
+> is no `source.config.ts`; content lives in `content/docs/`. Gate passed —
+> `.output/public/docs/test/index.html` contains real prerendered page text.
+
 **Files:**
-- Create: project scaffold at repo root (`package.json`, `vite.config.ts`, `src/`, `source.config.ts`).
+- Create: project scaffold at repo root (`package.json`, `vite.config.ts`, `src/`).
 - Modify: `.gitignore` (add `node_modules`, `dist`, `.output`, `.tanstack`).
 
 **Interfaces:**
@@ -645,8 +656,8 @@ git commit -m "feat: add version strip, switcher, and runnable-example component
 ## Task 7: Wire the `string.format` page end-to-end
 
 **Files:**
-- Create: `src/content/docs/string.format.mdx`
-- Modify: `src/routes/docs.$.tsx` (render strip + switcher + compat wiring), `source.config.ts` (frontmatter schema with `lua-compat`)
+- Create: `content/docs/string.format.mdx`
+- Modify: `src/routes/docs/$.tsx` (render strip + switcher + compat wiring), `src/lib/source.ts` (frontmatter schema with `lua-compat`)
 - Create: `src/sidebar/Sidebar.tsx`
 - Test: `tests/e2e/string-format.test.tsx` (component-level render of the assembled page)
 
@@ -656,7 +667,7 @@ git commit -m "feat: add version strip, switcher, and runnable-example component
 
 - [ ] **Step 1: Author the entry MDX (ported from the prototype)**
 
-`src/content/docs/string.format.mdx` — frontmatter carries the compat pointer; prose omits hand-written version facts (they come from compat data):
+`content/docs/string.format.mdx` — frontmatter carries the compat pointer; prose omits hand-written version facts (they come from compat data):
 ```mdx
 ---
 title: string.format
@@ -670,23 +681,31 @@ Builds a string by inserting values into a template, using the same directives a
 
 - [ ] **Step 2: Extend the Fumadocs frontmatter schema**
 
-`source.config.ts`:
+There is no `source.config.ts` in current `fumadocs-mdx` — the collection is declared
+inline via the `fumadocs-mdx/macro` `defineDocs`. Extend the existing call in
+`src/lib/source.ts`, keeping the `async` and `postprocess` options already there:
+
 ```ts
-import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
+import { defineDocs } from 'fumadocs-mdx/macro';
 import { pageSchema } from 'fumadocs-core/source/schema';
 import { z } from 'zod';
 
 export const docs = defineDocs({
-  dir: 'src/content/docs',
-  docs: { schema: pageSchema.extend({ 'lua-compat': z.string().optional() }) },
+  dir: 'content/docs',
+  docs: {
+    async: true,
+    schema: pageSchema.extend({ 'lua-compat': z.string().optional() }),
+    postprocess: { includeProcessedMarkdown: true },
+  },
 });
-
-export default defineConfig({});
 ```
+
+`defineDocs` is a build-time macro: its arguments must be statically analyzable, so
+the schema has to be written inline rather than imported from another module.
 
 - [ ] **Step 3: Assemble the page in the docs route**
 
-In `src/routes/docs.$.tsx`, wrap content in `SelectedVersionProvider`, load the page's compat JSON by its `lua-compat` key, and render `VersionSwitcher` + `VersionSupportStrip` + the MDX body (with `RunnableExample` in the MDX component map). Render the selected-version change note via `changeNoteFor`.
+In `src/routes/docs/$.tsx`, wrap content in `SelectedVersionProvider`, load the page's compat JSON by its `lua-compat` key, and render `VersionSwitcher` + `VersionSupportStrip` + the MDX body (with `RunnableExample` in the MDX component map). Render the selected-version change note via `changeNoteFor`.
 
 - [ ] **Step 4: Build the Option-C sidebar**
 
