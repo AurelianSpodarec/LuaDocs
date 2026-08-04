@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import { createRootRoute, createRouter, createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+import type * as PageTree from 'fumadocs-core/page-tree';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionNote } from '@/version/VersionNote';
 import { compatNodeFor } from '@/compat/registry';
+import { createSidebarItem } from '@/sidebar/Sidebar';
 
 const node = compatNodeFor('string.format')!;
 
@@ -34,7 +37,6 @@ describe('the assembled string.format entry', () => {
   });
 
   it('resolves its compat node from the registry', () => {
-    expect(node).not.toBeNull();
     expect(node.support.lua.version_added).toBe('5.1');
   });
 
@@ -86,5 +88,63 @@ describe('the assembled string.format entry', () => {
     const note = document.querySelector('[data-note="unavailable"]');
     expect(note).toHaveTextContent(/Not in Lua 5\.1/);
     expect(note).toHaveTextContent(/introduced in Lua 5\.3/);
+  });
+});
+
+// Renders the REAL sidebar item factory (src/sidebar/Sidebar.tsx) against the
+// REAL compat registry (src/compat/registry.ts), rather than hand-assembled
+// stand-ins, so the Option-C sidebar behaviour (dimming + version badge) is
+// actually exercised end to end.
+const compatByUrl: Record<string, string> = {
+  '/docs/math.tointeger': 'math.tointeger',
+  '/docs/string.format': 'string.format',
+};
+const SidebarItem = createSidebarItem(compatByUrl);
+
+const mathItem: PageTree.Item = { type: 'page', name: 'math.tointeger', url: '/docs/math.tointeger' };
+const stringItem: PageTree.Item = { type: 'page', name: 'string.format', url: '/docs/string.format' };
+
+function SidebarEntries() {
+  return (
+    <SelectedVersionProvider>
+      <VersionSwitcher />
+      <SidebarItem item={mathItem} />
+      <SidebarItem item={stringItem} />
+    </SelectedVersionProvider>
+  );
+}
+
+function renderSidebarWithRouter() {
+  const rootRoute = createRootRoute({ component: SidebarEntries });
+  const router = createRouter({
+    routeTree: rootRoute,
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
+  render(<RouterProvider router={router} />);
+}
+
+describe('the real sidebar item factory', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('dims math.tointeger with a 5.3+ badge at 5.1, leaving string.format untouched', async () => {
+    renderSidebarWithRouter();
+
+    const mathLink = await screen.findByRole('link', { name: /math\.tointeger/i });
+    const stringLink = screen.getByRole('link', { name: /string\.format/i });
+
+    // At the default version (5.5) both entries exist.
+    expect(mathLink).not.toHaveAttribute('data-unavailable');
+    expect(stringLink).not.toHaveAttribute('data-unavailable');
+
+    selectVersion('5.1');
+
+    expect(mathLink).toHaveAttribute('data-unavailable');
+    expect(within(mathLink).getByText('5.3+')).toBeInTheDocument();
+
+    expect(stringLink).not.toHaveAttribute('data-unavailable');
+    expect(within(stringLink).queryByText(/\+$/)).toBeNull();
   });
 });
