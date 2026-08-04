@@ -1,0 +1,6 @@
+# The generated content tree is compared as text by src/content-tree/scaffold.ts, which
+# writes LF. This repo sets core.autocrlf=true, so without this a fresh clone on Windows
+# would check every generated file out with CRLF, and the generator would then treat the
+# whole tree as hand-edited. Scoped to what the generator owns — nothing else in the repo
+# is renormalised.
+content/docs/** text eol=lf
