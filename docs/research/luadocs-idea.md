@@ -23,6 +23,10 @@ version-aware, with runnable examples, written in clear modern English.
   the original manual is used only as a reference for *what* to document, and each
   entry carries a **source link** back to its lua.org origin.
 - **Follow MDN** for page structure, information architecture, and reading feel.
+- **Lean on GitHub's free primitives** (PRs, Issues, Discussions, Actions) and the
+  browser; don't add a backend or paid third-party service without clear
+  justification. Static-first; hosting platform is a later decision. See
+  [ADR 0004](../adr/0004-self-hosted-on-github-no-third-parties.md).
 - **One canonical set of docs**, defaulting to the latest version, with content
   authored once and varied only by deltas — see
   [ADR 0001](../adr/0001-single-canonical-docs-with-version-deltas.md).
