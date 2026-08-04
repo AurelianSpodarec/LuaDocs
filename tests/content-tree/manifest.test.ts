@@ -146,3 +146,36 @@ describe('the language section', () => {
     expect(statements.entries.map((e) => e.slug)).toContain('to-be-closed-variables');
   });
 });
+
+describe('the remaining sections', () => {
+  it('gives the standalone interpreter its own group', () => {
+    const standalone = all.find((s) => s.slug === 'standalone')!;
+    expect(standalone.entries).toHaveLength(6);
+    expect(standalone.entries.find((e) => e.slug === 'lua-path')?.title).toBe('LUA_PATH');
+  });
+
+  it('stubs the C API to group level only', () => {
+    const cApi = all.find((s) => s.slug === 'c-api')!;
+    expect(cApi.sections).toHaveLength(11);
+    for (const group of cApi.sections) {
+      expect(group.entries, group.slug).toHaveLength(0);
+    }
+  });
+
+  it('types every guide as a guide', () => {
+    const guides = all.find((s) => s.slug === 'guides')!;
+    expect(guides.entries).toHaveLength(4);
+    for (const g of guides.entries) expect(g.type).toBe('guide');
+  });
+
+  it('orders the top-level groups', () => {
+    expect(CONTENT_TREE.map((s) => s.slug)).toEqual([
+      'learn',
+      'guides',
+      'language',
+      'standard-library',
+      'standalone',
+      'c-api',
+    ]);
+  });
+});

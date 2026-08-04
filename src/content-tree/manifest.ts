@@ -141,6 +141,13 @@ export const ROOT_PAGES = [
 ];
 
 export const CONTENT_TREE: Section[] = [
+  section('learn', 'Learn', '1'),
+  section('guides', 'Guides', '1', [
+    entry('lua-in-the-wild', 'Lua in the wild', 'guide', '1'),
+    entry('luarocks-and-the-ecosystem', 'LuaRocks and the ecosystem', 'guide', '1'),
+    entry('how-metatables-work', 'How metatables really work', 'guide', '2.4'),
+    entry('history-of-lua', 'A history of Lua', 'guide', '1'),
+  ]),
   section('language', 'Language', '3', [], [
     section('lexical-conventions', 'Lexical conventions', '3.1', [
       construct('comments', 'Comments', '3.1'),
@@ -266,5 +273,26 @@ export const CONTENT_TREE: Section[] = [
       ...fns('debug', 'debug gethook getinfo getlocal getmetatable getregistry getupvalue getuservalue sethook setlocal setmetatable setupvalue setuservalue traceback upvalueid upvaluejoin'),
       ...fnsFrom('5.1', 'debug', 'getfenv setfenv'),
     ]),
+  ]),
+  section('standalone', 'Standalone interpreter', '7', [
+    construct('command-line-options', 'Command-line options', '7'),
+    construct('script-execution', 'Script execution', '7'),
+    entry('arg', 'arg', 'constant', '7'),
+    entry('lua-path', 'LUA_PATH', 'constant', '6.4'),
+    entry('lua-cpath', 'LUA_CPATH', 'constant', '6.4'),
+    entry('lua-init', 'LUA_INIT', 'constant', '7'),
+  ]),
+  section('c-api', 'C API', '4', [], [
+    section('types', 'Types', '4.6'),
+    section('stack-manipulation', 'Stack manipulation', '4.1'),
+    section('types-and-values', 'Types and values', '4.6'),
+    section('calling', 'Calling', '4.5'),
+    section('error-handling', 'Error handling', '4.4'),
+    section('references-and-registry', 'References and the registry', '4.3'),
+    section('userdata', 'Userdata', '4.6'),
+    section('coroutines', 'Coroutines', '4.5'),
+    section('debug-interface', 'Debug interface', '4.7'),
+    section('auxiliary-library', 'Auxiliary library', '5'),
+    section('constants', 'Constants', '4.6'),
   ]),
 ];
