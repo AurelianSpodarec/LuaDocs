@@ -17,18 +17,27 @@ function isInside(pathname: string, url: string): boolean {
  * Area first, which is why the Area's own row stays visible and linked.
  */
 export function scopeToPath(tree: PageTree.Root, pathname: string): PageTree.Root {
-  return {
-    ...tree,
-    children: tree.children.map((area) => {
-      if (area.type !== 'folder') return area;
+  const kept: string[] = [];
 
-      const current = area.children.find(
-        (child) => child.type === 'folder' && child.index && isInside(pathname, child.index.url),
-      );
+  const children = tree.children.map((area) => {
+    if (area.type !== 'folder') return area;
 
-      // An Area whose children are entries rather than Sections — Guides, C API —
-      // has nothing to scope, and keeps all of them.
-      return current ? { ...area, children: [current] } : area;
-    }),
-  };
+    const current = area.children.find(
+      (child) => child.type === 'folder' && child.index && isInside(pathname, child.index.url),
+    );
+
+    // An Area whose children are entries rather than Sections — Guides, C API —
+    // has nothing to scope, and keeps all of them.
+    if (!current) return area;
+
+    kept.push((current as PageTree.Folder).index!.url);
+    return { ...area, children: [current] };
+  });
+
+  // The layout memoises the tree on `$id` alone, so a scoped copy that inherits the
+  // original id is silently ignored: the sidebar keeps rendering whichever scope was
+  // built on first load, while each Section's own expand check stays live. The result
+  // reads as an accordion — click a Section and it opens among its siblings. Keying
+  // the id to what was kept makes the identity change exactly when the scope does.
+  return { ...tree, $id: `${tree.$id ?? 'tree'}|${kept.join(',')}`, children };
 }

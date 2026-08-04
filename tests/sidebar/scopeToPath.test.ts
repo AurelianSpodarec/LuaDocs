@@ -68,6 +68,24 @@ describe('scopeToPath', () => {
     expect(childrenOf(out, 0)).toEqual(['string', 'table']);
   });
 
+  it('gives each scope its own id, so the layout stops reusing a stale tree', () => {
+    // The layout memoises on `$id` alone. A scoped copy that kept the original id
+    // was ignored, leaving whichever scope was built on first load on screen.
+    const inString = scopeToPath(tree, '/docs/standard-library/string');
+    const inTable = scopeToPath(tree, '/docs/standard-library/table');
+    const unscoped = scopeToPath(tree, '/docs/standard-library');
+
+    expect(inString.$id).not.toBe(inTable.$id);
+    expect(inString.$id).not.toBe(unscoped.$id);
+    expect(inString.$id).not.toBe(tree.$id);
+  });
+
+  it('gives the same scope the same id, so navigating within a section is stable', () => {
+    expect(scopeToPath(tree, '/docs/standard-library/string').$id).toBe(
+      scopeToPath(tree, '/docs/standard-library/string/format').$id,
+    );
+  });
+
   it('does not mutate the tree it is given', () => {
     const before = JSON.stringify(tree);
     scopeToPath(tree, '/docs/standard-library/string');
