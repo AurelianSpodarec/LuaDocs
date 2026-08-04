@@ -24,4 +24,5 @@ npm run dev
 - [CONTEXT.md](CONTEXT.md) — project glossary
 - [docs/adr/](docs/adr/) — architecture decision records
 - [docs/plans/](docs/plans/) — implementation plans
+- [docs/research/](docs/research/) — background research that feeds the ADRs
 - [docs/conventions/commit-messages.md](docs/conventions/commit-messages.md) — commit style
