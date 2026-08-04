@@ -17,4 +17,9 @@ describe('compatNodeSchema', () => {
     const bad = { support: { lua: { version_added: '5.1' } }, changed_in: { '4.0': 'nope' } };
     expect(() => compatNodeSchema.parse(bad)).toThrow();
   });
+
+  it('rejects an unknown key instead of silently stripping it', () => {
+    const typo = { support: { lua: { version_added: '5.1', version_remved: '5.3' } } };
+    expect(() => compatNodeSchema.parse(typo)).toThrow();
+  });
 });

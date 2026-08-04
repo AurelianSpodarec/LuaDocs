@@ -4,8 +4,10 @@ import mathTointeger from './data/math.tointeger.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
- * frontmatter. Parsing at module load means malformed version facts fail the build
- * rather than rendering as a silently wrong support strip.
+ * frontmatter. Parsing at module load, against a strict schema that rejects
+ * unknown keys, means malformed version facts (including typos like
+ * `version_remved`) fail the build rather than rendering as a silently wrong
+ * support strip.
  */
 const raw: Record<string, unknown> = {
   'string.format': stringFormat,
