@@ -88,6 +88,12 @@ Standard Library sits above Language because most lookups that bring a reader
 here are `string.format` or `table.insert`, not `goto`. MDN orders its JavaScript
 reference the same way, with "Standard built-in objects" above "Statements".
 
+**Amended by [ADR 0007](0007-documentation-shell.md):** Learn and Guides leave this
+sequence and become destinations in the sidebar's top block, so the Reference tree is
+`Standard Library · Language · Standalone interpreter · C API`. The argument above is
+unaffected — it was always about lookup beating learning, and that is now expressed by
+separating them rather than by ordering them.
+
 **Standard Library sections** — by how often a reader reaches for them
 
 ```

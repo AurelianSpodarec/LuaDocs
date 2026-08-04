@@ -57,6 +57,12 @@ time, exactly as MDN does. See the amendment in ADR 0006.
 Replaces Fumadocs's theme with our own chrome, which the version slice deferred
 (see the amendment on [ADR 0005](../adr/0005-platform-fumadocs-on-tanstack-start.md)).
 
+The shell is decided in [ADR 0007](../adr/0007-documentation-shell.md): a sidebar
+destinations block above the tree, the text filter between them, version in the header
+with theme and language, and no context bar. It also names three things this slice
+owes that the sidebar work left open — scrolling the active entry into view, collapse
+persistence that stores only explicit clicks, and the deferred version filter.
+
 The full reference-entry template from
 [page-structure.md](../research/page-structure.md): syntax block, parameters, return
 values, the Note/Warning/Gotcha callout set, source link to the original manual, and
