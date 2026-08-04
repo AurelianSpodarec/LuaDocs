@@ -4,8 +4,7 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { nitro } from 'nitro/vite';
-import { CONTENT_TREE } from './src/content-tree/manifest';
-import { contentTreeUrls } from './src/content-tree/scaffold';
+import { CONTENT_TREE, contentTreeUrls } from './src/content-tree/manifest';
 
 export default defineConfig({
   server: {

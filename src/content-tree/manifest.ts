@@ -32,15 +32,11 @@ export interface Section {
   /** Sidebar label, written to `meta.json`. */
   title: string;
   source: Source;
-  /** Frontmatter title of the section's own `index.mdx`. Defaults to `title`. */
-  indexTitle?: string;
   entries: Entry[];
   sections: Section[];
-  /** Explicit `meta.json` page order. Defaults to `['index', '...']`. */
-  pages?: string[];
 }
 
-export const MANUAL_BASE = 'https://www.lua.org/manual';
+const MANUAL_BASE = 'https://www.lua.org/manual';
 
 export function sourceUrl(source: Source): string {
   return `${MANUAL_BASE}/${source.version}/manual.html#${source.anchor}`;
@@ -127,6 +123,22 @@ export function section(
   sections: Section[] = [],
 ): Section {
   return { slug, title, source: { version: '5.5', anchor }, entries, sections };
+}
+
+/**
+ * Every docs URL the tree produces. The prerenderer discovers routes by crawling
+ * links, which cannot see inside a collapsed sidebar folder — so the routes are also
+ * listed explicitly, generated from the same source as the files themselves.
+ */
+export function contentTreeUrls(tree: Section[], prefix = '/docs'): string[] {
+  return tree.flatMap((sec) => {
+    const base = `${prefix}/${sec.slug}`;
+    return [
+      base,
+      ...sec.sections.flatMap((child) => contentTreeUrls([child], base)),
+      ...sec.entries.map((e) => `${base}/${e.slug}`),
+    ];
+  });
 }
 
 /** Order of the top-level groups in the sidebar. */
