@@ -46,4 +46,10 @@ export default defineConfig({
       tslib: 'tslib/tslib.es6.js',
     },
   },
+  optimizeDeps: {
+    // `@base-ui/utils` is ESM but imports these CommonJS shims by named export,
+    // which only works once Vite pre-bundles them. Without this the dev client
+    // entry throws on load and the app never hydrates (blank page).
+    include: ['use-sync-external-store/shim', 'use-sync-external-store/shim/with-selector'],
+  },
 });
