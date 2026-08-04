@@ -19,9 +19,9 @@
 - **`lua-compat` is never added to a stub.** It is added when the entry is authored.
 - **Every entry and every section carries a `source`** — a link back to the official manual passage it is a rewrite of (page-structure.md, section order item 11). It points at the **newest manual that still documents the symbol**: `5.5` for anything in the 5.5 index, `5.1` for anything the 5.5 manual dropped. Carrying the data is this slice's job; rendering the Source line is slice 2's.
 
-### Correction to the design doc
+### Note on the placeholder
 
-The spec's "Stub anatomy" shows an HTML comment, `<!-- Not yet written. -->`. **That is invalid MDX** — MDX 3 parses `<` as JSX and fails on `<!`. Every stub uses the JSX expression comment `{/* Not yet written. */}` instead. This plan is correct; the spec is wrong on that one line.
+The spec originally showed an HTML comment, `<!-- Not yet written. -->`. That is **invalid MDX** — MDX 3 parses `<` as JSX and fails on `<!`. Both documents now use the JSX expression comment `{/* Not yet written. */}`; if you see the HTML form anywhere, it is stale.
 
 ---
 
