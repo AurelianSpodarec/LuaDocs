@@ -21,7 +21,7 @@ import { compatNodeFor } from '@/compat/registry';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
-import { createSidebarItem } from '@/sidebar/Sidebar';
+import { createSidebarItem, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
 import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
@@ -115,7 +115,11 @@ function Page() {
   const Breadcrumb = useMemo(() => createBreadcrumb(pageTree), [pageTree]);
 
   return (
-    <DocsLayout {...baseOptions()} tree={tree} sidebar={{ components: { Item: SidebarItem } }}>
+    <DocsLayout
+      {...baseOptions()}
+      tree={tree}
+      sidebar={{ components: { Item: SidebarItem, Folder: SidebarFolderNode } }}
+    >
       <Link to={markdownUrl} hidden />
       <Suspense>
         <Content

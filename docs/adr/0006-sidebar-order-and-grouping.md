@@ -182,6 +182,39 @@ per built-in object because JavaScript has around eighty of them; Lua has ten
 standard libraries, and being able to move from `math` to `string` without
 navigating up is worth keeping. Same idea, one notch coarser.
 
+## Visual hierarchy
+
+MDN is the reference for how the sidebar *looks*, not only how it is ordered. Two
+things are copied from its `Math` page, measured rather than eyeballed:
+
+- **Typeface carries the hierarchy.** An identifier is set in the mono face
+  (`math.abs()`, `nil`, `_G`); a structural label is set in the UI face
+  (`Functions`, `Values and types`). This is the single largest readability win and
+  the thing the sidebar was missing.
+- **Indentation barely does.** 8px per level. MDN does not need more, because type
+  is already doing the work.
+
+One deliberate departure: MDN sets **every** row at 16px. It can, because its
+sidebar is scoped to one built-in object and shows two or three levels at a time.
+Ours is unscoped and four deep, so size and case separate the levels that are
+*labels* from the levels that are *content*:
+
+| Level | Face | Size | Weight | Case |
+|---|---|---|---|---|
+| Area — `Standard Library` | UI | 12px | 600 | upper, tracked |
+| Section — `math` | mono | 15px | 600 | — |
+| Group — `Functions` | UI | 12px | 500 | — |
+| Entry — `math.abs()` | mono | 14px | 400 | — |
+
+The Area and the Group share a size but never read alike: the Area is uppercase and
+unindented, the Group is sentence case, indented, and carries a chevron.
+
+Whether a name is code is decided from its shape, in `src/sidebar/Label.tsx`:
+whitespace means prose; a leading lowercase letter or underscore means an
+identifier; and what remains is code only if it carries a dot, colon, underscore or
+call parens — which is what keeps `LUA_PATH` mono while leaving `Functions`,
+`Globals` and `Language` in the UI face.
+
 ## Consequences
 
 - The generated `meta.json` shape — `{"pages": ["index", "..."]}` — is wrong on
