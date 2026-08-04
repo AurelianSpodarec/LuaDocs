@@ -42,6 +42,12 @@ describe('executeLua', () => {
     expect(typeof r.output).toBe('string');
   });
 
+  it('prints Lua nil as "nil", never as "null"', async () => {
+    const r = await executeLua('print(nil)');
+    expect(r.output).toContain('nil');
+    expect(r.output).not.toContain('null');
+  });
+
   it('resolves with the normal result shape even if cleanup (global.close) throws', async () => {
     const closeSpy = vi.spyOn(LuaGlobal.prototype, 'close').mockImplementationOnce(() => {
       throw new Error('close failed');

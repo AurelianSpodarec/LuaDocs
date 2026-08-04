@@ -6,7 +6,7 @@ export async function executeLua(code: string): Promise<{ output: string; error:
   let output = '';
   try {
     lua.global.set('print', (...args: unknown[]) => {
-      output += args.map((a) => (a === undefined ? 'nil' : String(a))).join('\t') + '\n';
+      output += args.map((a) => (a === undefined || a === null ? 'nil' : String(a))).join('\t') + '\n';
     });
     await lua.doString(code);
     return { output, error: null };
