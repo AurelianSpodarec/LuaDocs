@@ -124,10 +124,13 @@ do … end blocks · Function declarations · To-be-closed variables
 
 ## Labels and scope
 
-**Entry labels drop the prefix their section already supplies and take parentheses
-when callable.** Under `string`, entries read `format()` and `byte()`, not
-`string.format`. Under `math`, `pi` and `huge` stay bare. Frontmatter titles are
-unaffected — the page is still titled `string.format`.
+**Entry titles are fully qualified and take parentheses when callable** —
+`string.format()`, `math.pi`, `file:read()` — in the sidebar, the page heading, the
+breadcrumb and search alike. MDN shortens its sidebar rows to `abs()` because
+`Array.prototype.` is sixteen characters of noise; Lua's prefixes are five to seven,
+and keeping them buys two things worth more than the width. A row can be pasted
+straight into code. And **dotted means library member, bare means global** — which
+is what makes the cross-links below legible.
 
 **Groups appear only when a section holds more than one kind of entry.** `table`
 and `os` are all functions and get none, exactly as MDN gives a single-kind object
@@ -139,6 +142,40 @@ exist to let a reader collapse noise, not to hide entries from them.
 entries, but not for file methods, which are typed `function` and still belong
 apart. Each entry therefore carries its group name explicitly, defaulted from its
 type.
+
+## Cross-links
+
+A section may end with a **Related globals** group: rows linking to entries that
+live in `Globals` but that a reader would look for here first. `setmetatable()` is
+entirely about tables, and someone reading `table` should see it.
+
+**The row appears twice; the entry does not.** The page stays at
+`/docs/standard-library/globals/setmetatable`. Relocating it under `table` would
+put it at a URL asserting that `table.setmetatable` exists — it does not, and
+calling it is a runtime error — and would leave `Globals` missing its most-used
+functions. Sidebar rows are free; pages are not
+([ADR 0001](0001-single-canonical-docs-with-version-deltas.md)).
+
+Fully-qualified titles are what make this readable: `table.concat()` is dotted,
+`setmetatable()` is bare, and the reader can see which is which without being told.
+
+Cross-links are deliberately rare — only where a reader would plausibly search a
+section first and find nothing:
+
+| Section | Related globals |
+|---|---|
+| `table` | `getmetatable()` `ipairs()` `next()` `pairs()` `rawget()` `rawlen()` `rawset()` `setmetatable()` |
+| `string` | `tostring()` |
+| `package` | `dofile()` `loadfile()` `require()` |
+| `Language > Metatables and metamethods` | `getmetatable()` `rawget()` `rawlen()` `rawset()` `setmetatable()` |
+
+Everything else uses the entry's **See also** and its section overview, which is
+where a task-oriented view belongs: the sidebar says where a thing lives, the
+overview says what to reach for. `math` does not cross-link `tonumber()`, and
+`Error handling` does not cross-link `pcall()`; both are prose links.
+
+The group is always the last thing in a section, and always titled "Related
+globals". Native entries are never behind a disclosure; borrowed ones always are.
 
 **The sidebar is scoped to one Area at a time**, with a link back up. MDN scopes
 per built-in object because JavaScript has around eighty of them; Lua has ten
@@ -164,10 +201,11 @@ navigating up is worth keeping. Same idea, one notch coarser.
 - The glossary gains **Group** for the collapsible run of entries, and **Section**
   drops "group" from its _Avoid_ list, since the word now names a real thing.
 - Today's tooling expresses part of this and not the rest. `fumadocs-core` claims
-  an unlisted `index.mdx` as the folder's own link, which gives rule 4 for free.
-  It has no group: its `---Label---` `pages` entry is a static separator, which
-  cannot collapse and does not own the entries beneath it. **We build the group
-  ourselves.** Per [ADR 0005](0005-platform-fumadocs-on-tanstack-start.md) the UI
-  is ours anyway; the design is not cut down to what the plumbing already has.
+  an unlisted `index.mdx` as the folder's own link, which gives rule 4 for free,
+  and its `pages` array accepts `[Name](/url)` items, which gives cross-links for
+  free. It has no group: its `---Label---` `pages` entry is a static separator,
+  which cannot collapse and does not own the entries beneath it. **We build the
+  group ourselves.** Per [ADR 0005](0005-platform-fumadocs-on-tanstack-start.md)
+  the UI is ours anyway; the design is not cut down to what the plumbing has.
 - Version availability is out of scope here. Dimming unavailable entries rather
   than hiding them is already settled, and is orthogonal to order and grouping.

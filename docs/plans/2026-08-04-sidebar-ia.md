@@ -25,7 +25,7 @@
 | `src/content-tree/scaffold.ts` | Manifest → `content/docs/` | Modify: emit explicit ordered `pages` with separators |
 | `src/sidebar/groupPageTree.ts` | Fold separators into collapsible groups; rewrite entry labels | **Create** |
 | `src/sidebar/Sidebar.tsx` | Per-item render (version dimming) | Unchanged |
-| `src/routes/docs/$.tsx` | Loader + layout wiring | Modify: build `entryTypeByUrl`, apply the transform |
+| `src/routes/docs/$.tsx` | Loader + layout wiring | Modify: apply the group transform to the tree |
 | `tests/content-tree/manifest.test.ts` | Tree invariants | Modify: update counts/order, add rule guards |
 | `tests/content-tree/scaffold.test.ts` | Generator behaviour | Modify: `pages` expectations |
 | `tests/sidebar/groupPageTree.test.ts` | Grouping + labelling | **Create** |
@@ -461,14 +461,14 @@ git commit -m "feat(content-tree): order the tree for readers, not the manual"
 
 ---
 
-### Task 5: Emit the explicit order, with group separators
+### Task 5: Emit the explicit order, with groups and cross-links
 
 **Files:**
 - Modify: `src/content-tree/manifest.ts`, `src/content-tree/scaffold.ts`
 - Test: `tests/content-tree/scaffold.test.ts`
 
 **Interfaces:**
-- Produces: `pagesOf(sec: Section): string[]`
+- Produces: `pagesOf(sec: Section): string[]`; `Section.related?: CrossLink[]`; `relatedGlobals(names: string): CrossLink[]`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -494,9 +494,27 @@ it('separates groups only when a section holds more than one kind of entry', asy
   const meta = JSON.parse(await readFile(join(dir, 'standard-library/math/meta.json'), 'utf8'));
   expect(meta.pages).toEqual(['---Functions---', 'abs', 'ceil', '---Constants---', 'pi']);
 });
+
+it('ends a section with its cross-linked globals', async () => {
+  const withRelated: Section[] = [
+    section('standard-library', 'Standard Library', '6', [], [
+      { ...section('table', 'table', '6.7', fns('table', 'insert')),
+        related: relatedGlobals('pairs') },
+    ]),
+  ];
+  await scaffoldContent(dir, withRelated);
+
+  const meta = JSON.parse(await readFile(join(dir, 'standard-library/table/meta.json'), 'utf8'));
+  // The row lives here; the page stays at its canonical Globals URL.
+  expect(meta.pages).toEqual([
+    'insert',
+    '---Related globals---',
+    '[pairs()](/docs/standard-library/globals/pairs)',
+  ]);
+});
 ```
 
-Add `consts` to the manifest imports in this test file.
+Add `consts` and `relatedGlobals` to the manifest imports in this test file.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -529,8 +547,64 @@ export function pagesOf(sec: Section): string[] {
     }
     pages.push(e.slug);
   }
+
+  if (sec.related?.length) {
+    pages.push('---Related globals---');
+    for (const r of sec.related) pages.push(`[${r.title}](${r.url})`);
+  }
   return pages;
 }
+```
+
+Add the cross-link type and helper. `GLOBALS` must be declared **above**
+`CONTENT_TREE` and spread into it, so `relatedGlobals` can resolve against it:
+
+```ts
+/** A sidebar row pointing at an entry that lives in another section. */
+export interface CrossLink {
+  title: string;
+  url: string;
+}
+
+const GLOBALS = section('globals', 'Globals', '6.2', [
+  ...fns('', 'assert collectgarbage dofile error getmetatable ipairs load loadfile next pairs pcall print rawequal rawget rawlen rawset require select setmetatable tonumber tostring type warn xpcall'),
+  ...fnsFrom('5.1', '', 'getfenv loadstring module setfenv unpack'),
+  entry('_g', '_G', 'constant', 'pdf-_G'),
+  entry('_version', '_VERSION', 'constant', 'pdf-_VERSION'),
+]);
+
+/**
+ * Rows for globals a reader would look for inside another section — `setmetatable()`
+ * under `table`. The row is duplicated, the page is not: the URL stays in Globals,
+ * because `table.setmetatable` does not exist (ADR 0006).
+ */
+export function relatedGlobals(names: string): CrossLink[] {
+  return split(names).map((slug) => {
+    const found = GLOBALS.entries.find((e) => e.slug === slug);
+    if (!found) throw new Error(`no global named "${slug}"`);
+    return { title: found.title, url: `/docs/standard-library/globals/${slug}` };
+  });
+}
+```
+
+Add the optional field to `Section`:
+
+```ts
+  /** Cross-linked rows, shown last, under a "Related globals" group. */
+  related?: CrossLink[];
+```
+
+Attach them in `CONTENT_TREE`, per the table in ADR 0006 — `table`, `string`,
+`package`, and `Language > Metatables and metamethods`. For example:
+
+```ts
+      { ...section('table', 'table', '6.7', [
+          ...fns('table', 'concat create insert move pack remove sort unpack'),
+          ...fnsFrom('5.1', 'table', 'foreach foreachi getn maxn'),
+        ]),
+        related: relatedGlobals(
+          'getmetatable ipairs next pairs rawget rawlen rawset setmetatable',
+        ) },
 ```
 
 In `src/content-tree/scaffold.ts`, import `pagesOf` and change the one line:
@@ -631,16 +705,15 @@ collapse. A `PageTree.Folder` with no `index`, however, renders through
 `SidebarFolderTrigger` as a collapsible, non-link heading — MDN's
 `<details>`/`<summary>`. So we transform the tree before handing it to the layout.
 
-The same pass shortens labels: an entry drops the prefix its section already
-supplies. The parentheses are already in the title (Task 1), so this pass only
-strips — it never appends.
+Titles stay fully qualified (ADR 0006), so this pass only groups — it never
+rewrites a label.
 
 **Files:**
 - Create: `src/sidebar/groupPageTree.ts`
 - Test: `tests/sidebar/groupPageTree.test.ts`
 
 **Interfaces:**
-- Consumes: titles of the form `math.abs()` / `math.pi` (Task 1)
+- Consumes: separator nodes emitted by `pagesOf` (Task 5)
 - Produces: `groupPageTree<T extends PageTree.Root | PageTree.Folder>(node: T): T`
 
 - [ ] **Step 1: Write the failing test**
@@ -684,26 +757,37 @@ describe('groupPageTree', () => {
     expect(constants.name).toBe('Constants');
   });
 
-  it('drops the prefix its section supplies, keeping the parentheses', () => {
+  it('leaves every label fully qualified', () => {
     const math = groupPageTree(tree).children[0] as PageTree.Folder;
     const [functions, constants] = math.children as PageTree.Folder[];
 
-    expect((functions.children[0] as PageTree.Item).name).toBe('abs()');
-    expect((constants.children[0] as PageTree.Item).name).toBe('pi');
+    // Dotted means library member, bare means global — the distinction that makes
+    // a Related globals group legible, so nothing is shortened.
+    expect((functions.children[0] as PageTree.Item).name).toBe('math.abs()');
+    expect((constants.children[0] as PageTree.Item).name).toBe('math.pi');
   });
 
-  it('keeps a prefix the section does not supply', () => {
-    const io = {
+  it('folds a cross-linked global into its group, pointing at the canonical URL', () => {
+    const table = {
       name: 'docs',
       children: [{
-        type: 'folder', name: 'io', index: item('io', '/docs/standard-library/io'),
-        children: [item('file:read()', '/docs/standard-library/io/file-read')],
+        type: 'folder', name: 'table', index: item('table', '/docs/standard-library/table'),
+        children: [
+          item('table.insert()', '/docs/standard-library/table/insert'),
+          { type: 'separator', name: 'Related globals' },
+          item('setmetatable()', '/docs/standard-library/globals/setmetatable'),
+        ],
       }],
     } as unknown as PageTree.Root;
 
-    const folder = groupPageTree(io).children[0] as PageTree.Folder;
-    // Stripping `file:` would collide with io.read → read().
-    expect((folder.children[0] as PageTree.Item).name).toBe('file:read()');
+    const folder = groupPageTree(table).children[0] as PageTree.Folder;
+    expect((folder.children[0] as PageTree.Item).name).toBe('table.insert()');
+
+    const related = folder.children[1] as PageTree.Folder;
+    expect(related.name).toBe('Related globals');
+    // The row lives under `table`; the page stays in Globals.
+    expect((related.children[0] as PageTree.Item).url)
+      .toBe('/docs/standard-library/globals/setmetatable');
   });
 });
 ```
@@ -729,16 +813,11 @@ import type * as PageTree from 'fumadocs-core/page-tree';
  * `SidebarFolderTrigger` as exactly that — a collapse trigger that is not a link.
  * So each separator and the items that follow it become one index-less folder.
  *
- * The same pass shortens labels: an entry drops the prefix its section already
- * supplies (`math.abs()` under `math` → `abs()`). Parentheses come from the title
- * itself, so nothing is appended here. `file:read()` under `io` keeps its prefix —
- * the section supplies `io.`, not `file:`, and stripping it would collide with
- * `io.read()`.
+ * Labels are left alone. Titles stay fully qualified (`table.insert()` beside
+ * `setmetatable()`) because dotted-versus-bare is what tells a reader which rows
+ * are members of the section and which are cross-linked globals.
  */
-export function groupPageTree<T extends PageTree.Root | PageTree.Folder>(
-  node: T,
-  sectionTitle?: string,
-): T {
+export function groupPageTree<T extends PageTree.Root | PageTree.Folder>(node: T): T {
   const children: PageTree.Node[] = [];
   let group: PageTree.Folder | null = null;
 
@@ -749,25 +828,13 @@ export function groupPageTree<T extends PageTree.Root | PageTree.Folder>(
       continue;
     }
 
-    const next =
-      child.type === 'folder'
-        ? groupPageTree(child, typeof child.name === 'string' ? child.name : undefined)
-        : relabel(child, sectionTitle);
+    const next = child.type === 'folder' ? groupPageTree(child) : child;
 
     if (group) group.children.push(next);
     else children.push(next);
   }
 
   return { ...node, children };
-}
-
-function relabel(item: PageTree.Item, sectionTitle?: string): PageTree.Item {
-  if (typeof item.name !== 'string' || !sectionTitle) return item;
-
-  const prefix = `${sectionTitle}.`;
-  if (!item.name.startsWith(prefix)) return item;
-
-  return { ...item, name: item.name.slice(prefix.length) };
 }
 ```
 
@@ -820,13 +887,17 @@ Expected: PASS.
 
 - [ ] **Step 3: Verify in the browser**
 
-Start the dev server and open `/docs/standard-library/math`. Confirm, in order:
-`math` appears **once** as the folder heading and links to the overview;
-`Functions` and `Constants` are collapsible headings that do **not** navigate;
-entries read `abs()` not `math.abs()`; `pi` has no parentheses; the page heading
-reads `math.abs()` in full; the standard library lists `Globals, string, table,
-math, io, os, coroutine, utf8, package, debug`. Then open `/docs/language` and
-confirm `Coroutines` is a plain entry with no accordion.
+Start the dev server and check each of these:
+
+- `/docs/standard-library/math` — `math` appears **once** as the folder heading and
+  links to the overview. `Functions` and `Constants` are collapsible headings that
+  do **not** navigate. Rows read `math.abs()` and `math.pi`, fully qualified.
+- `/docs/standard-library/table` — a `Related globals` group sits last and collapses.
+  `setmetatable()` is bare next to the dotted `table.insert()`, and clicking it
+  lands on `/docs/standard-library/globals/setmetatable`.
+- The standard library lists `Globals, string, table, math, io, os, coroutine,
+  utf8, package, debug`, in that order.
+- `/docs/language` — `Coroutines` is a plain entry with no accordion.
 
 - [ ] **Step 4: Commit**
 
