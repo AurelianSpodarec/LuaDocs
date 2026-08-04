@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useLocation } from '@tanstack/react-router';
-import { DocsLayout } from 'fumadocs-ui/layouts/docs';
+import { DocsLayout } from 'fumadocs-ui/layouts/notebook';
 import { createServerFn } from '@tanstack/react-start';
 import { docs, source } from '@/lib/source';
 import {
@@ -135,11 +135,19 @@ function Page() {
     <FilteringContext.Provider value={query.trim().length > 0}>
       <DocsLayout
         {...options}
-        // The selected version decides which facts on the page are true, so it is not
-        // a preference and does not belong in a settings menu (ADR 0007). Theme joins
-        // it here rather than in the sidebar's own footer bar, which is dropped below.
+        // A full-width navbar, as Tailwind's docs have: wordmark and the selected
+        // version on the left, search in the middle, GitHub on the right. It exists to
+        // uncramp the sidebar — five controls were sharing one 30px row inside 268px,
+        // wrapping "Lua version 5.4" onto two lines (ADR 0007).
+        //
+        // The version switcher rides here rather than in a settings menu because it
+        // decides which facts on the page are true, and Tailwind's own `v4.3` chip sits
+        // in exactly this spot. Theme joins it through `nav.children` rather than
+        // through `themeSwitch`, because enabling that option also re-creates the
+        // sidebar footer bar this shell deliberately drops.
         nav={{
           ...options.nav,
+          mode: 'top',
           children: (
             <>
               <VersionSwitcher />
@@ -147,15 +155,14 @@ function Page() {
             </>
           ),
         }}
-        // Both of these exist only to feed fumadocs's sidebar footer bar. GitHub is
-        // already the Community destination, and theme moved to the row above, so the
-        // bar has nothing left in it — and fumadocs drops the element entirely when
-        // all three of githubUrl, themeSwitch and languageSelect are absent.
-        githubUrl={undefined}
         themeSwitch={{ enabled: false }}
-        // A `custom` link renders *inside* the scroll viewport, above the page tree,
-        // which is the only way to make the block scroll with the tree.
-        links={[{ type: 'custom', children: <DestinationsBlock /> }]}
+        // `on: 'menu'` keeps the destinations out of the navbar. Without it a link is
+        // rendered in both places; the block belongs to the sidebar, and a `custom`
+        // item is what puts it inside the scroll viewport so it scrolls with the tree.
+        links={[{ type: 'custom', on: 'menu', children: <DestinationsBlock /> }]}
+        // The tree's top level is Areas, not product tabs. Left on, fumadocs would
+        // derive a tab dropdown from it and offer a second, competing way to switch.
+        tabs={false}
         tree={tree}
         sidebar={{
           banner: (

@@ -15,7 +15,10 @@ Five rules govern it:
    session, and it is not worth a quarter of the panel.
 4. **The filter is pinned**, in the controls cluster with Search. It is the one thing
    in the sidebar that stops working when it scrolls away.
-5. **There is no context bar.** The breadcrumb goes in the article column, above the
+5. **One full-width navbar, and it holds controls rather than navigation** —
+   wordmark and selected version on the left, search in the middle, theme, language
+   and GitHub on the right.
+6. **There is no context bar.** The breadcrumb goes in the article column, above the
    `<h1>`.
 
 ## Why
@@ -107,6 +110,30 @@ sticky child has no distance to travel. Getting it would mean reproducing ~200 l
 of fumadocs's sidebar internals, which drift on upgrade. Worth revisiting when slice 2
 owns the shell outright — the design is right, the plumbing is not there yet.
 
+### The navbar holds controls, not navigation
+
+Tailwind has **both** a header nav and a sidebar block, and the split is a tier one:
+Docs · Blog · Showcase · Partners · Plus are *site sections*, while Documentation ·
+Components · Templates · Playground · Community are *product areas*. LuaDocs has no
+marketing tier. There is one product, so the navbar carries no links at all — only the
+wordmark, the selected version, search, theme, language and GitHub.
+
+That is why the earlier argument against copying MDN's top nav still holds. The
+objection was to a bar of *technologies* duplicating the sidebar's own top level, and
+a bar with no navigation in it duplicates nothing. The destinations stay in the
+sidebar, where they scroll.
+
+The reason to add it at all was that the sidebar was cramped, and measurably so: five
+controls shared one 30px row inside a 268px panel, which wrapped `Lua version 5.4`
+onto two lines. Moving the wordmark, version, theme and search into a navbar takes the
+sidebar's pinned region from 159px to **58px** — just the filter — and the tree
+viewport from 561px to **606px**. The navbar's own 56px is spent against the article's
+top margin, not against the tree.
+
+The selected version sits beside the wordmark because that is exactly where Tailwind
+puts its `v4.3` chip, and for the same reason: it is the one control that changes what
+the whole site is showing you.
+
 ### No context bar
 
 MDN carries a second bar under its header: breadcrumb on the left, Theme and Language
@@ -160,3 +187,11 @@ active destination is the only bold row in it.
   are all absent. That is another 60px back.
 - **Theme is a three-way control** — light, dark, system — not a two-state toggle.
   System is what most readers actually want and neither fixed choice expresses it.
+- The docs pages use fumadocs's **notebook** layout rather than its **docs** layout,
+  which is what supplies `nav.mode: 'top'`. Two couplings in it are worth knowing
+  before someone "tidies up" the options: enabling the `themeSwitch` option puts the
+  switch in the navbar *and* re-creates the sidebar footer bar, so theme is passed
+  through `nav.children` instead; and a link without `on: 'menu'` renders in the
+  navbar as well as the sidebar, which would put the destinations in both.
+- **`tabs` is off.** Left on, fumadocs derives a tab dropdown from the tree's top
+  level and offers a second, competing way to switch Area.
