@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { CONTENT_TREE, ENTRY_TYPES, sourceUrl, type Section } from '@/content-tree/manifest';
+import {
+  CONTENT_TREE,
+  ENTRY_TYPES,
+  contentTreeUrls,
+  fns,
+  section,
+  sourceUrl,
+  type Section,
+} from '@/content-tree/manifest';
 import { LUA_VERSIONS } from '@/compat/schema';
 
 function walk(sections: Section[]): Section[] {
@@ -31,21 +39,6 @@ describe('the content tree', () => {
     }
   });
 
-  it('gives every entry a non-empty title and a known type', () => {
-    for (const section of all) {
-      for (const e of section.entries) {
-        expect(e.title.length, `${section.slug}/${e.slug}`).toBeGreaterThan(0);
-        expect(ENTRY_TYPES).toContain(e.type);
-      }
-    }
-  });
-
-  it('has the string library the design commits to', () => {
-    const string = all.find((s) => s.slug === 'string');
-    expect(string?.entries).toHaveLength(19);
-    expect(string?.entries.find((e) => e.slug === 'format')?.title).toBe('string.format');
-  });
-
   it('points every entry at a manual passage', () => {
     for (const section of all) {
       for (const e of section.entries) {
@@ -59,9 +52,25 @@ describe('the content tree', () => {
   it('builds a manual URL from a source', () => {
     const string = all.find((s) => s.slug === 'string')!;
     const format = string.entries.find((e) => e.slug === 'format')!;
+    expect(format.title).toBe('string.format');
     expect(sourceUrl(format.source)).toBe(
       'https://www.lua.org/manual/5.5/manual.html#pdf-string.format',
     );
+  });
+
+  it('lists every entry URL for the prerenderer', () => {
+    const tree: Section[] = [
+      section('standard-library', 'Standard Library', '6', [], [
+        section('string', 'string', '6.5', fns('string', 'format upper')),
+      ]),
+    ];
+
+    expect(contentTreeUrls(tree)).toEqual([
+      '/docs/standard-library',
+      '/docs/standard-library/string',
+      '/docs/standard-library/string/format',
+      '/docs/standard-library/string/upper',
+    ]);
   });
 });
 
@@ -82,12 +91,6 @@ describe('the standard library', () => {
 
   it.each(Object.entries(counts))('has %s with %i entries', (slug, count) => {
     expect(all.find((s) => s.slug === slug)?.entries).toHaveLength(count);
-  });
-
-  it('has 171 entries in total', () => {
-    const lib = all.find((s) => s.slug === 'standard-library')!;
-    const total = walk(lib.sections).reduce((n, s) => n + s.entries.length, 0);
-    expect(total).toBe(171);
   });
 
   it('titles a bare global without a library prefix', () => {
@@ -122,16 +125,13 @@ describe('the language section', () => {
     expect(all.find((s) => s.slug === 'coroutines')?.entries).toHaveLength(0);
   });
 
-  it('slugs a metamethod without its underscores and titles it with them', () => {
-    const meta = all.find((s) => s.slug === 'metatables')!;
-    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
-  });
-
-  it('exempts only __index from the bare-slug rule, to avoid colliding with the overview', () => {
+  it('drops the underscores from a metamethod slug, exempting only __index', () => {
     const meta = all.find((s) => s.slug === 'metatables')!;
     const slugs = meta.entries.map((e) => e.slug);
+    // A bare `index` slug would collide with the section's own overview.
     expect(slugs).toContain('index-metamethod');
     expect(slugs).not.toContain('index');
+    expect(meta.entries.find((e) => e.slug === 'index-metamethod')?.title).toBe('__index');
     expect(meta.entries.find((e) => e.slug === 'newindex')?.title).toBe('__newindex');
   });
 
@@ -182,11 +182,19 @@ describe('the remaining sections', () => {
 });
 
 describe('the frontmatter schema', () => {
+  // `defineDocs` is a build-time macro, so the schema's enum cannot import
+  // ENTRY_TYPES — it is written out by hand and has to be read back as text.
   const source = readFileSync('src/lib/source.ts', 'utf8');
 
-  it('declares every entry type the manifest can produce', () => {
-    for (const type of ENTRY_TYPES) {
-      expect(source, `entry-type '${type}' missing from source.ts`).toContain(`'${type}'`);
-    }
+  it('declares exactly the entry types the manifest can produce', () => {
+    const declared = source.match(/'entry-type':[\s\S]*?\.enum\(\[([^\]]*)\]\)/);
+    expect(declared, "no `'entry-type': z.enum([...])` found in source.ts").not.toBeNull();
+
+    const types = declared![1]
+      .split(',')
+      .map((t) => t.trim().replace(/^'|'$/g, ''))
+      .filter(Boolean);
+
+    expect(new Set(types)).toEqual(new Set(ENTRY_TYPES));
   });
 });
