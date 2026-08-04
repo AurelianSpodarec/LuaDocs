@@ -1,9 +1,11 @@
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import type { MDXComponents } from 'mdx/types';
+import { RunnableExample } from '@/runner/RunnableExample';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
     ...defaultMdxComponents,
+    RunnableExample,
     ...components,
   } satisfies MDXComponents;
 }

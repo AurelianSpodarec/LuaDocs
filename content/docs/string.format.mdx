@@ -1,0 +1,19 @@
+---
+title: string.format
+description: Build a string by inserting values into a template.
+lua-compat: string.format
+---
+
+Builds a string by inserting values into a template, using the same directives as
+C's `printf`. The first argument is the template; every directive in it consumes one
+of the arguments that follow.
+
+<RunnableExample code={`print(string.format("%s is %d years old", "Ada", 36))`} />
+
+## Common directives
+
+- `%s` — the value as a string
+- `%d` — an integer
+- `%f` — a float
+- `%q` — a value written so Lua can read it back
+- `%%` — a literal percent sign

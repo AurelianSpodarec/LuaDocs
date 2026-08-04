@@ -14,8 +14,13 @@ import { baseOptions } from '@/lib/layout.shared';
 import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import { Suspense, use } from 'react';
+import { Suspense, use, useMemo } from 'react';
 import { useMDXComponents } from '@/components/mdx';
+import { compatNodeFor } from '@/compat/registry';
+import { VersionSupportStrip } from '@/version/VersionSupportStrip';
+import { VersionSwitcher } from '@/version/VersionSwitcher';
+import { VersionNote } from '@/version/VersionNote';
+import { createSidebarItem } from '@/sidebar/Sidebar';
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -36,19 +41,38 @@ const loader = createServerFn({
     const page = source.getPage(slugs);
     if (!page) throw notFound();
 
+    // The sidebar needs every entry's compat key, not just this page's, so it can
+    // dim entries that don't exist in the selected version.
+    const compatByUrl: Record<string, string> = {};
+    for (const other of source.getPages()) {
+      const key = other.data['lua-compat'];
+      if (key) compatByUrl[other.url] = key;
+    }
+
     return {
       path: page.path,
+      luaCompat: page.data['lua-compat'] ?? null,
+      compatByUrl,
       markdownUrl: encodeMarkdownUrl(page.slugs, page.locale),
       pageTree: await source.serializePageTree(source.getPageTree()),
     };
   });
 
-function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
+function Content({
+  path,
+  markdownUrl,
+  luaCompat,
+}: {
+  path: string;
+  markdownUrl: string;
+  luaCompat: string | null;
+}) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
   const { toc } = use(page.load());
   const MDX = page.body;
+  const node = compatNodeFor(luaCompat);
 
   return (
     <DocsPage toc={toc}>
@@ -60,7 +84,14 @@ function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
           markdownUrl={markdownUrl}
           githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
         />
+        <VersionSwitcher />
       </div>
+      {node && (
+        <div className="flex flex-col gap-3">
+          <VersionSupportStrip node={node} />
+          <VersionNote node={node} name={page.title} />
+        </div>
+      )}
       <DocsBody>
         <MDX components={useMDXComponents()} />
       </DocsBody>
@@ -69,13 +100,16 @@ function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
 }
 
 function Page() {
-  const { pageTree, path, markdownUrl } = useFumadocsLoader(Route.useLoaderData());
+  const { pageTree, path, markdownUrl, luaCompat, compatByUrl } = useFumadocsLoader(
+    Route.useLoaderData(),
+  );
+  const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
 
   return (
-    <DocsLayout {...baseOptions()} tree={pageTree}>
+    <DocsLayout {...baseOptions()} tree={pageTree} sidebar={{ components: { Item: SidebarItem } }}>
       <Link to={markdownUrl} hidden />
       <Suspense>
-        <Content path={path} markdownUrl={markdownUrl} />
+        <Content path={path} markdownUrl={markdownUrl} luaCompat={luaCompat} />
       </Suspense>
     </DocsLayout>
   );

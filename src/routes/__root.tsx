@@ -3,6 +3,7 @@ import * as React from 'react';
 import appCss from '@/styles/app.css?url';
 import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 import SearchDialog from '@/components/search';
+import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -15,7 +16,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Fumadocs on TanStack Start',
+        title: 'LuaDocs',
       },
     ],
     links: [{ rel: 'stylesheet', href: appCss }],
@@ -31,7 +32,9 @@ function RootComponent() {
       </head>
       <body className="flex flex-col min-h-screen">
         <RootProvider search={{ SearchDialog }}>
-          <Outlet />
+          <SelectedVersionProvider>
+            <Outlet />
+          </SelectedVersionProvider>
         </RootProvider>
         <Scripts />
       </body>
