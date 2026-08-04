@@ -13,7 +13,14 @@ export async function executeLua(code: string): Promise<{ output: string; error:
   } catch (e) {
     return { output, error: e instanceof Error ? e.message : String(e) };
   } finally {
-    lua.global.close();
+    // A failure while closing the engine must never turn a resolved
+    // { output, error } result into a rejected promise — cleanup errors are
+    // swallowed rather than propagated.
+    try {
+      lua.global.close();
+    } catch {
+      // Intentionally ignored.
+    }
   }
 }
 
