@@ -1,5 +1,6 @@
 import { compatNodeSchema, type CompatNode } from './schema';
 import stringFormat from './data/string.format.json';
+import mathTointeger from './data/math.tointeger.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -8,6 +9,7 @@ import stringFormat from './data/string.format.json';
  */
 const raw: Record<string, unknown> = {
   'string.format': stringFormat,
+  'math.tointeger': mathTointeger,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
