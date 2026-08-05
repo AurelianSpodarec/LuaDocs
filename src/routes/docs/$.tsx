@@ -20,6 +20,9 @@ import { Suspense, use, useMemo, useState, type FC } from 'react';
 import type { BreadcrumbProps } from 'fumadocs-ui/layouts/notebook/page';
 import { useMDXComponents } from '@/components/mdx';
 import { compatNodeFor } from '@/compat/registry';
+import { varies } from '@/compat/resolve';
+import { VersionMatrix } from '@/version/VersionMatrix';
+import { EntrySource } from '@/entry/EntrySource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
@@ -61,6 +64,7 @@ const loader = createServerFn({
     return {
       path: page.path,
       luaCompat: page.data['lua-compat'] ?? null,
+      source: page.data.source ?? null,
       compatByUrl,
       markdownUrl: encodeMarkdownUrl(page.slugs, page.locale),
       pageTree: await source.serializePageTree(source.getPageTree()),
@@ -71,11 +75,13 @@ function Content({
   path,
   markdownUrl,
   luaCompat,
+  sourceUrl,
   Breadcrumb,
 }: {
   path: string;
   markdownUrl: string;
   luaCompat: string | null;
+  sourceUrl: string | null;
   Breadcrumb: FC<BreadcrumbProps>;
 }) {
   const page = docs.getPage(path);
@@ -85,8 +91,19 @@ function Content({
   const MDX = page.body;
   const node = compatNodeFor(luaCompat);
 
+  // The matrix and the citation are rendered by the route, so neither heading is in
+  // the MDX-derived TOC. Without these the right rail claims the page ends at "See
+  // also" while two sections follow it.
+  const fullToc = [
+    ...toc,
+    ...(node && varies(node)
+      ? [{ title: 'Version support', url: '#version-support', depth: 2 }]
+      : []),
+    ...(sourceUrl ? [{ title: 'Source', url: '#source', depth: 2 }] : []),
+  ];
+
   return (
-    <DocsPage toc={toc} slots={{ breadcrumb: Breadcrumb }}>
+    <DocsPage toc={fullToc} slots={{ breadcrumb: Breadcrumb }}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       {/* The version switcher used to sit here. It moved to the header, where it is
@@ -107,14 +124,17 @@ function Content({
       <DocsBody>
         <MDX components={useMDXComponents()} />
       </DocsBody>
+      {/* Derived, not authored — see the amendment in page-structure.md. Both sit
+          after "See also" so neither is a thing an author has to remember to place. */}
+      {node && <VersionMatrix node={node} />}
+      {sourceUrl && <EntrySource url={sourceUrl} />}
     </DocsPage>
   );
 }
 
 function Page() {
-  const { pageTree, path, markdownUrl, luaCompat, compatByUrl } = useFumadocsLoader(
-    Route.useLoaderData(),
-  );
+  const { pageTree, path, markdownUrl, luaCompat, compatByUrl, source: sourceUrl } =
+    useFumadocsLoader(Route.useLoaderData());
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
   const { pathname } = useLocation();
   const [query, setQuery] = useState('');
@@ -189,6 +209,7 @@ function Page() {
             path={path}
             markdownUrl={markdownUrl}
             luaCompat={luaCompat}
+            sourceUrl={sourceUrl}
             Breadcrumb={Breadcrumb}
           />
         </Suspense>
