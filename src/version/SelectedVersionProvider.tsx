@@ -58,3 +58,16 @@ export function useSelectedVersion(): Ctx {
   if (!ctx) throw new Error('useSelectedVersion must be used within SelectedVersionProvider');
   return ctx;
 }
+
+/**
+ * The selected version where one is knowable, `null` where it is not.
+ *
+ * For components that *enhance* a page with version-aware detail rather than depend on
+ * it — the numeric-type disclosure (ADR 0009) is the first. Throwing there would mean a
+ * `<Returns>` list could crash a page for want of an aside, and would make every test
+ * rendering an entry component mount a provider it has no interest in. Silence is the
+ * right failure: with no selected version there is nothing truthful to disclose.
+ */
+export function useSelectedVersionOrNull(): LuaVersion | null {
+  return useContext(SelectedVersion)?.version ?? null;
+}
