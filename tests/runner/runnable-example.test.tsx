@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RunnableExample, RUNTIME_LUA_VERSION } from '@/runner/RunnableExample';
 import { runLua } from '@/runner/runLua';
@@ -6,8 +7,25 @@ import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import type { LuaVersion } from '@/compat/schema';
 
+// `RUNTIME_LUA_VERSION` moved into `runLua` when the playground began sharing the
+// runtime, and `RunnableExample` now re-exports it from there — so a mock replacing the
+// whole module has to carry it too, or every test importing it through the component
+// fails on an export the mock does not define.
 vi.mock('@/runner/runLua', () => ({
   runLua: vi.fn(),
+  RUNTIME_LUA_VERSION: '5.4',
+}));
+
+// The card gained an "Open in Playground" link, so it now needs router context to
+// render at all. These are unit tests of the example card, not of routing: standing a
+// memory router up around each one would make every assertion asynchronous to prove
+// something none of them is about. The link renders as the anchor it becomes.
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, hash, children, ...rest }: Record<string, unknown> & { children?: ReactNode }) => (
+    <a href={`${String(to)}${hash ? `#${String(hash)}` : ''}`} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 const mockRunLua = vi.mocked(runLua);
