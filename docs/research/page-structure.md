@@ -103,3 +103,43 @@ Stress-tested by hand-writing five real entries (one per type) in
 
 Overviews also read better with **authored sub-groups** than a flat alphabetical
 index.
+
+## Pilot findings (2026-08-05)
+
+Four `string` entries built against the real components rather than by hand:
+
+4. **A concept entry has no Syntax block.** The construct fork keeps Syntax "to show the
+   grammatical form", which works for `#` or a `for` statement and does not work for
+   Patterns: there is no call and no statement, so the block would be invented
+   pseudo-Lua. Patterns puts the notation in tables under Description instead. Syntax is
+   for entries with a form to quote.
+5. **A Gotcha must not name a version.** Finding #1 said version facts drift when
+   hand-repeated; the same fact reaching Errors, the Gotcha *and* the matrix is exactly
+   that. The dataset carries *when*, through `<Since>` and the matrix; the Gotcha
+   carries *what*, undated.
+6. **A version fact belongs on every entry where it is observable.** Lua 5.4 rejects an
+   empty match ending where the previous match ended. The manual files that rule in the
+   shared Patterns section, but it changes what `string.gsub` returns:
+   `("abc"):gsub("a*", "-")` gives `"--b-c-"` and 4 before 5.4, `"-b-c-"` and 3 after.
+   The compat dataset is organised per entry and drives that entry's version support,
+   change note and matrix, so a fact is replicated wherever it is observable — where the
+   manual files a rule is an editorial choice about their document, not about ours. Left
+   on Patterns alone, four surfaces would have told a reader that the most-used pattern
+   function never changed. `string.gmatch` needs the same fact when it is authored.
+7. **A concept entry needs `lua-compat` in its frontmatter, and nothing will say so.**
+   Patterns was authored from a stub whose frontmatter had no `lua-compat` key. Without
+   it nothing links the entry to its dataset, so no version support, no change note and
+   no matrix render, and the entry silently claims to be version-invariant. No test
+   catches this: a stub legitimately has no compat key, and the content guards check
+   written entries for structure, not for compat linkage. A guard could — every written
+   entry resolves a compat node — and belongs with the coverage checks in the
+   content-pipeline slice.
+8. **Entries are written from the manual because drafts are wrong.** All four were
+   drafted from memory in the implementation plan, then checked passage by passage
+   against the five manuals; they needed 6, 5, 9 and 11 corrections. Several were not
+   stylistic but false: a Gotcha claiming `string.len(string.gsub(...))` measures the
+   wrong argument (it does not — `string.len` ignores extra arguments), a claim that `n`
+   caps replacements when it caps matches, and a claim that in `(ab)+` the `+` applies
+   to the `b` when a dangling quantifier has nothing to repeat. The rule that every
+   factual claim traces to a passage is what caught them, and it earned a home outside
+   the plan that happened to state it.

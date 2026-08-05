@@ -15,7 +15,8 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | — | **Spike:** per-version Lua runtimes | [2026-08-04-per-version-lua-spike.md](2026-08-04-per-version-lua-spike.md) | Parked — see below |
 | 1.5 | Content tree — the blueprint | [2026-08-04-content-tree.md](2026-08-04-content-tree.md) | Done |
 | 1.6 | Sidebar IA — order, grouping, labels | [2026-08-04-sidebar-ia.md](2026-08-04-sidebar-ia.md) | Done |
-| 2 | Page anatomy | — | Next |
+| 2 | Page anatomy — piloted on `string` | [2026-08-05-page-anatomy-string.md](2026-08-05-page-anatomy-string.md) | Done |
+| 2.5 | Page anatomy — the rest of `string`, and the bespoke UI | — | Next |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
 | 5 | Playground | — | Not started |
@@ -68,6 +69,25 @@ The full reference-entry template from
 values, the Note/Warning/Gotcha callout set, source link to the original manual, and
 the lighter template variant for constants. Includes the conditional compat matrix
 (prototype findings #2/#3), which the version slice deliberately deferred.
+
+**Split, 2026-08-05.** The entry template landed first, proven on four `string` entries
+— one function with the full skeleton, one with none of the optional sections, one with
+two return values, and one concept entry. The remainder — the other sixteen `string`
+entries, the constant and overview templates, and replacing Fumadocs's chrome — is
+slice 2.5. Authoring twenty entries against an unused template would have put the same
+mistake in twenty files.
+
+**Owed an ADR: `<Return type="integer">` before 5.3.** `integer` is correct for the
+base, which is written against the default version, and weakening it to `number` would
+make an entry wrong for 5.3–5.5 in order to be right for 5.1 and 5.2. It nonetheless
+names a subtype those two versions do not have. It was raised on two of the four pilot
+entries and will reach every entry returning a count or an index, and none of the three
+delta forms — availability bound, change note, example variant — can express it, so it
+cannot be settled per entry without settling it twenty times. The proposal is one
+site-wide behaviour: the `<Return>` renderer surfaces a standing footnote when the
+**selected version** is 5.1 or 5.2, linking to the numeric-types entry. One
+implementation, no authoring cost, correct everywhere at once. Slice 2.5 owns it, and
+owes the ADR before the next entry returning a count is authored.
 
 ### 3. Content pipeline
 
