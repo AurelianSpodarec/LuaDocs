@@ -1,8 +1,116 @@
 ---
 title: table.getn()
-description: ""
+description: Count the elements in a list — the same count the length operator gives.
+lua-compat: table.getn
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-table.getn
 ---
 
-{/* Not yet written. */}
+Counts the elements in a list and hands the count back. It asks exactly the question the
+[length operator](/docs/language/expressions/length-operator) answers and gives exactly the
+same number, so `#list` is what to write in its place — everywhere it appears, with nothing
+else to change.
+
+<RunnableExample code={`local shipping_labels = {"first class", "airmail", "signed for"}\n-- table.getn(shipping_labels) asked exactly this\nprint(#shipping_labels)\n-- Expected output: 3`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that no longer has it,
+so they show the operator doing the work and name the old call in a comment beside it. The
+call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+table.getn(table)
+```
+
+<Parameters>
+  <Param name="table">The list to count.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">How many elements the list holds — the same number the length operator gives for it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the argument is not a table, including when it is left out. Anything passed after it is ignored rather than rejected.
+
+</Errors>
+
+## Description
+
+The count runs over the numbered positions, starting at `1`. On a list whose elements sit at
+`1` upwards with nothing missing between them it is the position of the last one, and it is
+what the rest of the library means whenever it talks about the length of a list.
+
+There is nothing the operator leaves for the function to do. The two are one question with
+two spellings, so a call can be replaced by `#` and the value, its type and every edge case
+below stay exactly as they were. That is why the call is not one to write new code against:
+it was carried along for code that already had it, and the operator was always there beside
+it.
+
+Only the numbered run is counted. Named fields stored alongside the elements are no part of
+it, so a list that doubles as a record reports the length of its list half alone and says
+nothing about the other.
+
+The count comes from the table itself. A [`__len` metamethod](/docs/language/metatables/len)
+does not stand in for it — a table is measured by what it holds, not by what it says about
+itself.
+
+Everything above is stated in terms of that count, so the call is only as dependable as the
+length is. A list with a gap in it has more than one defensible length, and every
+[caveat of the length operator](/docs/language/expressions/length-operator) applies here in
+full. The function inherits them rather than working around them, which is the other half of
+the reason it has nothing of its own to offer.
+
+## Examples
+
+### Counting a list that also carries named fields
+
+<RunnableExample code={`local recipe = {"cocoa", "flour", "sugar", servings = 4}\n-- table.getn(recipe) counted the ingredients, never the servings\nprint(#recipe)\n-- Expected output: 3`} />
+
+Three ingredients sit at positions `1` to `3` and `servings` sits beside them under a name.
+The count reaches the first three and stops, which is what makes the two halves of the table
+able to share one value without interfering.
+
+### Walking the positions the count reaches
+
+<RunnableExample code={`local shipping_labels = {"first class", "airmail", "signed for"}\nfor position = 1, #shipping_labels do\n  print(position .. ": " .. shipping_labels[position])\nend\n-- Expected output:\n-- 1: first class\n-- 2: airmail\n-- 3: signed for`} />
+
+The count's most common use is as the upper limit of a numeric `for`. Written as a call it
+was the same loop with a longer first line.
+
+### The count is read fresh every time
+
+<RunnableExample code={`local parcel_weights = {2.5, 1.0, 4.25}\nprint(#parcel_weights)\ntable.remove(parcel_weights)\nprint(#parcel_weights)\n-- Expected output:\n-- 3\n-- 2`} />
+
+Nothing is stored and nothing is cached: the answer is worked out from the table each time
+it is asked for, so a list that has just lost an element reports its new length without being
+told.
+
+## Gotchas
+
+<Gotcha title="The count is not how many things the table holds">
+It reaches the numbered run and no further. A table holding an element at position `1` and
+another at position `7` counts `1`, and one holding nothing but named fields counts `0` while
+being far from empty. The count answers *how long is the list part*, which on a table that is
+not a list is a question with a small and misleading answer.
+[`table.maxn()`](/docs/standard-library/table/maxn) asks the other one.
+</Gotcha>
+
+<Gotcha title="The operator accepts more than the call did">
+`#` measures a string as readily as a list — `#"airmail"` is `7` — while the call raises on
+anything that is not a table. So replacing one with the other widens what goes through: a
+mistake that used to be reported at the call now passes quietly and returns a length. It only
+matters where the argument was never certain to be a table, and there the check is worth
+writing back in by hand.
+</Gotcha>
+
+## See also
+
+- [The length operator](/docs/language/expressions/length-operator) — the replacement, and where its caveats are written out
+- [`table.maxn()`](/docs/standard-library/table/maxn) — the other question about how big a table is, and how the two answers differ
+- [`table.insert()`](/docs/standard-library/table/insert) — appending at one past the position this counts to
+- [`__len`](/docs/language/metatables/len) — the metamethod that does not stand in for a table's own length

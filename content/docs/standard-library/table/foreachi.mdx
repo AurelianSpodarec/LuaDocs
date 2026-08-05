@@ -1,8 +1,134 @@
 ---
 title: table.foreachi()
-description: ""
+description: Call a function once for each numbered position in a list, in order, stopping when it answers something.
+lua-compat: table.foreachi
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-table.foreachi
 ---
 
-{/* Not yet written. */}
+Walks the numbered positions of a list from `1` upwards and calls a function with each
+position and the element stored there. It is
+[`table.foreach()`](/docs/standard-library/table/foreach) with the order settled and the named
+fields left out. A generic `for` over [`ipairs()`](/docs/standard-library/globals/ipairs) is
+what to write instead — with one difference, and it is the one worth reading this page for.
+
+<RunnableExample code={`local reading_list = {"dune", "solaris", "ubik"}\n-- table.foreachi(reading_list, ...) walked exactly these positions\nfor position, title in ipairs(reading_list) do\n  print(position .. ". " .. title)\nend\n-- Expected output:\n-- 1. dune\n-- 2. solaris\n-- 3. ubik`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
+they show the loop that replaces it and name the old call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+table.foreachi(table, callback)
+```
+
+<Parameters>
+  <Param name="table">The list to walk.</Param>
+  <Param name="callback">Called once for each position, with the position and the element stored there.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The first value `callback` answers that is not `nil`, of whatever type. Nothing at all when every call answers `nil`.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table.
+- Raises when the second argument is not a function. Both are checked before the walk begins, so an empty list with no walking to do still raises.
+
+</Errors>
+
+## Description
+
+The range is `1` up to the list's length, and that length is measured once, before the first
+call. Nothing that happens during the walk moves the finishing line: a position added from
+inside the callback is never reached, and one taken away is still asked for.
+
+Each turn hands `callback` the position and whatever is stored at it. A position inside the
+range that holds nothing is not skipped — the callback is called for it too, and receives
+nothing where the element would have been.
+
+What the callback answers is read exactly as
+[`table.foreach()`](/docs/standard-library/table/foreach) reads it, and that entry states the
+rule in full: `nil` carries on, anything else stops the walk and becomes the result of the
+call, only the first of the callback's values is looked at, and a walk that runs to the end
+hands back nothing at all.
+
+Two things this settles that [`table.foreach()`](/docs/standard-library/table/foreach) leaves
+open. The order is ascending, from `1` to the length, so a walk whose output has to come out
+in order has it without sorting anything. And only numbered positions take part: named fields
+stored beside the elements are passed over entirely, whatever they hold.
+
+The elements are read as the list holds them, rather than looked up through the table's
+metamethods, so a table standing in for another gives up only its own elements.
+
+The range is measured with the length operator, so the walk is only as dependable as that
+length is, and every
+[caveat of the length operator](/docs/language/expressions/length-operator) applies.
+
+A generic `for` over [`ipairs()`](/docs/standard-library/globals/ipairs) is the replacement,
+and the two part company on exactly one thing. `ipairs()` stops at the first position holding
+nothing; this walk does not — it was handed a length up front and it goes to it, calling the
+callback for the empty positions along the way. On a list whose elements sit at `1` upwards
+with nothing missing the two visit the same positions and the swap is exact. On a list with a
+gap in it they do not, and the faithful stand-in is a
+[numeric `for`](/docs/language/statements/numeric-for) from `1` to a count settled before the
+loop starts.
+
+## Examples
+
+### Stopping at the first position that matches
+
+<RunnableExample code={`local queue_times = {4, 9, 21, 6}\nlocal slow_position = nil\nfor position, minutes in ipairs(queue_times) do\n  if minutes > 15 then\n    slow_position = position\n    break\n  end\nend\nprint(slow_position)\n-- Expected output: 3`} />
+
+`break` ends the walk the way an answer other than `nil` ended it, and the position that
+stopped it is kept in a variable rather than travelling out through the call's result. The
+fourth entry is never looked at.
+
+### Walking every position to the end
+
+<RunnableExample code={`local monthly_totals = {120, 95, 143}\nlocal highest_month = 1\nfor position, total in ipairs(monthly_totals) do\n  if total > monthly_totals[highest_month] then\n    highest_month = position\n  end\nend\nprint(highest_month)\n-- Expected output: 3`} />
+
+Nothing here stops early, so the walk runs to the last position and the answer is whatever
+the variable holds afterwards. Written as a callback, answering nothing on every turn is what
+kept the walk going.
+
+### A list that may have gaps in it
+
+<RunnableExample code={`local daily_rainfall = table.pack(0, nil, 4)\nlocal days_missing = 0\nfor day_number = 1, daily_rainfall.n do\n  if daily_rainfall[day_number] == nil then\n    days_missing = days_missing + 1\n  end\nend\nprint(daily_rainfall.n)\nprint(days_missing)\n-- Expected output:\n-- 3\n-- 1`} />
+
+This is the shape the old walk had: a count settled before the loop begins, and every position
+up to it visited whether or not anything is stored there.
+[`ipairs()`](/docs/standard-library/globals/ipairs) would have stopped after the first day and
+never noticed the missing one. [`table.pack()`](/docs/standard-library/table/pack) is what
+makes the count trustworthy on a list that a `nil` has left a gap in.
+
+## Gotchas
+
+<Gotcha title="It does not stop where ipairs() would">
+A gap inside the range does not end the walk. The callback is called for the empty position
+like any other and receives nothing for the element, so a callback that assumes something is
+there fails on that turn rather than finding the walk already over. Swapping in
+[`ipairs()`](/docs/standard-library/globals/ipairs) therefore changes behaviour on exactly the
+lists where behaviour is hardest to notice: it quietly finishes early instead.
+</Gotcha>
+
+<Gotcha title="The length is taken once, and then it is fixed">
+The finishing line is decided before the first call and never looked at again. A callback that
+appends to the list is appending past the end of a walk that will not reach it, and one that
+removes elements leaves the walk asking for positions that have gone — receiving nothing for
+them and carrying on regardless. A walk that changes how long the list is, is walking a range
+that has stopped describing it.
+</Gotcha>
+
+## See also
+
+- [`table.foreach()`](/docs/standard-library/table/foreach) — the walk over every key, and where the callback's contract is written out
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — the replacement, and the one place it stops earlier
+- [The numeric `for`](/docs/language/statements/numeric-for) — the faithful stand-in when the list may have gaps
+- [`table.pack()`](/docs/standard-library/table/pack) — a count carried beside the values, for a list a `nil` has left a gap in
+- [The length operator](/docs/language/expressions/length-operator) — what the range is measured with

@@ -1,8 +1,118 @@
 ---
 title: table.maxn()
-description: ""
+description: Find the largest positive number used as a key, or zero when the table has none.
+lua-compat: table.maxn
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-table.maxn
 ---
 
-{/* Not yet written. */}
+Looks at every key in a table and hands back the largest of the ones that are numbers above
+zero. Nothing else asks that question, so unlike most of what has left this library it has no
+replacement to swap in — a table that needs the answer works it out for itself, in the same
+loop the call was running.
+
+<RunnableExample code={`local sensor_slots = {[1] = 18, [7] = 24}\nlocal largest_key = 0\nfor key in pairs(sensor_slots) do\n  if type(key) == "number" and key > largest_key then\n    largest_key = key\n  end\nend\nprint(largest_key)\n-- Expected output: 7`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
+they work the answer out in Lua instead — which is also what a reader who still needs it has
+to do. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+table.maxn(table)
+```
+
+<Parameters>
+  <Param name="table">The table to look through.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="number">The largest key that is a number above zero, or `0` when the table has no such key.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the argument is not a table, including when it is left out. Anything passed after it is ignored rather than rejected.
+
+</Errors>
+
+## Description
+
+Every key in the table is looked at, not only the numbered run, so a key sitting far past a
+gap is found as readily as one at position `1`. Keys that are not numbers take no part and
+are passed over without being compared to anything.
+
+Among the keys that are numbers, the answer is the largest that is above zero. Zero is where
+the search starts rather than a value it can find, so a key of `0` and every negative key lose
+to it, and a table with no key above zero comes back with `0` itself.
+
+A number key does not have to be a whole one. `2.5` is a number like any other, so it can be
+the answer — and the value that comes back is then not a position anything could be stored at
+as an element of a list.
+
+Producing it costs a walk of the whole table, every key, every time. Nothing is kept between
+calls and there is nothing to keep: the table does not record its furthest key, which is the
+entire reason the function existed.
+
+This is not the [length operator](/docs/language/expressions/length-operator) under another
+name, and the difference is the point of the entry. `#` reports where the numbered run stops
+and is free to stop at a gap; this reports the furthest numeric key there is, gap or no gap.
+On a list whose elements sit at `1` upwards with nothing missing the two agree. On anything
+else they are answering different questions, and
+[`table.getn()`](/docs/standard-library/table/getn) is the one that asks the first.
+
+What stands in for it is the loop it was performing: walk the table with
+[`pairs()`](/docs/standard-library/globals/pairs), keep the largest key that is a number above
+zero, and the answer and the cost are both the same as before. A table asked the question
+often is better served by carrying the answer in a named field of its own and keeping it up to
+date as keys are added, which turns a walk of everything into a single lookup.
+
+The walk reads the table's own keys rather than reaching through its metamethods, so a table
+standing in for another reports only what it holds itself.
+
+## Examples
+
+### The furthest key, not the number of elements
+
+<RunnableExample code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nlocal sensor_slots = {[1] = 18, [7] = 24, station = "north"}\nprint(largest_numeric_key(sensor_slots))\nprint(#sensor_slots)\n-- Expected output:\n-- 7\n-- 1`} />
+
+Two readings are stored, at positions `1` and `7`, and the station's name sits beside them
+under a key that is not a number. The furthest numeric key is `7`; the numbered run stops
+after the first position, because nothing is stored at `2`. Neither number is the count of
+what is in the table, and they disagree because they were never asking the same thing.
+
+### What counts, and what comes back as zero
+
+<RunnableExample code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nprint(largest_numeric_key({[2.5] = "half past two"}))\nprint(largest_numeric_key({[-4] = "below datum"}))\nprint(largest_numeric_key({station = "north"}))\n-- Expected output:\n-- 2.5\n-- 0\n-- 0`} />
+
+A key of `2.5` is a number above zero and wins outright. A key of `-4` is a number and loses
+to the zero the search starts from. A key that is not a number never enters the comparison at
+all — and the last two tables, which have nothing in common, come back with the same answer.
+
+## Gotchas
+
+<Gotcha title="The answer is a key, not a count">
+A table holding two elements, at positions `1` and `7`, answers `7`. A table holding a
+thousand elements at positions `1` upwards answers `1000`, and the two answers look alike
+while describing tables that are nothing alike. Nothing about how many keys a table has can be
+read off this, and using it to size a loop over a list visits every position between the
+elements as well as the elements themselves.
+</Gotcha>
+
+<Gotcha title="Zero is the answer to more than one question">
+An empty table, a table keyed only by names, and a table whose only number keys are at or
+below zero all come back with `0`, because zero is where the search starts rather than
+something it found. So the result never distinguishes *there is no numeric key* from *there is
+nothing here at all*, and code that treats `0` as "empty" is wrong on two of those three
+tables.
+</Gotcha>
+
+## See also
+
+- [The length operator](/docs/language/expressions/length-operator) — the other way of asking how big a table is, and the one that stops at a gap
+- [`table.getn()`](/docs/standard-library/table/getn) — that operator under an older name
+- [`pairs()`](/docs/standard-library/globals/pairs) — the walk this performs, and the way to perform it yourself
+- [`next()`](/docs/standard-library/globals/next) — the traversal underneath both, and what may be changed while it runs

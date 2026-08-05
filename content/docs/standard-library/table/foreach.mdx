@@ -1,8 +1,130 @@
 ---
 title: table.foreach()
-description: ""
+description: Call a function once for every key and value in a table, stopping when it answers something.
+lua-compat: table.foreach
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-table.foreach
 ---
 
-{/* Not yet written. */}
+Walks a table and calls a function once for each key, handing it the key and the value stored
+under it. The walk stops the moment that function answers anything other than `nil`, and the
+answer becomes the result of the call. A generic `for` over
+[`pairs()`](/docs/standard-library/globals/pairs) does the same work, and is what to write
+instead.
+
+<RunnableExample code={`local stock_levels = {cocoa = 2, flour = 5, sugar = 1}\nlocal total_units = 0\n-- table.foreach(stock_levels, ...) walked exactly these pairs\nfor item_name, quantity in pairs(stock_levels) do\n  total_units = total_units + quantity\nend\nprint(total_units)\n-- Expected output: 8`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
+they show the loop that replaces it and name the old call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+table.foreach(table, callback)
+```
+
+<Parameters>
+  <Param name="table">The table to walk.</Param>
+  <Param name="callback">Called once for each key, with the key and the value stored under it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The first value `callback` answers that is not `nil`, of whatever type. Nothing at all when every call answers `nil`.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table.
+- Raises when the second argument is not a function. Both are checked before the walk begins, so an empty table with no walking to do still raises.
+
+</Errors>
+
+## Description
+
+The walk is [`next()`](/docs/standard-library/globals/next)'s. Every key that has a value is
+visited once, and the order they arrive in is not specified — not the order they were written
+in, and not numeric order for the keys that happen to be numbers. Named fields and numbered
+positions are visited alike, with nothing to tell them apart but the key itself.
+
+Each turn calls `callback` with two arguments, the key and the value stored under it, and
+reads one value back. `nil` means carry on. Anything else stops the walk where it stands, and
+that value is what the whole call hands back. A callback that never answers anything leaves
+the call handing back nothing at all — not a `nil`, but no value, which is a weaker thing to
+receive and a different thing to test.
+
+Only the first of the callback's results is read. A callback answering two values has its
+second dropped on the floor, so a search meaning to report both a key and its value has to
+put them in one table and answer that.
+
+The early stop is the whole of the control a callback has. There is no way to skip a key, no
+way to run the walk backwards, and no way to say *stop, and carry nothing out* — a stop always
+takes a value with it, because the value is what the stop is made of.
+
+What may change while the walk runs is [`next()`](/docs/standard-library/globals/next)'s rule
+as well: an existing key's value may be changed, and an existing key may be cleared, but
+storing under a key the table does not already have leaves the rest of the walk undefined. A
+walk that has to add keys collects them as it goes and stores them once it has finished.
+
+The values reach the callback as the table itself holds them. The walk reads them rather than
+looking them up, so a table standing in for another gives up only what it has of its own, and
+a default supplied by a metamethod is never visited because no key holds it.
+
+A generic `for` over [`pairs()`](/docs/standard-library/globals/pairs) walks the same keys in
+the same way, and `break` does the work a non-`nil` answer did — with two differences, both in
+the loop's favour. The value stays in a variable of yours instead of having to travel out
+through the call's single result, so a walk may carry out as many values as it likes. And a
+loop can leave without carrying anything at all, which is the one thing a callback cannot say.
+
+## Examples
+
+### Stopping at the first key that matches
+
+<RunnableExample code={`local response_times = {login = 120, search = 890, upload = 340}\nlocal slow_endpoint = nil\nlocal slow_time = nil\nfor endpoint_name, milliseconds in pairs(response_times) do\n  if milliseconds > 500 then\n    slow_endpoint = endpoint_name\n    slow_time = milliseconds\n    break\n  end\nend\nprint(slow_endpoint .. " took " .. slow_time .. " ms")\n-- Expected output: search took 890 ms`} />
+
+`break` ends the walk the way an answer other than `nil` ended it. Two values come out here,
+the key and the value found under it, which the call's single result could not have carried
+without a table built to hold them both.
+
+### Every key, named or numbered
+
+<RunnableExample code={`local recipe = {"cocoa", "flour", servings = 4}\nlocal key_count = 0\nfor recipe_key in pairs(recipe) do\n  key_count = key_count + 1\nend\nprint(key_count)\n-- Expected output: 3`} />
+
+Three keys, of two kinds: positions `1` and `2`, and the name `servings`. This walk makes no
+distinction between them, which is exactly what separates it from
+[`table.foreachi()`](/docs/standard-library/table/foreachi).
+
+### Answering a question about every entry
+
+<RunnableExample code={`local backup_status = {nightly = "ok", weekly = "ok", monthly = "ok"}\nlocal all_ok = true\nfor job_name, status in pairs(backup_status) do\n  if status ~= "ok" then\n    all_ok = false\n    break\n  end\nend\nprint(all_ok)\n-- Expected output: true`} />
+
+The answer lives in a variable outside the loop and is read once the walk is over. Written as
+a callback this shape has a trap in it, which the first gotcha below is about.
+
+## Gotchas
+
+<Gotcha title="`false` stops the walk, and it is an ordinary thing to answer">
+Only `nil` means *carry on*; every other value ends the walk and becomes the result. So a
+callback written to answer a yes-or-no question about each entry stops at the first entry it
+answers `false` for, and hands that `false` back as though it were a considered result for the
+whole table. A callback meant to visit everything answers nothing at all, and keeps whatever
+it is working out in a variable of its own.
+</Gotcha>
+
+<Gotcha title="The order is not yours to choose">
+The keys arrive in the order the underlying traversal produces, which is not the order they
+were written in and is not numeric order for the ones that are numbers. Nothing about it is
+specified, so it is not something to build on: a report assembled by appending in walk order
+comes out arranged by nothing in particular. Sort the keys first, or walk the numbered
+positions with [`table.foreachi()`](/docs/standard-library/table/foreachi), which fixes the
+order it visits them in.
+</Gotcha>
+
+## See also
+
+- [`table.foreachi()`](/docs/standard-library/table/foreachi) — the same walk narrowed to the numbered positions, in order
+- [`pairs()`](/docs/standard-library/globals/pairs) — the replacement, and the walk this performs
+- [`next()`](/docs/standard-library/globals/next) — the traversal underneath both, and what may be changed while it runs
+- [The generic `for`](/docs/language/statements/generic-for) — the statement the replacement is written as

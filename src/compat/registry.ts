@@ -21,7 +21,11 @@ import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
 import utf8Library from './data/utf8.library.json';
 import tableConcat from './data/table.concat.json';
+import tableForeach from './data/table.foreach.json';
+import tableForeachi from './data/table.foreachi.json';
+import tableGetn from './data/table.getn.json';
 import tableInsert from './data/table.insert.json';
+import tableMaxn from './data/table.maxn.json';
 import tableMove from './data/table.move.json';
 import tablePack from './data/table.pack.json';
 import tableRemove from './data/table.remove.json';
@@ -66,7 +70,14 @@ const raw: Record<string, unknown> = {
   // to, and says only when the library arrived.
   'utf8.library': utf8Library,
   'table.concat': tableConcat,
+  // Four symbols that leave rather than arrive. `version_removed` is the first version
+  // *without* the function, so it carries the whole fact and the prose names no version:
+  // the replacement each one points at ( `#`, `pairs`, `ipairs` ) is true everywhere.
+  'table.foreach': tableForeach,
+  'table.foreachi': tableForeachi,
+  'table.getn': tableGetn,
   'table.insert': tableInsert,
+  'table.maxn': tableMaxn,
   'table.move': tableMove,
   'table.pack': tablePack,
   'table.remove': tableRemove,
