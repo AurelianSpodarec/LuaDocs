@@ -108,11 +108,19 @@ index.
 
 Four `string` entries built against the real components rather than by hand:
 
-4. **A concept entry has no Syntax block.** The construct fork keeps Syntax "to show the
-   grammatical form", which works for `#` or a `for` statement and does not work for
-   Patterns: there is no call and no statement, so the block would be invented
-   pseudo-Lua. Patterns puts the notation in tables under Description instead. Syntax is
-   for entries with a form to quote.
+4. **A concept entry has no Syntax block, and no single Description either.** The
+   construct fork keeps Syntax "to show the grammatical form", which works for `#` or a
+   `for` statement and does not work for Patterns: there is no call and no statement, so
+   the block would be invented pseudo-Lua. Syntax is for entries with a form to quote.
+   What shipped drops `## Description` as well: Patterns has six bespoke H2s in its
+   place — Character classes, Sets, Repetition, Anchors, Captures, and Balanced and
+   frontier items — each covering one part of the notation, with the tables sitting
+   under the two that have a list to tabulate. One `## Description` holding all six
+   would have been a section long enough to need its own subheadings, and the right
+   rail is H2-only, so those subheadings would not have been navigable. The fixed part
+   of the fork is therefore only its tail — `## Examples`, `## Gotchas`, `## See also`,
+   preceded by as many topic headings as the concept takes. `Parameters`, `Returns` and
+   `Errors` have nothing to describe on a concept and are absent.
 5. **A Gotcha must not name a version.** Finding #1 said version facts drift when
    hand-repeated; the same fact reaching Errors, the Gotcha *and* the matrix is exactly
    that. The dataset carries *when*, through `<Since>` and the matrix; the Gotcha

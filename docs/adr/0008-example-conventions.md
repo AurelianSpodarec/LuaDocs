@@ -83,11 +83,14 @@ is what it compares against.
 - Rules 1 and 3 are mechanically checkable and are enforced by test over every
   `<RunnableExample>` in written content, not by review. Rules 2, 4 and 5 are
   judgement and stay human.
-- **Nothing is grandfathered.** The two examples in the repo today — on
-  `string.format` and `math.tointeger` — were written to prove the version slice's
-  stack, not to be content. Both are rewritten to conform, and the test enforcing
-  rules 1 and 3 runs over all written content from the start rather than over new
-  entries only. There is no legacy tier to keep track of.
+- **Nothing is grandfathered.** The test enforcing rules 1 and 3 runs over all written
+  content from the start rather than over new entries only, so there is no legacy tier
+  to keep track of. Two examples predated these rules, both written to prove the
+  version slice's stack rather than to be content: `string.format`'s was rewritten to
+  conform, and `math.tointeger` was reverted to an unwritten stub during the
+  page-anatomy slice, which took its example out of the tree along with it. When
+  `math.tointeger` is authored it is authored against these rules like any other
+  entry — it gets no exemption for having once contained something else.
 - The `Syntax` carve-out means one entry shows two naming styles — the manual's in the
   signature, ours in the examples below it. That is the honest presentation: the
   signature is a quotation and the examples are ours.

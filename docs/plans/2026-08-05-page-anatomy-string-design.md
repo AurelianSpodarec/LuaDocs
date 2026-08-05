@@ -30,9 +30,12 @@ In:
 - Compat data for `string.len`, `string.gsub` and Patterns.
 - Those four entries, authored.
 - [ADR 0008](../adr/0008-example-conventions.md) — how examples are written.
-- `math.tointeger`'s example, rewritten to conform. It is the only written example
-  outside the pilot, and the examples test runs over all written content — so there
-  is no grandfathered tier from the first commit onward.
+- Whatever it takes to leave no grandfathered tier: the examples test runs over all
+  written content from the first commit onward, so every example outside the pilot has
+  to conform too. This was planned as a rewrite of `math.tointeger`'s example, the only
+  one there was. A ruling during the slice reverted `math.tointeger` to an unwritten
+  stub instead, which removes its example from the tree and reaches the same end —
+  nothing written is exempt. The entry is now unwritten and owed to a later slice.
 
 Out:
 
