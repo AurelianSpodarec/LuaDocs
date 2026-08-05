@@ -10,13 +10,14 @@ Everything Lua does to text on its own is here: finding a substring, cutting one
 matching a pattern, formatting values into a template, and reading or writing runs of
 raw bytes. The functions live in the table `string`, and Lua also gives every string a
 metatable whose `__index` is that same table — so `string.upper(text)` can equally be
-written `text:upper()`, and both forms appear throughout this section.
+written `text:upper()`. The entries in this section quote the `string.…` form, which is
+the one the manual documents; the example below is written the other way.
 
 Positions are counted in bytes from 1, not 0, and a negative position counts backwards
-from the end: `-1` is the last byte, `-2` the one before it.
-[`string.sub()`](/docs/standard-library/string/sub) carries the full rules for how a
-range is corrected when it runs off either end, and the functions that take positions
-follow them.
+from the end: `-1` is the last byte, `-2` the one before it. What a function does with a
+position landing outside the string is not one rule for the whole library, though:
+[`string.sub()`](/docs/standard-library/string/sub) documents how it corrects a *range*,
+and the functions taking a place to start searching or reading each state their own reach.
 
 <RunnableExample code={`local product_name = "cocoa powder"\nprint(product_name:upper())\nprint(product_name:sub(-6))\nprint(product_name)\n-- Expected output:\n-- COCOA POWDER\n-- powder\n-- cocoa powder`} />
 
@@ -26,8 +27,9 @@ hands back a new string, which is why the third line still reads as it did.
 <Note>
 The library assumes one-byte character encodings: lengths, positions and ranges are all
 counted in bytes, and a character written in more than one byte is simply several of
-them. The [`utf8` library](/docs/standard-library/utf8) is what measures and indexes
-UTF-8 text by character instead.
+them. Nothing here decodes text. Reading and indexing UTF-8 by character belongs to a
+separate library, [`utf8`](/docs/standard-library/utf8), whose own version support says
+where you can reach for it.
 </Note>
 
 ## Searching and matching
@@ -42,6 +44,9 @@ regular expressions — and all four read the same one.
 - [`string.gsub()`](/docs/standard-library/string/gsub) — a copy with every match replaced
 
 ## Measuring and cutting
+
+Taking a string apart without a pattern: how much of it there is, and which part of it
+you want.
 
 - [`string.len()`](/docs/standard-library/string/len) — how many bytes a string holds
 - [`string.sub()`](/docs/standard-library/string/sub) — the piece lying between two positions
@@ -59,8 +64,8 @@ Each of these returns a new string built from the one handed in.
 ## Bytes and binary data
 
 Where the library stops treating a string as text and treats it as a run of bytes — byte
-codes one at a time, whole records laid out to a layout you describe, and the compiled
-form of a function.
+codes one at a time, whole records built to a layout you describe, and the compiled form
+of a function.
 
 - [`string.byte()`](/docs/standard-library/string/byte) — the numeric codes of a string's bytes
 - [`string.char()`](/docs/standard-library/string/char) — a string built from numeric codes
