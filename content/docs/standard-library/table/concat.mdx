@@ -31,6 +31,7 @@ table.concat(list [, sep [, i [, j]]])
 
 <Errors>
 
+- Raises when `list` is not a table.
 - Raises when a position in the run holds anything other than a string or a number — a position holding nothing included, which is what a run reaching past the end of the list finds there.
 - Raises when `sep` is given and is neither a string nor a number.
 
@@ -64,9 +65,9 @@ list that doubles as a record joins its list half and leaves the record half alo
 reads go through the table's metamethods rather than around them, so a table standing in
 for another is joined like any other.
 
-Both defaults are measured with `#list`, which leaves the call only as dependable as that
-length is. On a list whose elements sit at `1` through `#list` with no gaps there is one
-obvious answer; on a list with a gap in it there is not, and every
+The default `j` is measured with `#list`, which leaves a call that names no end position
+only as dependable as that length is. On a list whose elements sit at `1` through `#list`
+with no gaps there is one obvious answer; on a list with a gap in it there is not, and every
 [caveat of the length operator](/docs/language/expressions/length-operator) applies here in
 full — a gap inside the run is a position holding nothing, which is exactly the case that
 raises.

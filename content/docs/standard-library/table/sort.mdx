@@ -28,7 +28,7 @@ table.sort(list [, comp])
 
 <Errors>
 
-- Raises when `comp` is given and is not a function.
+- Raises when `comp` is given and is not a function — but only once the list holds more than one element. With one element or none there is nothing to compare, and whatever was passed in `comp`'s place goes unexamined.
 - Raises when two elements cannot be compared. Under the default order that is any pair `<` refuses, such as a string against a number, or a position in the list holding nothing.
 - Raises when the sort catches `comp` contradicting itself. Whether it does depends on the values and on how many there are, so this is a report of a broken order rather than a check for one.
 
@@ -53,10 +53,10 @@ it has to treat them as interchangeable everywhere else: anything that comes bef
 to come before the other. An order failing any of these describes no arrangement the sort
 could produce, and what it gets instead is unpredictable.
 
-The sort is not stable. Elements the order treats as equal may finish in either relative
-position, and the order they arrived in is not preserved. Where the original order of ties
-matters, the tie has to be broken inside `comp` — by a second field, or by a position
-recorded before the sort began.
+The sort is not stable: elements the order treats as equal may have their relative positions
+changed, so the order they arrived in is not something to rely on. Where the original order
+of ties matters, the tie has to be broken inside `comp` — by a second field, or by a
+position recorded before the sort began.
 
 Only numbered positions take part. Named fields stored beside them are left where they are,
 so a list that doubles as a record keeps its record half untouched. The reads and writes go
