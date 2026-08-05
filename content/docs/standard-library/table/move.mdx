@@ -32,7 +32,8 @@ table.move(a1, f, e, t [, a2])
 
 <Errors>
 
-- Raises when `a1` or `a2` is a value that cannot be indexed as a table.
+- Raises when `a1` is neither a table nor a value that can be read from like one.
+- Raises when the destination is neither a table nor a value that can be written to like one. The two ends are checked separately, so a value that can only be read from is accepted as `a1` and refused as `a2`.
 - Raises when the run holds more elements than an integer can count.
 - Raises when writing the run would carry a destination position past the largest integer there is.
 
