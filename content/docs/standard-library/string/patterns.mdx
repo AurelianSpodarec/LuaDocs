@@ -120,10 +120,14 @@ alike, as a quotation mark does, is outside what `%b` is defined for.
 `%f[set]` is a *frontier*, and matches the empty string at a boundary rather than
 matching any character: the character before the boundary must be outside the set and the
 character after it inside. Past either end of the subject there is no character to
-consult, so a zero byte stands in for one. That is what decides an end — `%f[%a]` fires
-before a word that opens the string, because a zero byte is not a letter, while
-`cat%f[%a]` does not fire at the end of `"cat"`, for the same reason. Frontiers are how
-a pattern gets word boundaries, which the notation otherwise lacks.
+consult, so a zero byte stands in for one. That stand-in is what makes the two ends of a
+subject count as boundaries like any other: `%f[%a]` fires before a word that opens the
+subject, because the zero byte in front of it is not a letter and the letter after it is,
+and `cat%f[%A]` fires at the end of `"cat"` for the mirror reason — `t` is a letter and so
+outside `%A`, while the zero byte after it is not a letter and so inside. Frontiers are
+how a pattern gets word boundaries, which the notation otherwise lacks, and it is that
+treatment of the ends that lets a pair of them match a word sitting flush against either
+edge of the subject rather than only one with spaces around it.
 
 ## Examples
 

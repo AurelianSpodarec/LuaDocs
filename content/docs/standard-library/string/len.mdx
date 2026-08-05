@@ -31,8 +31,8 @@ string.len(s)
 
 `string.len(text)` and `#text` return the same number, and nothing in the string's
 contents changes how it is counted. The empty string measures `0`. A zero byte inside a
-string is counted like any other byte rather than ending it, so `"a\0bc\0"` measures 5 —
-a Lua string holds arbitrary bytes and carries its own length, so there is no terminator
+string is counted like any other byte rather than ending it, so `"key\0value"` measures 9
+— a Lua string holds arbitrary bytes and carries its own length, so there is no terminator
 to stop at.
 
 ## Gotchas
