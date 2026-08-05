@@ -27,6 +27,7 @@ import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
+import { buildFullToc } from '@/entry/pageToc';
 import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
 import { scopeToDestination } from '@/sidebar/destinations';
@@ -94,16 +95,12 @@ function Content({
 
   // The matrix and the citation are rendered by the route, so neither heading is in
   // the MDX-derived TOC. Without these the right rail claims the page ends at "See
-  // also" while two sections follow it.
-  const fullToc = [
-    ...toc,
-    ...(node && varies(node)
-      ? [{ title: 'Version support', url: '#version-support', depth: 2 }]
-      : []),
-    ...(sourceUrl && parseManualUrl(sourceUrl)
-      ? [{ title: 'Source', url: '#source', depth: 2 }]
-      : []),
-  ];
+  // also" while two sections follow it. `buildFullToc` also drops the MDX TOC down to
+  // H2 — see the comment there for why the rail can't just take what Fumadocs hands it.
+  const fullToc = buildFullToc(toc, {
+    showVersionSupport: Boolean(node && varies(node)),
+    showSource: Boolean(sourceUrl && parseManualUrl(sourceUrl)),
+  });
 
   return (
     <DocsPage toc={fullToc} slots={{ breadcrumb: Breadcrumb }}>
