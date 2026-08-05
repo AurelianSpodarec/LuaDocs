@@ -1,0 +1,84 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { describe, it, expect } from 'vitest';
+import { CONTENT_TREE, sourceUrl, type Section } from '@/content-tree/manifest';
+import { listContentFiles, PLACEHOLDER } from '@/content-tree/scaffold';
+
+const DEST = 'content/docs';
+
+interface WrittenEntry {
+  rel: string;
+  frontmatter: string;
+  body: string;
+}
+
+/** Every entry actually authored. A stub has nothing to check. */
+const written: WrittenEntry[] = [];
+
+for (const rel of await listContentFiles(DEST)) {
+  if (!rel.endsWith('.mdx')) continue;
+
+  const text = await readFile(join(DEST, rel), 'utf8');
+  if (text.includes(PLACEHOLDER)) continue;
+
+  const match = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(text);
+  if (!match) throw new Error(`${rel} has no frontmatter`);
+
+  written.push({ rel, frontmatter: match[1], body: match[2] });
+}
+
+function fieldOf(frontmatter: string, key: string): string | null {
+  const found = new RegExp(`^${key}: (.*)$`, 'm').exec(frontmatter);
+  return found ? found[1].trim() : null;
+}
+
+const functions = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') === 'function');
+
+/** Every entry's expected source URL, keyed the way `listContentFiles` reports paths. */
+const expectedSource = new Map<string, string>();
+(function collect(sections: Section[], prefix: string): void {
+  for (const section of sections) {
+    const dir = prefix ? `${prefix}/${section.slug}` : section.slug;
+    expectedSource.set(`${dir}/index.mdx`, sourceUrl(section.source));
+    for (const entry of section.entries) {
+      expectedSource.set(`${dir}/${entry.slug}.mdx`, sourceUrl(entry.source));
+    }
+    collect(section.sections, dir);
+  }
+})(CONTENT_TREE, '');
+
+describe('the anatomy of a written entry', () => {
+  it('has entries to check at all', () => {
+    // A guard that silently checks nothing is worse than no guard.
+    expect(written.length).toBeGreaterThan(1);
+    expect(functions.length).toBeGreaterThan(0);
+  });
+
+  it('gives every function entry a Syntax section', () => {
+    for (const entry of functions) {
+      expect(entry.body, entry.rel).toContain('## Syntax');
+    }
+  });
+
+  it('gives every function entry its parameters and return values', () => {
+    for (const entry of functions) {
+      expect(entry.body, entry.rel).toContain('<Parameters>');
+      expect(entry.body, entry.rel).toContain('<Returns>');
+    }
+  });
+
+  it('ends every function entry with a See also section', () => {
+    for (const entry of functions) {
+      expect(entry.body, entry.rel).toContain('## See also');
+    }
+  });
+
+  it('cites exactly the manual passage the manifest generates for it', () => {
+    for (const entry of written) {
+      const want = expectedSource.get(entry.rel);
+      // `content/docs/index.mdx` is the authored site root, not an entry.
+      if (!want) continue;
+      expect(fieldOf(entry.frontmatter, 'source'), entry.rel).toBe(want);
+    }
+  });
+});
