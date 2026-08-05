@@ -19,7 +19,7 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | 2.5 | Page anatomy — the rest of `string`, and the bespoke UI | — | Next |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
-| 5 | Playground | — | Not started |
+| 5 | Playground | [2026-08-05-playground.md](2026-08-05-playground.md) | Done |
 | 6 | Per-version Lua runtimes | — | Not started |
 | 7 | Contribution surface | — | Not started |
 | 8 | Deploy | — | Not started |
@@ -129,8 +129,53 @@ Must be the static path, not `Accept`-header negotiation: there is no server
 
 The standalone full-page editor: CodeMirror 6 with real Lua syntax highlighting,
 shareable state in the URL, and the same worker-plus-timeout runner the inline
-examples use. Also the natural point to swap the version slice's `<textarea>` and
-native `<select>` for CodeMirror and Base UI (`@base-ui/react`).
+examples use.
+
+**Built out of order, 2026-08-05**, ahead of slice 2.5. It depends on nothing 2.5 owns,
+and the two touch different files.
+
+Tailwind Play was the reference and three of its choices were deliberately not copied —
+see the plan. The short version: its 50/50 split is earned by a rendered page where Lua
+output is a transcript, so the divider drags and remembers; it has no Run button because
+CSS compilation always terminates and `while true do end` does not; and its version chip
+swaps the compiler where ours cannot, so ours is pinned to 5.4 and disabled.
+
+**The playground has no selected version.** It documents nothing, so no version chooses
+any content on it. It neither reads nor writes `SelectedVersionProvider`: the control
+states the runtime, and the disclosure compares against `DEFAULT_VERSION` — now derived
+from `LUA_VERSIONS` in `src/compat/schema.ts` rather than written out a second time in the
+provider. The header is a wordmark and nothing else — not a back button, and not a link:
+most readers arriving on a shared link were never in the docs, so "back" named a direction
+they had not come from, and a title that navigates is a control wearing a label's clothes.
+The way into the docs is the way into the playground, the sidebar destinations block
+([ADR 0007](../adr/0007-documentation-shell.md)).
+
+The load-bearing feature is not the editor, it is the seam: every inline example carries
+an **Open in Playground** link that hands over the reader's *current* buffer, edits
+included, in the URL hash. No server, nothing stored, nothing to rot
+([ADR 0004](../adr/0004-self-hosted-on-github-no-third-parties.md)).
+
+**Tidy re-indents; it does not pretty-print.** A formatter needs a parser and moves
+comments, which [ADR 0008](../adr/0008-example-conventions.md) rule 6 cannot afford. The
+re-indenter needs only a lexer, touches leading and trailing whitespace and nothing else,
+and preserves the line count so a reported error line stays valid.
+
+**Still owed:**
+
+- **The Base UI select swap.** Slice 5 was called "the natural point" for it; it is not
+  playground work. `VersionSwitcher` is site-wide and tested, and replacing it belongs
+  with the rest of the chrome in slice 2.5. The playground reuses it as it stands.
+- **A theme toggle.** The playground escapes the docs chrome, and the toggle went with
+  it. Theme follows whatever the docs were left on, which is right until someone opens
+  the playground first.
+- **Version-aware linting** — flagging `//` as 5.3+, `goto` as 5.2+, `setfenv` as
+  5.1-only from the compat data already in `src/compat/`. This is what would make the
+  switcher mean something before slice 6, and `src/playground/lexLua.ts` was built with
+  it in mind.
+- **Multiple files and `require`**, which needs a virtual filesystem and a
+  `package.searchers` shim in the worker.
+- **A bytecode drawer**, the honest analogue of Play's "Generated CSS" panel. It needs a
+  Lua 5.4 bytecode disassembler, because `string.dump` returns a binary chunk.
 
 ### 6. Per-version Lua runtimes
 
