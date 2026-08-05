@@ -17,7 +17,7 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | 1.6 | Sidebar IA — order, grouping, labels | [2026-08-04-sidebar-ia.md](2026-08-04-sidebar-ia.md) | Done |
 | 2 | Page anatomy — piloted on `string` | [2026-08-05-page-anatomy-string.md](2026-08-05-page-anatomy-string.md) | Done |
 | 2.5 | `string` section — the remaining sixteen entries | [2026-08-05-string-section.md](2026-08-05-string-section.md) | Done |
-| 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Next |
+| 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Next — start from [the handoff](2026-08-05-standard-library-handoff.md) |
 | 2.7 | The bespoke UI — replacing Fumadocs's chrome | — | Not started |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
