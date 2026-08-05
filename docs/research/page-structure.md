@@ -154,6 +154,48 @@ Four `string` entries built against the real components rather than by hand:
    factual claim traces to a passage is what caught them, and it earned a home outside
    the plan that happened to state it.
 
+## Section-overview findings (2026-08-05)
+
+The first page of the overview fork, `string`, built after the nineteen entries it
+indexes:
+
+9. **An overview's groups are its table of contents, and they are authored.** The fork
+   above is one line — summary, common-patterns example, grouped index, See also,
+   Source — and building the first one moved three parts of it. The **groups are H2s**:
+   the rail is H2-only, so the `###`-under-`## Functions` shape the `table` prototype
+   used renders a right-hand column containing the single word "Functions", on the one
+   page whose whole job is orientation. They are grouped
+   **by task, not by kind** — the sidebar groups by kind because it must also carry
+   constants and cross-links, while an overview's reader has a job, and grouping by task
+   is what dissolves the Concepts box and puts Patterns at the head of the four functions
+   that read it. And the index is **authored**, per the prototype finding, for a reason
+   only visible once written: a derived list cannot gloss an entry for *this* page, cannot
+   say why two entries are adjacent, and cannot order a group locate → extract → iterate →
+   replace. What that costs is the one thing a derived list cannot lose — the index can
+   silently omit a sibling — so it wants a guard asserting an overview's links and its
+   directory's `.mdx` files are the same set, both directions.
+
+   Two smaller corrections. The fork needs a slot the line does not name, between the
+   example and the index, for the **library-wide facts the manual's section preamble
+   carries and no entry owns** — for `string`, method syntax, byte positions counted from
+   either end, and the one-byte-encoding assumption. And `Source` is listed as an authored
+   step but is derived by the route, like the matrix and the review status; the 2026-08-05
+   amendment applies to this fork too.
+
+10. **An overview carries `lua-compat`, and its node describes the library's own existence
+    and membership — never the union of its members' behaviour.** Five uniform chips on a
+    library whose membership changed is the objection, and the answer is to record the
+    membership change rather than to drop the node: `string.library` is added at 5.1 and
+    `changed_in` 5.3 names the three packing functions that arrived there, so the strip
+    marks 5.3 as changed, the matrix renders, and a reader on 5.3 gets the inline note.
+    The rule has to be *what* an overview claims rather than *whether*, because `utf8` does
+    not exist before 5.3 at all and a silent overview would omit the most important fact
+    about it. Member-level changes stay on their members. What is still missing is
+    per-entry availability *inside* the index: the sidebar dims an entry the selected
+    version lacks and the index beside it does not, and hand-written badges are ruled out
+    by finding #1 — the fix is derived badges from the `compatByUrl` map the route already
+    loads.
+
 ## Review status (2026-08-05)
 
 Every entry states at its foot whether a person has read it, beside the manual
