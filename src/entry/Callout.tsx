@@ -35,6 +35,30 @@ const kindIcon: Record<CalloutKind, ComponentType<{ className?: string }>> = {
   unavailable: CircleAlert,
 };
 
+/**
+ * `not-prose` on the shell is what keeps a callout compact — without it every authored
+ * paragraph inside one carries prose's `1em` top and bottom margins and the box grows
+ * to twice its height. It was harmless when the only children were the plain strings
+ * `VersionNote` builds from the compat dataset; it is not harmless now that Note,
+ * Warning and Gotcha wrap authored MDX, because it also switches off prose's link and
+ * inline-code rules, leaving a link inside a callout indistinguishable from the text
+ * around it.
+ *
+ * So the block margins stay suppressed and the two inline treatments are put back by
+ * hand, on the callout's own content only. The values mirror
+ * `@fumadocs/tailwind`'s typography plugin — `a:not([data-card])` and `code` — so a
+ * link or a code chip reads the same inside a callout as it does in body prose.
+ */
+const bodyClass = [
+  '[&_a]:font-medium [&_a]:underline [&_a]:decoration-fd-primary',
+  '[&_a]:decoration-[1.5px] [&_a]:underline-offset-[3.5px]',
+  '[&_a]:transition-opacity [&_a:hover]:opacity-80',
+  '[&_code]:rounded-[5px] [&_code]:border [&_code]:bg-fd-muted',
+  '[&_code]:p-[3px] [&_code]:text-[0.8125rem] [&_code]:font-normal',
+  // Prose gives a code chip inside a link the link's colour rather than its own.
+  '[&_a_code]:text-inherit',
+].join(' ');
+
 export function Callout({
   kind,
   title,
@@ -54,7 +78,7 @@ export function Callout({
       className={`not-prose my-4 flex items-start gap-2.5 rounded-lg border border-s-4 px-3.5 py-2.5 text-sm leading-6 ${kindClass[kind]}`}
     >
       <Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${kindIconClass[kind]}`} />
-      <div>
+      <div className={bodyClass}>
         {title && <strong className="me-1 text-fd-foreground">{title}</strong>}
         {children}
       </div>
