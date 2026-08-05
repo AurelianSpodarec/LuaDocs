@@ -8,8 +8,9 @@ source: https://www.lua.org/manual/5.1/manual.html#pdf-table.getn
 
 Counts the elements in a list and hands the count back. It asks exactly the question the
 [length operator](/docs/language/expressions/length-operator) answers and gives exactly the
-same number, so `#list` is what to write in its place — everywhere it appears, with nothing
-else to change.
+same number, so `#list` is what to write in its place. The number is the same; the two are
+not interchangeable in every other respect, and the differences are worth reading before
+making the swap.
 
 <RunnableExample code={`local shipping_labels = {"first class", "airmail", "signed for"}\n-- table.getn(shipping_labels) asked exactly this\nprint(#shipping_labels)\n-- Expected output: 3`} />
 
@@ -45,19 +46,24 @@ The count runs over the numbered positions, starting at `1`. On a list whose ele
 `1` upwards with nothing missing between them it is the position of the last one, and it is
 what the rest of the library means whenever it talks about the length of a list.
 
-There is nothing the operator leaves for the function to do. The two are one question with
-two spellings, so a call can be replaced by `#` and the value, its type and every edge case
-below stay exactly as they were. That is why the call is not one to write new code against:
-it was carried along for code that already had it, and the operator was always there beside
-it.
+There is nothing the operator leaves for the function to do, which is why the call is not one
+to write new code against: it was carried along for code that already had it, and the
+operator was always there beside it.
+
+The number that comes back is the same number, and that is the part of the swap that is
+safe. What is not the same is everything around the number. The operator accepts values this
+call refuses, so a check disappears with it — the second gotcha below. And what the operator
+does with a table that carries a metatable is the operator's own business, settled on
+[its entry](/docs/language/expressions/length-operator) rather than here: this call read the
+table's own length and consulted nothing.
 
 Only the numbered run is counted. Named fields stored alongside the elements are no part of
 it, so a list that doubles as a record reports the length of its list half alone and says
 nothing about the other.
 
-The count comes from the table itself. A [`__len` metamethod](/docs/language/metatables/len)
-does not stand in for it — a table is measured by what it holds, not by what it says about
-itself.
+The count comes from the table itself. This call never asks a
+[`__len` metamethod](/docs/language/metatables/len) to answer for it — a table is measured
+here by what it holds, not by what it says about itself.
 
 Everything above is stated in terms of that count, so the call is only as dependable as the
 length is. A list with a gap in it has more than one defensible length, and every
@@ -93,11 +99,16 @@ told.
 ## Gotchas
 
 <Gotcha title="The count is not how many things the table holds">
-It reaches the numbered run and no further. A table holding an element at position `1` and
-another at position `7` counts `1`, and one holding nothing but named fields counts `0` while
-being far from empty. The count answers *how long is the list part*, which on a table that is
-not a list is a question with a small and misleading answer.
-[`table.maxn()`](/docs/standard-library/table/maxn) asks the other one.
+It reaches the numbered run and no further. Store an element at position `1` and another at
+position `7` with nothing between them and the count does not become `2`: it lands on one of
+the table's borders — a position holding an element with nothing directly after it — and a
+table with a gap in it has more than one, so the same two elements can be counted differently
+depending on how the table was built. A table holding nothing but named fields is the one case
+here with a single answer, and that answer is `0` while the table is far from empty. The count
+asks *how long is the list part*, and on a table that is not a list that question has a small
+answer and sometimes an arbitrary one.
+[`table.maxn()`](/docs/standard-library/table/maxn) asks the other one, and asks it of every
+key.
 </Gotcha>
 
 <Gotcha title="The operator accepts more than the call did">
@@ -113,4 +124,4 @@ writing back in by hand.
 - [The length operator](/docs/language/expressions/length-operator) — the replacement, and where its caveats are written out
 - [`table.maxn()`](/docs/standard-library/table/maxn) — the other question about how big a table is, and how the two answers differ
 - [`table.insert()`](/docs/standard-library/table/insert) — appending at one past the position this counts to
-- [`__len`](/docs/language/metatables/len) — the metamethod that does not stand in for a table's own length
+- [`__len`](/docs/language/metatables/len) — the metamethod this call never consulted, and one the operator's answer may go through instead

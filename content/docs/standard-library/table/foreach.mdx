@@ -37,8 +37,8 @@ table.foreach(table, callback)
 
 <Errors>
 
-- Raises when the first argument is not a table.
-- Raises when the second argument is not a function. Both are checked before the walk begins, so an empty table with no walking to do still raises.
+- Raises when the first argument is not a table, including when it is left out.
+- Raises when the second argument is not a function, including when it is left out. Both are checked before the walk begins, so an empty table with no walking to do still raises.
 
 </Errors>
 
@@ -72,11 +72,16 @@ The values reach the callback as the table itself holds them. The walk reads the
 looking them up, so a table standing in for another gives up only what it has of its own, and
 a default supplied by a metamethod is never visited because no key holds it.
 
-A generic `for` over [`pairs()`](/docs/standard-library/globals/pairs) walks the same keys in
-the same way, and `break` does the work a non-`nil` answer did — with two differences, both in
-the loop's favour. The value stays in a variable of yours instead of having to travel out
-through the call's single result, so a walk may carry out as many values as it likes. And a
-loop can leave without carrying anything at all, which is the one thing a callback cannot say.
+A generic `for` over [`pairs()`](/docs/standard-library/globals/pairs) walks the same keys, and
+`break` does the work a non-`nil` answer did — with two differences, both in the loop's favour.
+The value stays in a variable of yours instead of having to travel out through the call's
+single result, so a walk may carry out as many values as it likes. And a loop can leave without
+carrying anything at all, which is the one thing a callback cannot say.
+
+One difference runs the other way. `pairs()` is a call a table's metatable may answer for
+itself, and this walk never was — it read the table's own keys directly. Where a table does
+that, [`next()`](/docs/standard-library/globals/next) driving the same `for` is the closer
+match.
 
 ## Examples
 

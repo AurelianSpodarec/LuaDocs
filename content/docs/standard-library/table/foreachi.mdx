@@ -37,8 +37,8 @@ table.foreachi(table, callback)
 
 <Errors>
 
-- Raises when the first argument is not a table.
-- Raises when the second argument is not a function. Both are checked before the walk begins, so an empty list with no walking to do still raises.
+- Raises when the first argument is not a table, including when it is left out.
+- Raises when the second argument is not a function, including when it is left out. Both are checked before the walk begins, so an empty list with no walking to do still raises.
 
 </Errors>
 
@@ -74,10 +74,16 @@ A generic `for` over [`ipairs()`](/docs/standard-library/globals/ipairs) is the 
 and the two part company on exactly one thing. `ipairs()` stops at the first position holding
 nothing; this walk does not — it was handed a length up front and it goes to it, calling the
 callback for the empty positions along the way. On a list whose elements sit at `1` upwards
-with nothing missing the two visit the same positions and the swap is exact. On a list with a
-gap in it they do not, and the faithful stand-in is a
+with nothing missing the two visit the same positions and the swap is exact.
+
+They diverge only where the range runs *past* a gap, and a gap alone does not decide that. The
+range is the list's length, and on a gapped list that length is free to land at the gap as
+readily as beyond it — where it lands at the gap, this walk stops exactly where `ipairs()`
+stops and the two are indistinguishable. Where it lands beyond one, the empty positions in
+between are visited here and skipped there. So the divergence is real but not something a
+glance at the list settles, and code that must reach the positions past a gap uses a
 [numeric `for`](/docs/language/statements/numeric-for) from `1` to a count settled before the
-loop starts.
+loop starts rather than either of them.
 
 ## Examples
 
@@ -99,13 +105,14 @@ kept the walk going.
 
 ### A list that may have gaps in it
 
-<RunnableExample code={`local daily_rainfall = table.pack(0, nil, 4)\nlocal days_missing = 0\nfor day_number = 1, daily_rainfall.n do\n  if daily_rainfall[day_number] == nil then\n    days_missing = days_missing + 1\n  end\nend\nprint(daily_rainfall.n)\nprint(days_missing)\n-- Expected output:\n-- 3\n-- 1`} />
+<RunnableExample code={`local daily_rainfall = {0, nil, 4}\nlocal recorded_days = 3\nlocal days_missing = 0\nfor day_number = 1, recorded_days do\n  if daily_rainfall[day_number] == nil then\n    days_missing = days_missing + 1\n  end\nend\nprint(recorded_days)\nprint(days_missing)\n-- Expected output:\n-- 3\n-- 1`} />
 
 This is the shape the old walk had: a count settled before the loop begins, and every position
 up to it visited whether or not anything is stored there.
 [`ipairs()`](/docs/standard-library/globals/ipairs) would have stopped after the first day and
-never noticed the missing one. [`table.pack()`](/docs/standard-library/table/pack) is what
-makes the count trustworthy on a list that a `nil` has left a gap in.
+never reached the third. The count is written down rather than measured, because a list a `nil`
+has left a gap in is exactly the list whose length cannot be relied on to say how far the data
+goes.
 
 ## Gotchas
 
@@ -113,8 +120,10 @@ makes the count trustworthy on a list that a `nil` has left a gap in.
 A gap inside the range does not end the walk. The callback is called for the empty position
 like any other and receives nothing for the element, so a callback that assumes something is
 there fails on that turn rather than finding the walk already over. Swapping in
-[`ipairs()`](/docs/standard-library/globals/ipairs) therefore changes behaviour on exactly the
-lists where behaviour is hardest to notice: it quietly finishes early instead.
+[`ipairs()`](/docs/standard-library/globals/ipairs) therefore changes behaviour whenever the
+range runs past a gap: it finishes early where this walk carried on. Whether a given list is
+one of those is not something to settle by looking at it — the range is the list's length, and
+on a gapped list that is not a single answer.
 </Gotcha>
 
 <Gotcha title="The length is taken once, and then it is fixed">
@@ -130,5 +139,5 @@ that has stopped describing it.
 - [`table.foreach()`](/docs/standard-library/table/foreach) — the walk over every key, and where the callback's contract is written out
 - [`ipairs()`](/docs/standard-library/globals/ipairs) — the replacement, and the one place it stops earlier
 - [The numeric `for`](/docs/language/statements/numeric-for) — the faithful stand-in when the list may have gaps
-- [`table.pack()`](/docs/standard-library/table/pack) — a count carried beside the values, for a list a `nil` has left a gap in
+- [`table.pack()`](/docs/standard-library/table/pack) — a count carried beside the values, for code moving on from a list a `nil` has left a gap in
 - [The length operator](/docs/language/expressions/length-operator) — what the range is measured with

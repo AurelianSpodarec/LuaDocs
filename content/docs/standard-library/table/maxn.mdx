@@ -66,9 +66,12 @@ else they are answering different questions, and
 
 What stands in for it is the loop it was performing: walk the table with
 [`pairs()`](/docs/standard-library/globals/pairs), keep the largest key that is a number above
-zero, and the answer and the cost are both the same as before. A table asked the question
-often is better served by carrying the answer in a named field of its own and keeping it up to
-date as keys are added, which turns a walk of everything into a single lookup.
+zero, and the answer comes out for the same work. One caveat on the stand-in — `pairs()` is a
+call a table's metatable may answer for itself, where this walk always read the table's own
+keys and nothing else. Where a table does that, [`next()`](/docs/standard-library/globals/next)
+in the same loop is the closer match. A table asked the question often is better served again
+by carrying the answer in a named field of its own and keeping it up to date as keys are
+added, which turns a walk of everything into a single lookup.
 
 The walk reads the table's own keys rather than reaching through its metamethods, so a table
 standing in for another reports only what it holds itself.
@@ -80,9 +83,11 @@ standing in for another reports only what it holds itself.
 <RunnableExample code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nlocal sensor_slots = {[1] = 18, [7] = 24, station = "north"}\nprint(largest_numeric_key(sensor_slots))\nprint(#sensor_slots)\n-- Expected output:\n-- 7\n-- 1`} />
 
 Two readings are stored, at positions `1` and `7`, and the station's name sits beside them
-under a key that is not a number. The furthest numeric key is `7`; the numbered run stops
-after the first position, because nothing is stored at `2`. Neither number is the count of
-what is in the table, and they disagree because they were never asking the same thing.
+under a key that is not a number. The furthest numeric key is `7`, and it is `7` however the
+table was assembled. The length operator answered `1` here — a border on the near side of the
+gap, and not the only one this table has, so a table holding the same two readings can answer
+differently. Neither number is a count of what the table holds, they disagree because they
+were never asking the same thing, and only one of them has a single right answer.
 
 ### What counts, and what comes back as zero
 
