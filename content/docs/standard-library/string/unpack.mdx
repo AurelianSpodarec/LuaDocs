@@ -1,8 +1,129 @@
 ---
 title: string.unpack()
-description: ""
+description: Read Lua values back out of a string of bytes laid out to a format.
+lua-compat: string.unpack
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.unpack
 ---
 
-{/* Not yet written. */}
+Reads a run of bytes as the values a format describes, and returns them — the counterpart
+of [`string.pack()`](/docs/standard-library/string/pack), taking the same format string in
+the other direction. After the values it returns one more number: the index of the first
+byte it did *not* read.
+
+<RunnableExample code={`local packed_pair = string.pack(">i4i4", 12, -5)\nprint(string.unpack(">i4i4", packed_pair))\n-- Expected output: 12\t-5\t9`} />
+
+## Syntax
+
+```lua
+string.unpack(fmt, s [, pos])
+```
+
+<Parameters>
+  <Param name="fmt">A [format string](/docs/standard-library/string/pack-formats) describing the layout to read.</Param>
+  <Param name="s">The bytes to read.</Param>
+  <Param name="pos">The position in `s` to start reading at. Omitted, it is `1`, the first byte.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer, float or string">One value for each option in `fmt` that stands for a value, in the order the options appear. Which of the three it is follows from the option.</Return>
+  <Return type="integer">The index of the first byte in `s` that was not read — one past the end of what the format consumed.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `s` runs out before the format does.
+- Raises when `pos` is past the end of `s`.
+- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
+- Raises when an option that needs a size is written without one.
+- Raises when an integer read from `s` is too large to become a Lua integer.
+- Raises when the alignment an option would need is not a power of two.
+
+</Errors>
+
+## Description
+
+Every option in the format that stands for a value produces one result, in the order the
+options are written. Settings and padding produce nothing: byte order, alignment, `x` and
+spaces are consumed from `s` where they occupy bytes, but they do not add to the results.
+Which options are which is
+[the format notation](/docs/standard-library/string/pack-formats).
+
+The last value returned is not part of the data. It is the position immediately after the
+bytes the format read, which is what makes a second call possible without any arithmetic:
+hand it straight back as the next call's `pos` and the read continues where this one
+stopped. That is the whole mechanism for a buffer holding more than one record, and it is
+why the number is there rather than left to the caller to work out.
+
+<RunnableExample code={`local packed_pair = string.pack(">i4i4", 12, -5)\nprint(select("#", string.unpack(">i4i4", packed_pair)))\n-- Expected output: 3`} />
+
+`pos` starts the read anywhere in `s` rather than only at its beginning, so a single field
+can be pulled out of a record without reading the fields in front of it. A negative `pos`
+counts back from the end of `s` the way an index does
+[elsewhere in the library](/docs/standard-library/string/sub). A position past the end of
+`s` raises rather than returning nothing.
+
+`s` may hold more bytes than the format asks for; the extra bytes are simply left, and the
+returned index says where they begin. Too *few* bytes is an error rather than a short
+read, so a truncated record is reported instead of silently producing a wrong value.
+
+## Examples
+
+### Reading one field out of the middle
+
+<RunnableExample code={`local file_record = string.pack(">c4I2I2", "LUAD", 1, 512)\nlocal block_size = string.unpack(">I2", file_record, 7)\nprint(block_size)\n-- Expected output: 512`} />
+
+The tag and the version field occupy the first six bytes, so the third field starts at 7.
+Assigning to a single name keeps the first result and drops the trailing index.
+
+### Walking records with the index it hands back
+
+<RunnableExample code={`local inventory_blob = string.pack("s1s1s1", "cocoa", "flour", "sugar")\nlocal read_position = 1\nwhile read_position <= #inventory_blob do\n  local item_name, next_position = string.unpack("s1", inventory_blob, read_position)\n  print(item_name)\n  read_position = next_position\nend\n-- Expected output:\n-- cocoa\n-- flour\n-- sugar`} />
+
+Each string carries its own length, so nothing here knows how long a record is — the
+trailing index is the only thing moving the loop forward, which is what lets it walk
+variable-length data at all.
+
+### Unpacking a whole record at once
+
+<RunnableExample code={`local shipment = string.pack(">s1I2z", "cocoa", 250, "warehouse-3")\nlocal item_name, quantity, destination = string.unpack(">s1I2z", shipment)\nprint(item_name)\nprint(quantity)\nprint(destination)\n-- Expected output:\n-- cocoa\n-- 250\n-- warehouse-3`} />
+
+Three names take the three values and the trailing index falls off the end of the
+assignment, which is the usual way to be rid of it.
+
+## Gotchas
+
+<Gotcha title="The trailing index travels with the values">
+The extra number is returned whether or not anything wanted it, and a call used as an
+argument passes it along with the rest. `print(string.unpack(">i4", bytes))` prints the
+value *and* a position, and a function with an optional second parameter will read that
+position as an argument it was never given. Assign the results to names, or wrap the call
+in a second pair of parentheses to keep the first value only.
+</Gotcha>
+
+<Gotcha title="It is not table.unpack, and not the global unpack">
+Three similar names do unrelated things. `string.unpack()` reads binary data out of a
+string. [`table.unpack()`](/docs/standard-library/table/unpack) does nothing with bytes at
+all: it spreads a table's array part out into separate values.
+[The global `unpack`](/docs/standard-library/globals/unpack) is an older spelling of that
+table function, not of this one. Nothing here is an inverse of anything there.
+</Gotcha>
+
+<Gotcha title="A format that does not match the bytes may succeed anyway">
+Nothing in a packed string records the layout that produced it, so unpacking with the
+wrong format is not usually an error — it is a wrong answer. Reading big-endian bytes as
+little-endian, or splitting four-byte fields into pairs of two-byte ones, gives numbers
+in range and a trailing index that looks exactly as convincing as a correct one.
+
+<RunnableExample code={`local packed_pair = string.pack(">i4i4", 12, -5)\nprint(string.unpack("<i4i4", packed_pair))\n-- Expected output: 201326592\t-67108865\t9`} />
+
+Only running off the end of the string raises. Keep the format in one place and use the
+same name for both directions.
+</Gotcha>
+
+## See also
+
+- [Format strings for pack and unpack](/docs/standard-library/string/pack-formats) — the notation `fmt` is written in
+- [`string.pack()`](/docs/standard-library/string/pack) — producing the bytes this reads
+- [`string.packsize()`](/docs/standard-library/string/packsize) — how many bytes a fixed format consumes
+- [`table.unpack()`](/docs/standard-library/table/unpack) — the differently named function that spreads a table

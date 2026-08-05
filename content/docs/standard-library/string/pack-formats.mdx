@@ -1,8 +1,179 @@
 ---
 title: Format strings for pack and unpack
-description: ""
+description: The notation that describes how values are laid out as bytes.
+lua-compat: string.pack-formats
 entry-type: construct
 source: https://www.lua.org/manual/5.5/manual.html#6.5.2
 ---
 
-{/* Not yet written. */}
+A *format string* describes the layout of a run of bytes — how wide each value is, in
+what order its bytes sit, and where padding falls between them. It is the first argument
+to [`string.pack()`](/docs/standard-library/string/pack),
+[`string.packsize()`](/docs/standard-library/string/packsize) and
+[`string.unpack()`](/docs/standard-library/string/unpack), and the same string describes
+both directions: whatever a format writes, it reads back.
+
+A format is a sequence of *conversion options*, written one after another with no
+separator. Most options stand for one value — an argument to `string.pack()`, a result
+from `string.unpack()`. The rest are settings and padding, which stand for nothing and
+consume nothing.
+
+<RunnableExample code={`local packed_reading = string.pack(">i2i2", 21, 45)\nprint(#packed_reading)\nprint(string.unpack(">i2i2", packed_reading))\n-- Expected output:\n-- 4\n-- 21\t45\t5`} />
+
+## Integers
+
+Each of these stands for one integer. The lower-case option is signed, its upper-case
+twin unsigned.
+
+| Option | Stands for | Width |
+|---|---|---|
+| `b` | a signed byte | 1 byte |
+| `B` | an unsigned byte | 1 byte |
+| `h` | a signed short | whatever a short is where Lua was built |
+| `H` | an unsigned short | whatever a short is where Lua was built |
+| `l` | a signed long | whatever a long is where Lua was built |
+| `L` | an unsigned long | whatever a long is where Lua was built |
+| `j` | a Lua integer | as wide as Lua's own integer |
+| `J` | a Lua integer read as unsigned | as wide as Lua's own integer |
+| `T` | a size, as C measures one | whatever a size is where Lua was built |
+| `i[n]` | a signed integer | `n` bytes; the width of an `int` when `n` is left off |
+| `I[n]` | an unsigned integer | `n` bytes; the width of an `int` when `n` is left off |
+
+`n` is written immediately after the option, with no space, and may be any whole number
+from 1 to 16.
+
+Every integer option is range-checked in both directions. Packing rejects a value too
+large for the width it was given, and unpacking rejects a value too large to become a Lua
+integer — so a width wider than Lua's own integer is accepted, but can still only carry
+what a Lua integer holds. For the unsigned options a Lua integer is read as an unsigned
+quantity, which is how a width equal to Lua's own integer carries a value with the top
+bit set.
+
+## Floating-point numbers
+
+| Option | Stands for |
+|---|---|
+| `f` | a single-precision float |
+| `d` | a double-precision float |
+| `n` | a Lua number, which is a double |
+
+The value packed is a float even when the argument was an integer, and what comes back
+from `string.unpack()` is always a float. `f` is the only one of the three that is
+narrower than Lua's own number, so it is the only one that rounds.
+
+<RunnableExample code={`local original_ratio = 0.1\nlocal through_single = string.unpack("f", string.pack("f", original_ratio))\nlocal through_double = string.unpack("d", string.pack("d", original_ratio))\nprint(through_single == original_ratio)\nprint(through_double == original_ratio)\n-- Expected output:\n-- false\n-- true`} />
+
+## Strings
+
+Three options carry a string, and they differ in how the reader is told where it ends.
+
+| Option | Stands for |
+|---|---|
+| `cn` | exactly `n` bytes, with nothing recording the real length |
+| `z` | bytes running up to a zero byte, which ends them |
+| `s[n]` | bytes preceded by their length, written as an unsigned integer `n` bytes wide — a size when `n` is left off |
+
+`c` is the one option whose size is compulsory: `c8` is eight bytes, and a bare `c` is
+not a format. A string shorter than the size is padded out with zero bytes, and one
+longer than it is refused rather than truncated. `s` refuses a string whose length will
+not fit in the width in front of it.
+
+<RunnableExample code={`local label = "cocoa"\nprint(#string.pack("c8", label))\nprint(#string.pack("z", label))\nprint(#string.pack("s1", label))\n-- Expected output:\n-- 8\n-- 6\n-- 6`} />
+
+`z` is the only one that cannot hold a zero byte in the middle of its own data, since
+that is what marks the end. `c` and `s` carry arbitrary bytes.
+
+## Byte order
+
+| Option | Sets |
+|---|---|
+| `<` | little-endian |
+| `>` | big-endian |
+| `=` | the byte order of the machine Lua runs on |
+
+These are settings rather than items: they take no argument, produce no result, and
+apply to every option after them until the next one appears. A format that names none
+starts in the machine's own order, exactly as if it began with `=`.
+
+<RunnableExample code={`local port_number = 8080\nprint(string.byte(string.pack(">I2", port_number), 1, -1))\nprint(string.byte(string.pack("<I2", port_number), 1, -1))\n-- Expected output:\n-- 31\t144\n-- 144\t31`} />
+
+Byte order reaches integers only. A machine is assumed to be wholly big-endian or
+wholly little-endian, and a layout that mixes the two within one value is outside what
+these options can describe.
+
+## Alignment and padding
+
+| Option | Stands for |
+|---|---|
+| `![n]` | a setting: the maximum alignment becomes `n`, or the machine's own alignment when `n` is left off |
+| `x` | one byte of padding |
+| `Xop` | no data at all — an empty item that aligns as `op` would, without packing `op` itself |
+| ` ` | a space, which is ignored and may be used to make a format readable |
+
+A format starts as if it were prefixed by `!1=`: maximum alignment of 1, meaning no
+alignment at all, and the machine's own byte order. Under any larger maximum, each
+option is preceded by enough padding that its data begins at an offset divisible by the
+smaller of the option's own width and the maximum — and that smaller number has to be a
+power of two, so a three-byte integer under a maximum of 4 is refused rather than
+quietly placed.
+
+<RunnableExample code={`print(string.packsize("Bi4"))\nprint(string.packsize("!4Bi4"))\n-- Expected output:\n-- 5\n-- 8`} />
+
+`c` and `z` are never aligned, whatever the maximum is. `s` takes the alignment of the
+integer that records its length rather than of the bytes themselves.
+
+`string.pack()` fills every padding byte with zero, and `string.unpack()` reads padding
+without producing anything for it.
+
+## Examples
+
+### Describing one record and reusing it
+
+<RunnableExample code={`local record_format = ">I4I2I2"\nlocal first_row = string.pack(record_format, 20260805, 21, 45)\nlocal second_row = string.pack(record_format, 20260806, 22, 47)\nprint(string.packsize(record_format))\nprint(#(first_row .. second_row))\nprint(string.unpack(record_format, second_row))\n-- Expected output:\n-- 8\n-- 16\n-- 20260806\t22\t47\t9`} />
+
+Writing the format once and naming it is what keeps the writer and the reader in step; a
+layout described twice is a layout that will eventually be described two different ways.
+
+### Aligning a value without packing one
+
+<RunnableExample code={`print(string.packsize("!4bi1"))\nprint(string.packsize("!4bXi4i1"))\n-- Expected output:\n-- 2\n-- 5`} />
+
+`Xi4` packs nothing, but it insists that whatever follows begins where a four-byte
+integer could have — which is how a layout reproduces a hole a C compiler left behind.
+
+## Gotchas
+
+<Gotcha title="Native widths are not fixed widths">
+`h`, `l`, `T`, and `i` or `I` written without a size take the width the machine gives
+them, and so does the length in front of a bare `s`. The same format can therefore
+produce a different number of bytes on another machine, and `=` leaves byte order to the
+machine as well. For bytes that stay inside one process that is convenient; for bytes
+written to a file, a socket or another program it is a portability bug that will not
+show up until the layout crosses a boundary. Name the size and the byte order — `>i4`
+rather than `i` — for anything that leaves.
+</Gotcha>
+
+<Gotcha title="A fixed-size string comes back padded">
+`cn` records no length, so the zero bytes that padded a short string out to `n` are
+indistinguishable from data when it is read back. `string.pack("c8", "cocoa")` gives
+eight bytes and unpacking them gives an eight-byte string, not the five-byte one that
+went in.
+
+<RunnableExample code={`local padded_label = string.pack("c8", "cocoa")\nlocal recovered_label = string.unpack("c8", padded_label)\nprint(#recovered_label)\nprint(recovered_label == "cocoa")\n-- Expected output:\n-- 8\n-- false`} />
+
+Where the exact string has to survive, use `z` or `s`, both of which carry the length.
+</Gotcha>
+
+<Gotcha title="A size has to touch its option">
+`i4` is a four-byte integer; `i 4` is a native-width integer followed by a `4`, and a
+`4` on its own is not an option at all, so the format is rejected. Spaces are ignored
+everywhere *except* between an option and its size, which is exactly where the instinct
+to space a long format out puts them.
+</Gotcha>
+
+## See also
+
+- [`string.pack()`](/docs/standard-library/string/pack) — turning values into bytes with one of these
+- [`string.unpack()`](/docs/standard-library/string/unpack) — reading the values back out
+- [`string.packsize()`](/docs/standard-library/string/packsize) — how many bytes a format takes
+- [`string.byte()`](/docs/standard-library/string/byte) — inspecting the bytes a format produced

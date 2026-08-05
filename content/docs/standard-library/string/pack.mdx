@@ -1,8 +1,116 @@
 ---
 title: string.pack()
-description: ""
+description: Turn Lua values into a string of bytes laid out to a format.
+lua-compat: string.pack
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.pack
 ---
 
-{/* Not yet written. */}
+Writes numbers and strings into a run of bytes with a layout you describe — a fixed-width
+integer here, a length-prefixed string there — and hands the whole run back as an ordinary
+Lua string. It is how Lua produces the byte-exact records that binary file formats and
+network protocols are made of, without a byte-buffer type or a struct.
+
+<RunnableExample code={`local colour_bytes = string.pack("BBB", 255, 128, 0)\nprint(#colour_bytes)\nprint(string.byte(colour_bytes, 1, -1))\n-- Expected output:\n-- 3\n-- 255\t128\t0`} />
+
+## Syntax
+
+```lua
+string.pack(fmt, v1, v2, ···)
+```
+
+<Parameters>
+  <Param name="fmt">A [format string](/docs/standard-library/string/pack-formats) describing the layout to write.</Param>
+  <Param name="v1, v2, ···">The values to write, one for each option in `fmt` that stands for a value, in the order the options appear.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The bytes the format describes, holding the values given.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
+- Raises when an option that needs a size is written without one.
+- Raises when a value is too large for the width its option gives it.
+- Raises when a float with a fractional part reaches an integer option.
+- Raises when a string is longer than the fixed size it was given, or when its length will not fit in the width recording it.
+- Raises when a value is missing for an option that needs one, or is of a kind the option cannot take.
+- Raises when the alignment an option would need is not a power of two.
+
+</Errors>
+
+## Description
+
+The format is read left to right, and every option in it that stands for a value takes
+the next argument. Settings and padding — byte order, alignment, `x`, spaces — stand for
+nothing and take no argument, so the arguments line up with the value-bearing options
+alone rather than with the characters of the format. Which options are which, and what
+each one writes, is [the format notation](/docs/standard-library/string/pack-formats).
+
+What comes back is a plain Lua string. It is immutable and concatenable like any other,
+so records are assembled with `..`, and `#` gives the byte count. It is *not* text: it
+holds zero bytes and byte values with no printable character behind them, which Lua
+carries along quite happily and a terminal does not.
+
+<RunnableExample code={`local packed_length = string.pack(">I2", 5)\nprint(#packed_length)\nprint(string.byte(packed_length, 1, -1))\n-- Expected output:\n-- 2\n-- 0\t5`} />
+
+The result is exactly as long as the format says, which for a format holding no
+variable-length option is what
+[`string.packsize()`](/docs/standard-library/string/packsize) reports. Padding inserted
+for alignment is written as zero bytes and counts towards that length.
+
+Reading the bytes back is [`string.unpack()`](/docs/standard-library/string/unpack) with
+the same format. The pairing is the whole point: a format written once and used in both
+directions cannot drift out of step with itself.
+
+## Examples
+
+### A fixed record with a magic number in front
+
+<RunnableExample code={`local file_header = string.pack(">c4I2I2", "LUAD", 1, 512)\nprint(#file_header)\nprint(string.byte(file_header, 1, 4))\n-- Expected output:\n-- 8\n-- 76\t85\t65\t68`} />
+
+`c4` writes four bytes of the tag exactly as given, and the two `I2` fields follow it as
+big-endian pairs, so the header is the same eight bytes on every machine that writes it.
+
+### Framing strings that carry their own length
+
+<RunnableExample code={`local packed_message = string.pack(">s2z", "cocoa powder", "grocery")\nprint(#packed_message)\nprint(string.unpack(">s2z", packed_message))\n-- Expected output:\n-- 22\n-- cocoa powder\tgrocery\t23`} />
+
+`s2` puts a two-byte length in front of the first string and `z` ends the second with a
+zero byte, so a reader can find where each one stops without being told in advance.
+
+### Building a table of records
+
+<RunnableExample code={`local readings = { { 21, 45 }, { 22, 47 }, { 20, 44 } }\nlocal packed_rows = {}\nfor position, reading in ipairs(readings) do\n  packed_rows[position] = string.pack(">i2i2", reading[1], reading[2])\nend\nlocal packed_log = table.concat(packed_rows)\nprint(#packed_log)\nprint(string.unpack(">i2i2", packed_log, 5))\n-- Expected output:\n-- 12\n-- 22\t47\t9`} />
+
+Each row is packed on its own and the rows are joined at the end, which keeps the format
+describing one record rather than the whole file.
+
+## Gotchas
+
+<Gotcha title="The result is bytes, not text">
+A packed string is a Lua string, so every string function will accept it — and most of
+them will do something meaningless with it. A zero byte inside it is data rather than a
+terminator, `string.upper()` will rewrite bytes that happen to fall in the letter range,
+and a pattern match will treat the layout as characters. Printing one to a terminal
+emits control bytes. Treat the result as opaque: concatenate it, measure it, write it
+out, and read it back with
+[`string.unpack()`](/docs/standard-library/string/unpack).
+</Gotcha>
+
+<Gotcha title="Extra values are dropped without a word">
+The format decides how many arguments are used; anything past that is ignored. A format
+and an argument list that fall out of step therefore fail loudly in one direction only —
+too few values raises, too many is silent, and the values that went missing were the
+ones at the end.
+
+<RunnableExample code={`local trimmed = string.pack("BB", 10, 20, 30)\nprint(#trimmed)\nprint(string.byte(trimmed, 1, -1))\n-- Expected output:\n-- 2\n-- 10\t20`} />
+</Gotcha>
+
+## See also
+
+- [Format strings for pack and unpack](/docs/standard-library/string/pack-formats) — the notation `fmt` is written in
+- [`string.unpack()`](/docs/standard-library/string/unpack) — reading the values back out of the bytes
+- [`string.packsize()`](/docs/standard-library/string/packsize) — how long the result will be
+- [`string.char()`](/docs/standard-library/string/char) — building a string from byte values alone

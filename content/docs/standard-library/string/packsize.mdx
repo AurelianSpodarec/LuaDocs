@@ -1,8 +1,98 @@
 ---
 title: string.packsize()
-description: ""
+description: Measure how many bytes a format string will produce.
+lua-compat: string.packsize
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.packsize
 ---
 
-{/* Not yet written. */}
+Answers how long the string
+[`string.pack()`](/docs/standard-library/string/pack) would return for a given layout,
+without packing anything. No values are needed and none are read: the format alone
+settles the length, so long as the format describes a fixed one.
+
+<RunnableExample code={`local record_format = ">I4I2I2"\nprint(string.packsize(record_format))\nprint(#string.pack(record_format, 20260805, 21, 45))\n-- Expected output:\n-- 8\n-- 8`} />
+
+## Syntax
+
+```lua
+string.packsize(fmt)
+```
+
+<Parameters>
+  <Param name="fmt">A [format string](/docs/standard-library/string/pack-formats) describing a fixed-length layout.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">How many bytes `string.pack()` would produce for `fmt`.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the format holds a variable-length option — `z`, or `s` in any width.
+- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
+- Raises when an option that needs a size is written without one.
+- Raises when the alignment an option would need is not a power of two.
+
+</Errors>
+
+## Description
+
+The count covers everything `string.pack()` would write, padding included. Alignment
+therefore shows up in the answer: raising the maximum alignment over a format inserts
+zero bytes between the fields, and those bytes are part of the length.
+
+<RunnableExample code={`print(string.packsize("BI4B"))\nprint(string.packsize("!4BI4B"))\n-- Expected output:\n-- 6\n-- 9`} />
+
+Two options describe a length the format cannot know on its own, and both are refused
+rather than guessed at: `z` runs until a zero byte appears, and `s` writes as many bytes
+as the string handed to it happens to have. A format containing either raises, however
+much of the rest of it is fixed. `c` is not in that company — `c8` is eight bytes
+whatever string goes into it, so a fixed-size string is measurable like any number.
+
+<RunnableExample code={`local measured_variable = pcall(string.packsize, ">I2z")\nlocal measured_fixed = pcall(string.packsize, ">I2c8")\nprint(measured_variable)\nprint(measured_fixed)\n-- Expected output:\n-- false\n-- true`} />
+
+Because the answer depends only on the format, it is the natural stride for a run of
+identical records: divide the length of a buffer by it to count the records, and multiply
+it to reach the *n*th one.
+
+## Examples
+
+### Walking a buffer of fixed-size records
+
+<RunnableExample code={`local row_format = ">i2i2"\nlocal row_size = string.packsize(row_format)\nlocal packed_log = string.pack(row_format, 21, 45) .. string.pack(row_format, 22, 47)\nprint(row_size)\nprint(#packed_log // row_size)\nfor record_number = 1, #packed_log // row_size do\n  local temperature, humidity = string.unpack(row_format, packed_log, (record_number - 1) * row_size + 1)\n  print(temperature, humidity)\nend\n-- Expected output:\n-- 4\n-- 2\n-- 21\t45\n-- 22\t47`} />
+
+The stride is derived from the format rather than written as a number, so changing the
+layout in one place moves the loop with it.
+
+### Checking a buffer is the length it claims
+
+<RunnableExample code={`local header_format = ">c4I2I2"\nlocal file_header = string.pack(header_format, "LUAD", 1, 512)\nprint(string.packsize(header_format))\nprint(#file_header == string.packsize(header_format))\n-- Expected output:\n-- 8\n-- true`} />
+
+Reading a header from somewhere else, this is the guard that says whether there are
+enough bytes to unpack before the attempt is made.
+
+## Gotchas
+
+<Gotcha title="It refuses a variable-length format rather than estimating one">
+There is no answer for `z` or `s` that is right for every value, so there is no answer at
+all — the call raises instead of returning a minimum, a maximum or `nil`. A format that
+mixes fixed and variable parts is refused whole. Where a length is genuinely needed,
+measure the fixed prefix on its own and add what the variable part actually holds, or
+pack the value and take `#` of the result.
+</Gotcha>
+
+<Gotcha title="The answer describes this machine">
+Several options take their width from the build rather than from the format, so the same
+format can measure differently elsewhere. A size computed here and used to lay out bytes
+that another machine will read is only right by coincidence. Naming every width and the
+byte order — `>i4` rather than `i` — makes the measurement portable as well as the
+layout.
+</Gotcha>
+
+## See also
+
+- [Format strings for pack and unpack](/docs/standard-library/string/pack-formats) — the notation `fmt` is written in, and which options have a fixed width
+- [`string.pack()`](/docs/standard-library/string/pack) — producing the bytes this measures
+- [`string.unpack()`](/docs/standard-library/string/unpack) — reading them back
+- [`string.len()`](/docs/standard-library/string/len) — measuring a string that already exists
