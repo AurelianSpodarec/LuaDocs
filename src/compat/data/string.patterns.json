@@ -1,7 +1,7 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.2": "Adds the %g class and drops %z; patterns may contain embedded zeros.",
-    "5.4": "Rejects an empty match ending where the previous match ended."
+    "5.2": "Adds the %g class and deprecates %z; patterns may contain embedded zeros.",
+    "5.4": "Rejects an empty match ending where the previous match ended, in gsub and gmatch."
   }
 }
