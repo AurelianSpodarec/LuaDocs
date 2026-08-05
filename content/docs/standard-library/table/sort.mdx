@@ -1,8 +1,120 @@
 ---
 title: table.sort()
-description: ""
+description: Rearrange a list's elements into order, in place, by an order of your choosing.
+lua-compat: table.sort
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.sort
 ---
 
-{/* Not yet written. */}
+Rearranges a list so its elements come out in order. The list handed in is the list that
+changes — nothing is copied and nothing is returned.
+
+<RunnableExample code={`local scores = {88, 95, 62, 71}\ntable.sort(scores)\nprint(table.concat(scores, ", "))\n-- Expected output: 62, 71, 88, 95`} />
+
+## Syntax
+
+```lua
+table.sort(list [, comp])
+```
+
+<Parameters>
+  <Param name="list">The list to put in order.</Param>
+  <Param name="comp">The order to use. Given two elements, it answers whether the first belongs before the second. Omitted, `<` decides.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing at all. The list is rearranged where it stands.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `comp` is given and is not a function.
+- Raises when two elements cannot be compared. Under the default order that is any pair `<` refuses, such as a string against a number, or a position in the list holding nothing.
+- Raises when the sort catches `comp` contradicting itself. Whether it does depends on the values and on how many there are, so this is a report of a broken order rather than a check for one.
+
+</Errors>
+
+## Description
+
+The elements from `1` to `#list` are the ones sorted, and they are rearranged in place: the
+same table comes out holding the same values in different positions. Nothing is returned,
+so the sorted list is the variable that was passed in and never the result of the call.
+
+`comp` decides the order. It receives two elements and answers `true` when the first must
+come before the second in the finished list, and `false` otherwise — including when the
+two are equal, which is the case worth being careful about. Left out, `<` does the same
+job: numbers are ordered by their mathematical value, and strings by the current locale.
+
+The order `comp` describes has to be consistent with itself, in three ways. It must never
+put each of two elements before the other. It must be transitive — having placed the first
+before the second and the second before the third, it has to place the first before the
+third. And where it declines to separate two elements, answering `false` both ways round,
+it has to treat them as interchangeable everywhere else: anything that comes before one has
+to come before the other. An order failing any of these describes no arrangement the sort
+could produce, and what it gets instead is unpredictable.
+
+The sort is not stable. Elements the order treats as equal may finish in either relative
+position, and the order they arrived in is not preserved. Where the original order of ties
+matters, the tie has to be broken inside `comp` — by a second field, or by a position
+recorded before the sort began.
+
+Only numbered positions take part. Named fields stored beside them are left where they are,
+so a list that doubles as a record keeps its record half untouched. The reads and writes go
+through the table's metamethods rather than around them, so a table standing in for another
+is sorted like any other.
+
+The range is measured with `#list`, so the function is only as dependable as that length is,
+and all the [caveats of the length operator](/docs/language/expressions/length-operator)
+apply. A gap inside the range is worse here than a miscount: the default order cannot
+compare a position holding nothing against a value, and the sort stops.
+
+## Examples
+
+### Ordering records by one of their fields
+
+<RunnableExample code={`local pioneers = {\n  { name = "grace", born = 1906 },\n  { name = "ada", born = 1815 },\n  { name = "alan", born = 1912 },\n}\ntable.sort(pioneers, function(left, right) return left.born < right.born end)\nfor position, pioneer in ipairs(pioneers) do\n  print(position .. ". " .. pioneer.name .. " (" .. pioneer.born .. ")")\nend\n-- Expected output:\n-- 1. ada (1815)\n-- 2. grace (1906)\n-- 3. alan (1912)`} />
+
+`comp` receives the elements themselves, not their positions, so a list of records is
+ordered by reaching into whichever field the order is meant to follow.
+
+### Turning the order around
+
+<RunnableExample code={`local high_scores = {62, 95, 71, 88}\ntable.sort(high_scores, function(left, right) return left > right end)\nprint(table.concat(high_scores, ", "))\n-- Expected output: 95, 88, 71, 62`} />
+
+Descending order is the same comparison read the other way. `>` is still strict, so equal
+scores are still reported as neither one coming first, which is what keeps the order a
+valid one.
+
+### Keeping the original arrangement as well
+
+<RunnableExample code={`local arrival_order = {"carol", "alice", "bob"}\nlocal alphabetical = {}\nfor position, guest_name in ipairs(arrival_order) do\n  alphabetical[position] = guest_name\nend\ntable.sort(alphabetical)\nprint(table.concat(arrival_order, ", "))\nprint(table.concat(alphabetical, ", "))\n-- Expected output:\n-- carol, alice, bob\n-- alice, bob, carol`} />
+
+Because the sort happens in place, the only way to keep the arrangement a list arrived in
+is to sort a copy of it. Copying the elements across into a second list first leaves both
+available.
+
+## Gotchas
+
+<Gotcha title="It hands back nothing, so there is no sorted copy to assign">
+`local ranked = table.sort(scores)` leaves `ranked` holding `nil`, because the call returns
+no values at all — the sorted list is `scores` itself. The mistake is easy to make and
+quiet to find: the sort really did happen, so the list is in order and only the variable
+meant to receive it is empty. Sort the list, then use the list.
+</Gotcha>
+
+<Gotcha title="A comparison that answers true for equal elements is not an order">
+`comp` must answer `false` when its two elements are equal, which means writing `<` rather
+than `<=` — and `>` rather than `>=` going the other way. An order built on `<=` claims
+that an element comes before itself, so no arrangement satisfies it, and the sort may stop
+partway with the list left half rearranged. Whether it notices depends on the values and on
+how many there are: a handful of elements can go through a comparison built on `<=` without
+complaint, so the version tried on a small list is not evidence that the order is sound.
+</Gotcha>
+
+## See also
+
+- [`table.concat()`](/docs/standard-library/table/concat) — writing the sorted list out
+- [`table.insert()`](/docs/standard-library/table/insert) — keeping a list in order as values arrive, instead of sorting afterwards
+- [Anonymous functions](/docs/language/expressions/anonymous-functions) — the form `comp` is usually written in
+- [Relational operators](/docs/language/expressions/relational-operators) — what `<` compares, and on which types
+- [The length operator](/docs/language/expressions/length-operator) — what the sorted range is measured with

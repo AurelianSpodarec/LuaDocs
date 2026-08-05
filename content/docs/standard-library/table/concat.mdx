@@ -1,8 +1,129 @@
 ---
 title: table.concat()
-description: ""
+description: Join a run of a list's elements into one string, with a separator between them.
+lua-compat: table.concat
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.concat
 ---
 
-{/* Not yet written. */}
+Writes out a run of a list's elements one after another as a single string, putting a
+separator between each pair of neighbours. The list is only read — nothing in it is moved
+or changed.
+
+<RunnableExample code={`local shopping_list = {"cocoa", "flour", "sugar"}\nprint(table.concat(shopping_list, ", "))\n-- Expected output: cocoa, flour, sugar`} />
+
+## Syntax
+
+```lua
+table.concat(list [, sep [, i [, j]]])
+```
+
+<Parameters>
+  <Param name="list">The list to read the elements from.</Param>
+  <Param name="sep">What goes between one element and the next. Omitted, nothing does and the pieces run together.</Param>
+  <Param name="i">The position to start at. Omitted, it is `1`.</Param>
+  <Param name="j">The last position to include. Omitted, it is `#list`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The elements from `i` to `j`, written out in order with `sep` between neighbours.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a position in the run holds anything other than a string or a number — a position holding nothing included, which is what a run reaching past the end of the list finds there.
+- Raises when `sep` is given and is neither a string nor a number.
+
+</Errors>
+
+## Description
+
+The separator goes *between* neighbours and nowhere else, so a run of three elements
+carries two separators and none at either end. A run of one comes back on its own, with no
+separator anywhere in it, and that stays true whatever `sep` says.
+
+`i` and `j` mark the run, and both ends are included. Left out they are `1` and `#list`,
+which is the whole list, so the everyday call names only the separator. When `i` sits past
+`j` the run is empty and the answer is the empty string. An empty list is that same case
+arriving on its own: `#list` is `0` there, `1` is already past it, and the call answers
+with an empty string rather than raising — so a list that may have nothing in it needs no
+guard before joining.
+
+The run is read exactly as it is given and is never trimmed to fit the list. A `j` beyond
+the last element does not stop early at the end; it goes on reading positions that hold
+nothing, and nothing is not something this function can write out. Everything in the run
+has to be a string or a number, and a number is written the way printing it would write it.
+Nothing else is converted — a `true` or a nested list is refused rather than described.
+
+What falls outside the run is not read at all. That is what makes the two position
+arguments worth more than slicing: a list whose tail holds values `table.concat()` could
+not join still joins cleanly, as long as `j` stops before them.
+
+Only numbered positions take part. Named fields stored beside them are passed over, so a
+list that doubles as a record joins its list half and leaves the record half alone. The
+reads go through the table's metamethods rather than around them, so a table standing in
+for another is joined like any other.
+
+Both defaults are measured with `#list`, which leaves the call only as dependable as that
+length is. On a list whose elements sit at `1` through `#list` with no gaps there is one
+obvious answer; on a list with a gap in it there is not, and every
+[caveat of the length operator](/docs/language/expressions/length-operator) applies here in
+full — a gap inside the run is a position holding nothing, which is exactly the case that
+raises.
+
+<Note>
+Collecting the pieces into a list and joining them once is the usual way to build a long
+string in Lua. Strings are immutable, so appending with `..` inside a loop cannot extend
+one in place: each turn builds a fresh string and abandons the last. Gathering the pieces
+first and calling `table.concat()` at the end builds the result once.
+</Note>
+
+## Examples
+
+### Joining part of a list
+
+<RunnableExample code={`local startup_steps = {"boot", "read config", "open port", "accept", "serve"}\nprint(table.concat(startup_steps, " -> ", 3, 5))\n-- Expected output: open port -> accept -> serve`} />
+
+`3` and `5` name the first and last steps to include, so the two before them are skipped
+and no separator is left dangling where the run begins.
+
+### Numbers need no conversion first
+
+<RunnableExample code={`local measurement = {"kitchen", 21, "celsius"}\nprint(table.concat(measurement, " "))\n-- Expected output: kitchen 21 celsius`} />
+
+A number in the run is written out as it stands. Only a value that is neither a string nor
+a number has to be turned into one before it goes into the list.
+
+### Building one string out of many pieces
+
+<RunnableExample code={`local guest_names = {"ada", "grace", "alan"}\nlocal greetings = {}\nfor position, guest_name in ipairs(guest_names) do\n  greetings[position] = "Hello, " .. guest_name .. "!"\nend\nprint(table.concat(greetings, " "))\n-- Expected output: Hello, ada! Hello, grace! Hello, alan!`} />
+
+The loop puts each finished piece at its own position, and one call at the end turns the
+whole collection into the string that was wanted.
+
+## Gotchas
+
+<Gotcha title="Anything that is not a string or a number stops the join">
+There is no conversion step: `table.concat()` refuses a `true`, a nested list or a
+function outright rather than describing it the way `print()` would. A list built from
+mixed data therefore joins only once every element in the run has been turned into a
+string or a number by the code that put it there. The refusal names the position it
+stopped at, which is the quickest way to find the value that does not belong.
+</Gotcha>
+
+<Gotcha title="The run is not clamped to the list">
+`j` is a position to read, not a limit to stop at, so asking for more than the list holds
+does not quietly give back what there is:
+`table.concat({"one", "two"}, ",", 1, 3)` reads a third position, finds nothing stored
+there and raises. "Everything from here on" therefore has to be spelled `#list` rather
+than a number picked to be large enough — and the same applies at the other end, where `0`
+is a position like any other and holds nothing on an ordinary list.
+</Gotcha>
+
+## See also
+
+- [`table.insert()`](/docs/standard-library/table/insert) — building up the list this reads
+- [`table.sort()`](/docs/standard-library/table/sort) — putting a list in order before joining it
+- [`string.rep()`](/docs/standard-library/string/rep) — repeating one string, rather than joining many different ones
+- [The concatenation operator](/docs/language/expressions/concatenation) — joining two strings rather than a list of them
+- [The length operator](/docs/language/expressions/length-operator) — what the default `j` is measured with

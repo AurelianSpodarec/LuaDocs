@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Reads elements through the table's metamethods; 5.1 and 5.2 read them raw."
+  }
+}
