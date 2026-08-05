@@ -30,6 +30,32 @@ On disk in the session scratchpad as `5.1.html` … `5.5.html` with `passage.py`
 
 Anchors for functions are `pdf-string.<name>` in every version. Section anchors move: **Pack formats** is `6.5.2` in 5.5, `6.4.2` in 5.2–5.4, and absent from 5.1. The section overview is `6.5` in 5.5, `6.4` in 5.2–5.4, `5.4` in 5.1.
 
+## Two rulings that cross batches
+
+**The 5.3 fractional-float rejection.** From 5.3, passing a float with a fractional part
+where an integer is expected raises `number has no integer representation`. That is true
+of `rep`, `sub`, `byte` and most of the library, and batch 1 rightly asked whether it
+should appear on every one of them.
+
+The rule follows [ADR 0010](../adr/0010-entries-are-written-from-the-manual.md) rule 4:
+**record it where the manual documents it for that function, and nowhere else.**
+`string.format` carries it as a `<Since v="5.3" />` Errors bullet because the 5.3 manual
+changes `format`'s own passage to say integer directives require an integer
+representation. For `rep` or `sub` the manual says no such thing per function — it is
+the general argument-checking behaviour underneath — so writing it there would be
+inventing a per-function fact out of a language-wide one, which is what
+[ADR 0009](../adr/0009-type-names-across-versions.md) exists to stop.
+
+This does not conflict with pilot finding #6. That finding is about a fact the manual
+states about *this symbol's behaviour*, filed elsewhere for editorial convenience. This
+is a fact about the language beneath every symbol.
+
+**`string.sub` owns the index rules.** From 5.2 the manual points `string.byte` at
+`string.sub` for how indices are corrected, and negative indices are documented at the
+library level rather than in any one function's passage. **Batch 3 writes the canonical
+explanation** — negative indices, clamping, out-of-range — and every other entry that
+takes an index links to it rather than restating it. Batch 1 already defers this way.
+
 ## The batches
 
 Each batch: research compat for its symbols → write the entries → verify every example in the browser → commit. One dispatch per batch, one review per batch.
