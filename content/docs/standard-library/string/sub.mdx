@@ -47,11 +47,10 @@ string simply begins at its first byte. An end past the last byte is pulled back
 a range asking for more than is there stops where the string does. Nothing pulls a start
 *down* or an end *up*; those cases are left as they are, for the next rule to answer.
 
-If the start ends up after the end, the result is the empty string. That is the single
-answer to every range that describes nothing — a start past the end of the string, an end
-before its beginning, or a backwards pair such as `4, 2`. No position is ever out of
-bounds and no range raises: asking for a piece that is not there gives an empty string
-rather than an error.
+If the start ends up after the end, the result is the empty string — a start past the end
+of the string, an end before its beginning and a backwards pair such as `4, 2` all arrive
+there. No position is ever out of bounds and no range raises: asking for a piece that is
+not there gives an empty string rather than an error.
 
 Position `0` therefore names no byte, and what it does depends on which end it sits at. As
 a start it is below 1 and is pulled up to it, so `string.sub(text, 0)` returns the whole
@@ -62,8 +61,10 @@ counts it back from the end.
 Three shapes follow from all this and cover most of what the function is used for.
 `string.sub(text, 1, -1)` is the whole string, and so is `string.sub(text, 1)`.
 `string.sub(text, 1, count)` is a prefix `count` bytes long. `string.sub(text, -count)` is
-a suffix that many bytes long. Neither of the last two needs a length check in front of it:
-a `count` larger than the string yields the whole of it.
+a suffix that many bytes long, so long as `count` is *positive*. A count larger than the
+string needs no guard in either shape — the correction trims it back to what is there — but
+the two part company at zero: a prefix of nothing is the empty string, while `-0` is
+`0`, which is not negative, corrects up to 1, and hands back the whole string.
 
 ## Examples
 
@@ -93,9 +94,20 @@ unnecessary.
 
 <Gotcha title="The second argument is an end, not a length">
 Both positions are inclusive, so taking `count` bytes from `start` ends at
-`start + count - 1`. Passing the count itself — `string.sub(text, start, count)` — asks for
-the range between two positions that have nothing to do with each other: it is quietly
-wrong whenever `count` is larger than `start`, and empty whenever it is smaller.
+`start + count - 1`. Passing the count itself — `string.sub(text, start, count)` — is right
+only when `start` is 1, which is exactly where the habit forms. Anywhere else it quietly
+returns `count - start + 1` bytes instead of `count`, and nothing at all once `count` falls
+below `start`.
+</Gotcha>
+
+<Gotcha title="A zero-length suffix returns the whole string">
+`string.sub(text, -count)` is the last `count` bytes only while `count` is positive. Let a
+computed count reach zero and the minus sign stops meaning anything — `-0` is `0`, and a
+start of `0` is corrected up to 1 — so the call returns the *entire string* where the empty
+one was wanted. `string.sub(file_name, -extension_length)` hands back the whole name for a
+file that has no extension, which is precisely the case most likely to produce a zero.
+Count from the front instead: `string.sub(text, #text - count + 1)` is the same suffix and
+is empty at zero. The prefix shape has no such trap — `string.sub(text, 1, 0)` is `""`.
 </Gotcha>
 
 <Gotcha title="A range that misses gives an empty string, not nil">
