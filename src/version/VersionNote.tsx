@@ -11,7 +11,7 @@ import { useSelectedVersion } from './SelectedVersionProvider';
  * exist where you are", blue for "it exists but behaves differently". `data-note` is
  * what `tests/e2e/string-format.test.tsx` queries.
  */
-export function VersionNote({ node, name }: { node: CompatNode; name: string }) {
+export function VersionNote({ node }: { node: CompatNode }) {
   const { version } = useSelectedVersion();
 
   if (!isAvailable(node, version)) {
@@ -20,9 +20,13 @@ export function VersionNote({ node, name }: { node: CompatNode; name: string }) 
       <Callout kind="unavailable">
         <span data-note="unavailable">
           <strong>Not in Lua {version}.</strong>{' '}
+          {/* Subject-free on purpose. Building the sentence from the entry's title read
+              "Format strings for pack and unpack was introduced in Lua 5.3" — the verb
+              cannot agree with a title it does not know the number of, and the title is
+              directly above the callout anyway. */}
           {added === false
-            ? `${name} is not part of any documented Lua version.`
-            : `${name} was introduced in Lua ${added}.`}
+            ? 'Not part of any documented Lua version.'
+            : `Introduced in Lua ${added}.`}
         </span>
       </Callout>
     );

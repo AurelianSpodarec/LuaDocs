@@ -16,7 +16,7 @@ function Entry() {
     <SelectedVersionProvider>
       <VersionSwitcher />
       <VersionSupportStrip node={node} />
-      <VersionNote node={node} name="string.format" />
+      <VersionNote node={node} />
     </SelectedVersionProvider>
   );
 }
@@ -78,7 +78,7 @@ describe('the assembled string.format entry', () => {
       <SelectedVersionProvider>
         <VersionSwitcher />
         <VersionSupportStrip node={introducedIn53} />
-        <VersionNote node={introducedIn53} name="math.tointeger" />
+        <VersionNote node={introducedIn53} />
       </SelectedVersionProvider>,
     );
 
@@ -87,7 +87,7 @@ describe('the assembled string.format entry', () => {
 
     const note = document.querySelector('[data-note="unavailable"]');
     expect(note).toHaveTextContent(/Not in Lua 5\.1/);
-    expect(note).toHaveTextContent(/introduced in Lua 5\.3/);
+    expect(note).toHaveTextContent(/Introduced in Lua 5\.3/);
   });
 });
 

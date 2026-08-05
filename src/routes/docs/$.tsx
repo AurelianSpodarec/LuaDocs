@@ -118,7 +118,7 @@ function Content({
       {node && (
         <div className="flex flex-col gap-3">
           <VersionSupportStrip node={node} />
-          <VersionNote node={node} name={page.title} />
+          <VersionNote node={node} />
         </div>
       )}
       <DocsBody>
