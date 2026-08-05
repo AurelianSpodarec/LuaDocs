@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Adds `table.pack` and `table.unpack`, and drops the deprecated `table.foreach`, `table.foreachi` and `table.getn`.",
+    "5.3": "Adds `table.move`, and drops `table.maxn`.",
+    "5.5": "Adds `table.create`."
+  }
+}

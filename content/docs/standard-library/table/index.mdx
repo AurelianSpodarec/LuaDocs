@@ -1,8 +1,89 @@
 ---
 title: table
-description: ""
+description: Lua's toolkit for tables used as lists — adding, removing, ordering, copying and reading them out.
+lua-compat: table.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.7
 ---
 
-{/* Not yet written. */}
+The table is Lua's only way of structuring data, and this is the library that works on one.
+Its functions live in the table `table`, and there is no method form of them: tables are not
+given a shared metatable the way strings are, so it is always
+`table.insert(guest_list, "dave")` and never `guest_list:insert("dave")`.
+
+Most of what is here treats a table as a *list* — a run of values stored at the positions
+`1`, `2`, `3` and upwards — rather than as an arbitrary collection of keys. Nothing marks a
+table as a list; it is one because of where its values sit. So whenever a function here needs
+to know how long a list is, the answer is the one the
+[length operator](/docs/language/expressions/length-operator) gives, and every caveat that
+operator carries is carried into the call along with it. Those functions take no notice of
+keys that are not numbers, so named fields stored beside the elements come through untouched.
+
+<RunnableExample code={`local shopping_list = {"cocoa", "flour"}\ntable.insert(shopping_list, "sugar")\ntable.sort(shopping_list)\nprint(#shopping_list)\nprint(table.concat(shopping_list, ", "))\n-- Expected output:\n-- 3\n-- cocoa, flour, sugar`} />
+
+Neither of those first two calls handed a list back. The functions that change a list change
+the one they were given, where it stands, and none of them returns a changed copy — which is
+the other way round from the [`string`](/docs/standard-library/string) library, where nothing
+is edited in place and anything that looks like it changes a string hands back a new one. The
+functions that only read a list, like the `table.concat()` on the last line, leave it exactly
+as they found it.
+
+<Note>
+All of the above holds for a list whose positions run from `1` with no gaps. Store a `nil` in
+the middle of one and its length stops having a single answer, and every function whose
+default position is measured with `#` inherits that ambiguity. Where values may be missing,
+[`table.pack()`](/docs/standard-library/table/pack) and the explicit count it records are the
+way to keep track of how many there were.
+</Note>
+
+Whether these functions reach a table's elements through its metamethods or go straight past
+them is not one rule for the whole library, and neither is which of them exist: this library's
+membership is the part of the standard library that has changed most. Each entry's own version
+support says which Lua lines carry it, and the sidebar dims the ones your selected version
+does not have.
+
+## Making a list and adding to it
+
+Where a list comes from: an empty one you are about to fill, one value at a time, or a whole
+call's worth at once.
+
+- [`table.create()`](/docs/standard-library/table/create) — an empty table with room set aside for what is coming, on the lines that have it
+- [`table.insert()`](/docs/standard-library/table/insert) — one value added, at the end or at a position you choose
+- [`table.pack()`](/docs/standard-library/table/pack) — every value a call was given, collected with a count
+
+## Rearranging and copying
+
+Changing the arrangement of what a list already holds — in place, or into a second list.
+
+- [`table.move()`](/docs/standard-library/table/move) — a run of elements copied to another position, in one list or between two
+- [`table.sort()`](/docs/standard-library/table/sort) — the whole list put into order, by your comparison or by `<`
+
+## Taking elements back out
+
+Three ways to get at what a list holds: one element, a run of them as separate values, or a
+run of them joined into a string.
+
+- [`table.remove()`](/docs/standard-library/table/remove) — one element taken out, with the gap closed behind it
+- [`table.unpack()`](/docs/standard-library/table/unpack) — a run handed back as separate values, for passing on as arguments
+- [`table.concat()`](/docs/standard-library/table/concat) — a run written out as one string, with a separator between
+
+## Functions best written another way
+
+Four the library has carried at one time or another and newer Lua no longer does. They are
+listed because reading old code means meeting them; each entry says what to write in its
+place, and how exact the swap is.
+
+- [`table.getn()`](/docs/standard-library/table/getn) — a list's length, which `#` answers identically
+- [`table.foreach()`](/docs/standard-library/table/foreach) — a function called for every key, which a `for` over `pairs()` replaces
+- [`table.foreachi()`](/docs/standard-library/table/foreachi) — the same for numbered positions, where `ipairs()` differs in one way worth knowing
+- [`table.maxn()`](/docs/standard-library/table/maxn) — the largest number used as a key, which nothing else asks and you write out yourself
+
+## See also
+
+- [`table`](/docs/language/values-and-types/table) — the value type these functions work on
+- [Table constructors](/docs/language/expressions/table-constructors) — writing one in source
+- [`#` length operator](/docs/language/expressions/length-operator) — what "the length of a list" means, and where it stops meaning one thing
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — walking a list's positions in order
+- [`pairs()`](/docs/standard-library/globals/pairs) — walking everything a table holds, positions and names alike
+- [`next()`](/docs/standard-library/globals/next) — the single step those two are built on
+- [Metatables](/docs/language/metatables) — what a table can be made to do when it is indexed

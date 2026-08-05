@@ -1,8 +1,120 @@
 ---
 title: table.create()
-description: ""
+description: Make an empty table with room set aside for the elements you are about to put in it.
+lua-compat: table.create
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.create
 ---
 
-{/* Not yet written. */}
+Hands back a new, empty table, having first set memory aside for the elements you say it is
+going to hold. The counts are hints about what is coming, not contents: the table arrives
+empty and behaves exactly as `{}` would, so the only thing the call changes is how much work
+filling it costs.
+
+<RunnableExample code={`local attendees = {"alice", "bob", "carol"}\nlocal badges = {}\n-- table.create(#attendees) hands back exactly this table, with the room already set aside\nfor position = 1, #attendees do\n  badges[position] = attendees[position]:upper()\nend\nprint(table.concat(badges, ", "))\n-- Expected output: ALICE, BOB, CAROL`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so
+they show the table it hands back — a plain empty one — and name the call in a comment
+beside it. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+table.create(nseq [, nrec])
+```
+
+<Parameters>
+  <Param name="nseq">How many elements the table is expected to hold as a run of numbered positions.</Param>
+  <Param name="nrec">How many elements it is expected to hold anywhere else — under names, or under keys that are not positions. Omitted, it is `0`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">A new table, holding nothing.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `nseq` is missing, or when either count is not a number usable as a whole number.
+- Raises when either count is negative. A negative is not read as `0`.
+- Raises when a count is larger than the space Lua is willing to set aside.
+
+</Errors>
+
+## Description
+
+The two counts describe the two halves of a table. `nseq` is for the numbered run — the
+positions `1`, `2`, `3` and upwards that the rest of this library works on — and `nrec` is
+for everything else a table can hold: fields under names, and keys that are not positions at
+all. A table that is purely a list wants only the first; a table that is purely a record
+wants `table.create(0, 8)`.
+
+Both are hints, in the full sense of the word. Nothing about the table that comes back
+depends on them, nothing later reads them, and nothing is bound by them: the table grows past
+whatever was asked for exactly as any table does, so a count that turns out too small costs
+nothing beyond the growth it was meant to avoid. A count that turns out too large costs the
+memory it reserved.
+
+What arrives is empty, and empty in every way you can ask about. Its length is `0`, walking it
+with [`next()`](/docs/standard-library/globals/next) finds nothing to hand back, and every
+position inside the space set aside reads as `nil` — because it holds nothing, exactly like a
+position past the end. Space and contents are different things, and this call only ever
+touches the first.
+
+That is what makes it a performance decision and nothing else. Swapping `table.create(20)` for
+`{}` cannot change what a program computes or what it prints; it can only change how many
+times Lua reallocates on the way there. Where the size is not known ahead of the loop, a
+[table constructor](/docs/language/expressions/table-constructors) is the same table without
+the guess.
+
+The table is built fresh on every call, with no metatable and no connection to anything the
+caller already had.
+
+## Examples
+
+### The table it hands back is empty
+
+<RunnableExample code={`local monthly_totals = {}\n-- table.create(12) hands back a table indistinguishable from this one\nprint(#monthly_totals)\nprint(next(monthly_totals))\nprint(monthly_totals[1])\n-- Expected output:\n-- 0\n-- nil\n-- nil`} />
+
+Room for twelve elements and twelve elements are not the same thing. Nothing counts, nothing
+iterates, and nothing reads back — the space is invisible from Lua, which is precisely why
+adding the call to working code is safe.
+
+### Setting room aside for named fields instead
+
+<RunnableExample code={`local order = {}\n-- table.create(0, 3) sets aside room for three fields stored under names, and nothing else\norder.customer = "alice"\norder.total_in_pence = 1250\norder.paid = false\nprint(order.customer)\nprint(order.total_in_pence)\nprint(order.paid)\n-- Expected output:\n-- alice\n-- 1250\n-- false`} />
+
+A record has no numbered run, so its first count is `0` and its second is the number of fields
+it is about to be given.
+
+### The counts are not a limit
+
+<RunnableExample code={`local waiting_line = {}\n-- table.create(2) asks for room for two; nothing stops a third\ntable.insert(waiting_line, "alice")\ntable.insert(waiting_line, "bob")\ntable.insert(waiting_line, "carol")\nprint(#waiting_line)\nprint(table.concat(waiting_line, ", "))\n-- Expected output:\n-- 3\n-- alice, bob, carol`} />
+
+Asking for room for two and storing three is not an error and not a special case. The table
+grows, and the only cost is the reallocation the count was there to avoid.
+
+## Gotchas
+
+<Gotcha title="It does not give you a list of that many elements">
+`table.create(10)` is not ten of anything. The table's length is `0`, a generic `for` over it
+runs its body no times, and `table.insert()` on it puts the first value at position `1` rather
+than at `11`. Code that wants ten positions actually filled has to fill them —
+with a loop, or with a [table constructor](/docs/language/expressions/table-constructors)
+that lists them.
+</Gotcha>
+
+<Gotcha title="The second count is a count, not a value to fill with">
+`nrec` says *how many* other elements are coming, never *what* they are.
+`table.create(0, 5)` sets room aside for five fields; it does not store `5`, and it does not
+store five of anything. Neither count ever appears in the table.
+</Gotcha>
+
+## See also
+
+- [`table.insert()`](/docs/standard-library/table/insert) — putting the elements into the room set aside
+- [`table.pack()`](/docs/standard-library/table/pack) — a new table built from values you already have, rather than an empty one
+- [`table.move()`](/docs/standard-library/table/move) — filling a fresh table from a run of an existing one
+- [Table constructors](/docs/language/expressions/table-constructors) — the same empty table, written as `{}`
+- [The length operator](/docs/language/expressions/length-operator) — what the numbered run of a table is measured with

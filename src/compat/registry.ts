@@ -21,6 +21,8 @@ import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
 import utf8Library from './data/utf8.library.json';
 import tableConcat from './data/table.concat.json';
+import tableCreate from './data/table.create.json';
+import tableLibrary from './data/table.library.json';
 import tableForeach from './data/table.foreach.json';
 import tableForeachi from './data/table.foreachi.json';
 import tableGetn from './data/table.getn.json';
@@ -70,6 +72,12 @@ const raw: Record<string, unknown> = {
   // to, and says only when the library arrived.
   'utf8.library': utf8Library,
   'table.concat': tableConcat,
+  'table.create': tableCreate,
+  // The `table` section's own node, on the rule `string.library` set: the library's
+  // existence and its *membership*, never the union of its members' behaviour. Its
+  // members' raw-versus-metamethod change is therefore absent here and present on each
+  // of the five entries where it is observable.
+  'table.library': tableLibrary,
   // Four symbols that leave rather than arrive. `version_removed` is the first version
   // *without* the function, so it carries the whole fact and the prose names no version:
   // the replacement each one points at ( `#`, `pairs`, `ipairs` ) is true everywhere.
