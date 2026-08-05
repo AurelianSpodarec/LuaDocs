@@ -1,5 +1,8 @@
 import { compatNodeSchema, type CompatNode } from './schema';
 import stringFormat from './data/string.format.json';
+import stringLen from './data/string.len.json';
+import stringGsub from './data/string.gsub.json';
+import stringPatterns from './data/string.patterns.json';
 import mathTointeger from './data/math.tointeger.json';
 
 /**
@@ -11,6 +14,9 @@ import mathTointeger from './data/math.tointeger.json';
  */
 const raw: Record<string, unknown> = {
   'string.format': stringFormat,
+  'string.len': stringLen,
+  'string.gsub': stringGsub,
+  'string.patterns': stringPatterns,
   'math.tointeger': mathTointeger,
 };
 
