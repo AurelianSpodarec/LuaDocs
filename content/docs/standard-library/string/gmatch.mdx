@@ -1,8 +1,97 @@
 ---
 title: string.gmatch()
-description: ""
+description: Build an iterator that walks every match of a pattern in a string.
+lua-compat: string.gmatch
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.gmatch
 ---
 
-{/* Not yet written. */}
+Searches nothing when you call it. What it returns is a *function* — an iterator that
+finds the next match each time it is called — which is what a generic `for` loop wants, and
+what turns "every match in this string" into a two-line loop.
+
+<RunnableExample code={`local shopping_note = "2 apples, 3 pears, 12 plums"\nfor quantity, fruit_name in string.gmatch(shopping_note, "(%d+) (%a+)") do\n  print(fruit_name, quantity)\nend\n-- Expected output:\n-- apples\t2\n-- pears\t3\n-- plums\t12`} />
+
+## Syntax
+
+```lua
+string.gmatch(s, pattern [, init])
+```
+
+<Parameters>
+  <Param name="s">The string to walk.</Param>
+  <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) each turn looks for.</Param>
+  <Param name="init">The position the first search starts from. Omitted, it starts at the first byte.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function">An iterator. Each call advances to the next match and returns exactly what [`string.match()`](/docs/standard-library/string/match) would return for it — one value per capture, or the whole matched text when the pattern captures nothing. Once the matches run out it returns no values at all, which is what ends a generic `for`.</Return>
+</Returns>
+
+## Description
+
+Every call resumes where the previous match ended, so the string is covered once, left to
+right, and no two matches overlap. `"aa"` over `"aaa"` therefore produces one match and not
+two: the second `a` has already been consumed by the first.
+
+`init` moves the first search's starting point and leaves the rest of the walk alone. It is
+a position in `s`, read the way [`string.sub()`](/docs/standard-library/string/sub) reads
+one — counting from 1 at the front, and backwards from the end when it is negative.
+
+The iterator is an ordinary function and nothing obliges you to put it in a `for`. Storing
+it in a name and calling it by hand is how a match is taken one at a time, out of step with
+a loop — reading a header before the body, say, or pulling only as many matches as are
+wanted. What it will not do is start over: an iterator that has run out stays run out, and
+a second pass needs a second `string.gmatch()` call.
+
+## Examples
+
+### Collecting every match into a table
+
+<RunnableExample code={`local query_string = "page=2&sort=name&order=asc"\nlocal settings = {}\nfor setting_name, setting_value in string.gmatch(query_string, "(%w+)=(%w+)") do\n  settings[setting_name] = setting_value\nend\nprint(settings.page, settings.sort, settings.order)\n-- Expected output: 2\tname\tasc`} />
+
+Two captures per turn arrive as two loop variables, which is what makes a key-and-value
+pattern collapse into a single loop with no splitting step in front of it.
+
+### Calling the iterator by hand
+
+<RunnableExample code={`local next_name = string.gmatch("Ada Lovelace Byron", "%a+")\nprint(next_name())\nprint(next_name())\nprint(next_name())\nprint(select("#", next_name()))\n-- Expected output:\n-- Ada\n-- Lovelace\n-- Byron\n-- 0`} />
+
+The fourth call has nothing left to find and returns *no values*, which `select("#", ...)`
+counts as zero. That is the signal a `for` loop reads as the end of the walk.
+
+### Skipping a prefix that would otherwise match
+
+<RunnableExample code={`local shipping_label = "ORDER-4471: 2 boxes, 5 crates, 1 pallet"\nlocal header_end = string.find(shipping_label, ": ", 1, true)\nfor quantity in string.gmatch(shipping_label, "%d+", header_end) do\n  print(quantity)\nend\n-- Expected output:\n-- 2\n-- 5\n-- 1`} />
+
+Starting the walk after the colon keeps the digits of the order number out of it, without
+having to cut the label into a new string first.
+
+## Gotchas
+
+<Gotcha title="A leading caret does not anchor the walk">
+`^` pins a match to the start of the subject in every other pattern-matching function, and
+an iterator that could only ever match there would have nowhere to go after its first turn
+— so [Patterns](/docs/standard-library/string/patterns) records that `string.gmatch()` does
+not honour it. What it does instead is the part that bites: the caret is not quietly
+dropped, it is matched as an ordinary character. `"^%a+"` therefore looks for a caret
+followed by letters and walks over nothing at all in text that contains no caret, which
+reads at the call site as a pattern that simply found no matches. Where a match really has
+to be at the start, [`string.match()`](/docs/standard-library/string/match) or
+[`string.find()`](/docs/standard-library/string/find) is the function that anchors.
+</Gotcha>
+
+<Gotcha title="The iterator is spent, not reusable">
+Reaching the end of the string leaves the iterator permanently exhausted; it does not
+rewind. Keeping one in a table field or an upvalue and looping over it a second time runs
+the body zero times and raises nothing, so the loop looks like a string that had no matches
+in it rather than one already walked. Call `string.gmatch()` again for each pass — the call
+is cheap, and it is the fresh iterator that is the point.
+</Gotcha>
+
+## See also
+
+- [`string.match()`](/docs/standard-library/string/match) — the first match only, and what each turn here returns
+- [`string.gsub()`](/docs/standard-library/string/gsub) — replacing every match instead of visiting it
+- [`string.find()`](/docs/standard-library/string/find) — locating a match by position
+- [Patterns](/docs/standard-library/string/patterns) — captures, anchors and the rest of the notation

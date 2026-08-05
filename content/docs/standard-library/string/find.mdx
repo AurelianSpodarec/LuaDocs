@@ -1,8 +1,106 @@
 ---
 title: string.find()
-description: ""
+description: Locate the first match of a pattern and report where it starts and ends.
+lua-compat: string.find
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.find
 ---
 
-{/* Not yet written. */}
+Reports *where* something is rather than what it says: the position of the first byte of
+the earliest match and the position of its last.
+[`string.match()`](/docs/standard-library/string/match) answers the same search with the
+text itself, and is the one to reach for when the positions are not what you are after.
+
+<RunnableExample code={`local log_line = "2026-08-05 12:04:11 WARN disk almost full"\nlocal start_index, end_index = string.find(log_line, "WARN")\nprint(start_index, end_index)\nprint(string.sub(log_line, end_index + 2))\n-- Expected output:\n-- 21\t24\n-- disk almost full`} />
+
+## Syntax
+
+```lua
+string.find(s, pattern [, init [, plain]])
+```
+
+<Parameters>
+  <Param name="s">The string to search.</Param>
+  <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) to look for — or, with `plain` switched on, literal text.</Param>
+  <Param name="init">The position to start searching from. Omitted, the search starts at the first byte.</Param>
+  <Param name="plain">`true` turns pattern matching off, making this a search for `pattern` as it stands.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">Where the match starts. A search that finds nothing returns `nil` on its own, with nothing after it.</Return>
+  <Return type="integer">Where the match ends. That byte belongs to it, so `string.sub(s, start_index, end_index)` is the text that matched and the match is `end_index - start_index + 1` bytes long.</Return>
+  <Return type="string or integer">Then one value per capture the pattern has, in the order the captures open — after the two indices, not instead of them. A pattern that captures nothing adds nothing here.</Return>
+</Returns>
+
+## Description
+
+The search runs from left to right and stops at the earliest position where the pattern
+matches, so what comes back describes the *first* match and never a later or a longer one.
+
+`init` moves that starting point. It is a position in `s` and is read the way
+[`string.sub()`](/docs/standard-library/string/sub) reads one, counting from 1 at the
+front and backwards from the end when it is negative. Passing the previous match's end
+index back in — one past it, to clear the match just found — is how a single call becomes
+a walk over every match in the string, and it is the loop
+[`string.gmatch()`](/docs/standard-library/string/gmatch) writes for you.
+
+`plain` switches the pattern machinery off entirely. Nothing in `pattern` is magic then:
+a full stop is a full stop, a per cent sign is a per cent sign, and the call is an
+ordinary substring search. It sits fourth, so a call that uses it fills the third slot as
+well — `string.find(s, needle, 1, true)` is the usual spelling. That matters most when
+what is being searched for arrived in a variable rather than being typed into the call,
+because text from a file, a form or a user is exactly the text likeliest to contain a
+character the notation would otherwise read as an instruction.
+
+When the pattern has captures, the captured values follow the two indices in the same
+call, which makes one `string.find()` do the work of a `string.match()` and a position
+lookup together.
+
+## Examples
+
+### Searching for text that has magic characters in it
+
+<RunnableExample code={`local file_name = "quarterly.report.2026.csv"\nprint(string.find(file_name, "."))\nprint(string.find(file_name, ".", 1, true))\n-- Expected output:\n-- 1\t1\n-- 10\t10`} />
+
+Unquoted, `.` is the class that matches any character at all, so the first call reports the
+`q` at position 1. The fourth argument makes the second call look for a full stop.
+
+### Walking a string one match at a time
+
+<RunnableExample code={`local header_row = "name;role;team"\nlocal search_from = 1\nwhile true do\n  local separator_position = string.find(header_row, ";", search_from, true)\n  if not separator_position then break end\n  print(separator_position)\n  search_from = separator_position + 1\nend\n-- Expected output:\n-- 5\n-- 10`} />
+
+### Captures alongside the positions
+
+<RunnableExample code={`local timestamp = "12:04:11"\nlocal start_index, end_index, hours, minutes = string.find(timestamp, "(%d+):(%d+)")\nprint(start_index, end_index)\nprint(hours, minutes)\n-- Expected output:\n-- 1\t5\n-- 12\t04`} />
+
+The two indices come first and the two captures after them, so the names on the left have
+to account for all four values.
+
+## Gotchas
+
+<Gotcha title="The thing being searched for is a pattern, not a substring">
+Without the fourth argument every magic character in `pattern` does its job, and the
+characters that turn up in version numbers, file names and prices are exactly the magic
+ones. Searching for `3.14` finds `3x14`, because `.` matches any character; searching for
+`20%` raises rather than searching, because `%` is the escape character and there is
+nothing after it to escape. The failure that costs most is the first kind, where the call
+succeeds and reports a position that is not the text you asked for. Pass `true` fourth, or
+escape the character with `%` — the full list of what is magic is in
+[Patterns](/docs/standard-library/string/patterns).
+</Gotcha>
+
+<Gotcha title="An empty match ends before it starts">
+A pattern able to match nothing — anything built on `*`, `-` or `?` — succeeds at the
+first position it is tried, matching zero bytes. The result is an end index one *below* the
+start index, so `string.find("hello", "l*")` gives `1` and `0`. Nothing about that is an
+error, and `string.sub()` over the pair correctly yields the empty string, but a loop that
+resumes at the end index plus one never moves forward and spins on the same position for
+ever. Advance from the start index instead when the pattern can match nothing.
+</Gotcha>
+
+## See also
+
+- [`string.match()`](/docs/standard-library/string/match) — the matched text instead of its position
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — every match rather than the first
+- [`string.sub()`](/docs/standard-library/string/sub) — cutting the string at the positions found
+- [Patterns](/docs/standard-library/string/patterns) — the notation `pattern` is written in
