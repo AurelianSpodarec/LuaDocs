@@ -22,3 +22,17 @@ export function supportRow(node: CompatNode) {
     return { version, state: 'yes' as const };
   });
 }
+
+/**
+ * Does any documented version differ from the rest?
+ *
+ * The detailed matrix renders only when this is true. On an entry available
+ * everywhere and changed nowhere it would be five identical rows restating the strip
+ * at the top of the page — `page-structure.md`, prototype finding #2.
+ */
+export function varies(node: CompatNode): boolean {
+  if (node.support.lua.version_added !== LUA_VERSIONS[0]) return true;
+  if (node.support.lua.version_removed) return true;
+
+  return Object.keys(node.changed_in ?? {}).length > 0;
+}

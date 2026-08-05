@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isAvailable, changeNoteFor, supportRow } from '@/compat/resolve';
+import { isAvailable, changeNoteFor, supportRow, varies } from '@/compat/resolve';
 import { LUA_VERSIONS, type CompatNode } from '@/compat/schema';
 
 const node: CompatNode = {
@@ -69,5 +69,35 @@ describe('supportRow', () => {
   it('"no" beats "changed" when a removed version also has a changed_in entry', () => {
     const row = supportRow(removedAndChangedNode);
     expect(row.find((r) => r.version === '5.3')).toEqual({ version: '5.3', state: 'no' });
+  });
+});
+
+describe('varies', () => {
+  it('is false for an entry present since 5.1 and never changed', () => {
+    expect(varies({ support: { lua: { version_added: '5.1' } } })).toBe(false);
+  });
+
+  it('is false when changed_in is present but empty', () => {
+    expect(varies({ support: { lua: { version_added: '5.1' } }, changed_in: {} })).toBe(false);
+  });
+
+  it('is true when the entry arrived later than 5.1', () => {
+    expect(varies({ support: { lua: { version_added: '5.3' } } })).toBe(true);
+  });
+
+  it('is true when the entry was removed', () => {
+    expect(
+      varies({ support: { lua: { version_added: '5.1', version_removed: '5.4' } } }),
+    ).toBe(true);
+  });
+
+  it('is true when any version carries a change note', () => {
+    expect(
+      varies({ support: { lua: { version_added: '5.1' } }, changed_in: { '5.3': 'x' } }),
+    ).toBe(true);
+  });
+
+  it('is true for a symbol in no documented version', () => {
+    expect(varies({ support: { lua: { version_added: false } } })).toBe(true);
   });
 });
