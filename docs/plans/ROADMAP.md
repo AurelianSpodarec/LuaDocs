@@ -89,6 +89,26 @@ site-wide behaviour: the `<Return>` renderer surfaces a standing footnote when t
 implementation, no authoring cost, correct everywhere at once. Slice 2.5 owns it, and
 owes the ADR before the next entry returning a count is authored.
 
+**Owed to the content pipeline: the `.md` route and `llms.txt` degraded.** Both serve
+the MDX body, and the page-anatomy slice changed what the body holds. Examples are now a `RunnableExample`
+component taking its Lua in a `code` prop, so the two text surfaces carry a program as an
+entity-escaped JSX attribute rather than as readable code. The version matrix and the
+manual citation are rendered by the route rather than authored into the body, so the
+markdown copy of an entry carries no version data and no attribution at all —
+`page.data.getText('processed')` never sees either. This is not cosmetic:
+[ADR 0008](../adr/0008-example-conventions.md) rule 6 keeps the expected-output comment
+specifically because "the prerendered page, the `.md` route, and `llms.txt` are all
+read", and one of those three is now unreadable. Slice 3 owns it, alongside the CI
+verification that every runnable example still runs.
+
+**Owed to CI: the link check must run against build output, not the dev server.** The
+dev server answers every path with the same 200 SPA shell — nonsense routes included —
+so a crawl of it can never 404 and would pass over a wholly broken set of links. The
+site prerenders, so the check belongs after `npm run build`, over `.output/public`,
+where a missing page is a missing file. Worth having: entries cross-link heavily in
+`## See also` and in prose, and most of those targets are still unwritten stubs today,
+so the first real check will have a backlog to work through.
+
 ### 3. Content pipeline
 
 What it takes to author entries at volume rather than one at a time: sidebar
