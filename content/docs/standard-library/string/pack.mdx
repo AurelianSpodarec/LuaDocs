@@ -30,11 +30,12 @@ string.pack(fmt, v1, v2, ···)
 
 <Errors>
 
-- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
-- Raises when an option that needs a size is written without one.
+- Raises when the format holds an option that is not defined.
+- Raises when an option that needs a size is written without one, or when the size on `i`, `I`, `s` or `!` falls outside the range 1 to 16. `c` takes a size of any width.
 - Raises when a value is too large for the width its option gives it.
 - Raises when a float with a fractional part reaches an integer option.
 - Raises when a string is longer than the fixed size it was given, or when its length will not fit in the width recording it.
+- Raises when a string packed with `z` holds a zero byte, which would end it early.
 - Raises when a value is missing for an option that needs one, or is of a kind the option cannot take.
 - Raises when the alignment an option would need is not a power of two.
 

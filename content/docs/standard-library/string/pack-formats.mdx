@@ -40,7 +40,9 @@ twin unsigned.
 | `I[n]` | an unsigned integer | `n` bytes; the width of an `int` when `n` is left off |
 
 `n` is written immediately after the option, with no space, and may be any whole number
-from 1 to 16.
+from 1 to 16. That range is shared by every option that takes a size *except* `c` — it
+binds `i` and `I` here, `s` under Strings and `!` under Alignment, and a size outside it
+is refused rather than clamped.
 
 Every integer option is range-checked in both directions. Packing rejects a value too
 large for the width it was given, and unpacking rejects a value too large to become a Lua
@@ -51,17 +53,20 @@ bit set.
 
 ## Floating-point numbers
 
-| Option | Stands for |
-|---|---|
-| `f` | a single-precision float |
-| `d` | a double-precision float |
-| `n` | a Lua number, which is a double |
+| Option | Stands for | Width |
+|---|---|---|
+| `f` | a float, as C has them | whatever a `float` is where Lua was built |
+| `d` | a double, as C has them | whatever a `double` is where Lua was built |
+| `n` | a Lua number | as wide as Lua's own number |
 
 The value packed is a float even when the argument was an integer, and what comes back
-from `string.unpack()` is always a float. `f` is the only one of the three that is
-narrower than Lua's own number, so it is the only one that rounds.
+from `string.unpack()` is always a float. Where `f` is narrower than Lua's own number —
+which is every ordinary build — it is the one that loses precision, and a value sent
+through it does not come back the number that went in.
 
-<RunnableExample code={`local original_ratio = 0.1\nlocal through_single = string.unpack("f", string.pack("f", original_ratio))\nlocal through_double = string.unpack("d", string.pack("d", original_ratio))\nprint(through_single == original_ratio)\nprint(through_double == original_ratio)\n-- Expected output:\n-- false\n-- true`} />
+<RunnableExample code={`local original_ratio = 0.1\nprint((string.unpack("f", string.pack("f", original_ratio))))\nprint((string.unpack("d", string.pack("d", original_ratio))))\n-- Expected output:\n-- 0.10000000149012\n-- 0.1`} />
+
+Byte order and alignment apply to all three, exactly as they do to the integers above.
 
 ## Strings
 
@@ -74,14 +79,20 @@ Three options carry a string, and they differ in how the reader is told where it
 | `s[n]` | bytes preceded by their length, written as an unsigned integer `n` bytes wide — a size when `n` is left off |
 
 `c` is the one option whose size is compulsory: `c8` is eight bytes, and a bare `c` is
-not a format. A string shorter than the size is padded out with zero bytes, and one
-longer than it is refused rather than truncated. `s` refuses a string whose length will
-not fit in the width in front of it.
+not a format. It is also the one exempt from the 1-to-16 range the other sizes obey —
+`c100` is a hundred bytes, which is what makes it the option for a fixed-width field of
+any width at all. A string shorter than the size is padded out with zero bytes, and one
+longer than it is refused rather than truncated.
 
-<RunnableExample code={`local label = "cocoa"\nprint(#string.pack("c8", label))\nprint(#string.pack("z", label))\nprint(#string.pack("s1", label))\n-- Expected output:\n-- 8\n-- 6\n-- 6`} />
+`s` takes a size in the 1-to-16 range like an integer option, because that size is the
+width of the integer recording the length rather than of the bytes themselves. It refuses
+a string whose length will not fit in it.
 
-`z` is the only one that cannot hold a zero byte in the middle of its own data, since
-that is what marks the end. `c` and `s` carry arbitrary bytes.
+<RunnableExample code={`local label = "cocoa"\nprint(#string.pack("c8", label))\nprint(#string.pack("z", label))\nprint(#string.pack("s1", label))\nprint(#string.pack("c100", label))\n-- Expected output:\n-- 8\n-- 6\n-- 6\n-- 100`} />
+
+`z` is the only one that cannot hold a zero byte in the middle of its own data, since that
+is what marks the end — a string carrying one is refused rather than silently cut short.
+`c` and `s` take arbitrary bytes, zeros included.
 
 ## Byte order
 
@@ -97,9 +108,15 @@ starts in the machine's own order, exactly as if it began with `=`.
 
 <RunnableExample code={`local port_number = 8080\nprint(string.byte(string.pack(">I2", port_number), 1, -1))\nprint(string.byte(string.pack("<I2", port_number), 1, -1))\n-- Expected output:\n-- 31\t144\n-- 144\t31`} />
 
-Byte order reaches integers only. A machine is assumed to be wholly big-endian or
-wholly little-endian, and a layout that mixes the two within one value is outside what
-these options can describe.
+Every option wider than a single byte follows the current setting — floats as readily as
+integers. `>d` and `<d` write the same number in opposite orders, and reading one as the
+other produces a number bearing no relation to what was packed.
+
+<RunnableExample code={`local scale_factor = 1.0\nprint(string.byte(string.pack(">f", scale_factor), 1, -1))\nprint(string.byte(string.pack("<f", scale_factor), 1, -1))\nprint((string.unpack("<f", string.pack(">f", scale_factor))))\n-- Expected output:\n-- 63\t128\t0\t0\n-- 0\t0\t128\t63\n-- 4.6006029882248e-41`} />
+
+A machine is taken to be wholly big-endian or wholly little-endian. A layout that mixes
+the two within a single value is outside what these options describe, and Lua does not
+try to reproduce one.
 
 ## Alignment and padding
 
@@ -108,7 +125,9 @@ these options can describe.
 | `![n]` | a setting: the maximum alignment becomes `n`, or the machine's own alignment when `n` is left off |
 | `x` | one byte of padding |
 | `Xop` | no data at all — an empty item that aligns as `op` would, without packing `op` itself |
-| ` ` | a space, which is ignored and may be used to make a format readable |
+| `' '` | a space, which is ignored and may be used to make a format readable |
+
+`n` on `!` is a size like any other, and obeys the same 1-to-16 range.
 
 A format starts as if it were prefixed by `!1=`: maximum alignment of 1, meaning no
 alignment at all, and the machine's own byte order. Under any larger maximum, each
@@ -117,10 +136,12 @@ smaller of the option's own width and the maximum — and that smaller number ha
 power of two, so a three-byte integer under a maximum of 4 is refused rather than
 quietly placed.
 
-<RunnableExample code={`print(string.packsize("Bi4"))\nprint(string.packsize("!4Bi4"))\n-- Expected output:\n-- 5\n-- 8`} />
+<RunnableExample code={`print(string.packsize("Bi4"))\nprint(string.packsize("!4Bi4"))\nprint(string.packsize("!4Bd"))\n-- Expected output:\n-- 5\n-- 8\n-- 12`} />
 
-`c` and `z` are never aligned, whatever the maximum is. `s` takes the alignment of the
-integer that records its length rather than of the bytes themselves.
+Floats are aligned on the same rule as integers, which is what puts the `d` above at
+offset 8 rather than 1. The exceptions are `c` and `z`, which are never aligned whatever
+the maximum is; `s` takes the alignment of the integer that records its length rather
+than of the bytes themselves.
 
 `string.pack()` fills every padding byte with zero, and `string.unpack()` reads padding
 without producing anything for it.
@@ -144,13 +165,18 @@ integer could have — which is how a layout reproduces a hole a C compiler left
 ## Gotchas
 
 <Gotcha title="Native widths are not fixed widths">
-`h`, `l`, `T`, and `i` or `I` written without a size take the width the machine gives
-them, and so does the length in front of a bare `s`. The same format can therefore
-produce a different number of bytes on another machine, and `=` leaves byte order to the
-machine as well. For bytes that stay inside one process that is convenient; for bytes
-written to a file, a socket or another program it is a portability bug that will not
-show up until the layout crosses a boundary. Name the size and the byte order — `>i4`
-rather than `i` — for anything that leaves.
+Most options take the width the machine gives them rather than one the format states:
+`h`, `H`, `l`, `L`, `T`, `j`, `J`, `n`, `f`, `d`, `i` or `I` written without a size, and
+the length in front of a bare `s`. The same format can therefore produce a different
+number of bytes elsewhere, and `=` leaves byte order to the machine too. For bytes that
+stay inside one process that is convenient; for bytes written to a file, a socket or
+another program it is a portability bug that will not show up until the layout crosses a
+boundary.
+
+Name the width and the byte order for anything that leaves. `>i4` rather than `i` fixes
+an integer, and only `>f` and `>d` fix a float — there is no float option that states its
+width in the format, so a layout needing an exactly known one has to rely on `f` and `d`
+being the four and eight bytes that every ordinary build makes them.
 </Gotcha>
 
 <Gotcha title="A fixed-size string comes back padded">

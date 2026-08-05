@@ -34,8 +34,8 @@ string.unpack(fmt, s [, pos])
 
 - Raises when `s` runs out before the format does.
 - Raises when `pos` is past the end of `s`.
-- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
-- Raises when an option that needs a size is written without one.
+- Raises when the format holds an option that is not defined.
+- Raises when an option that needs a size is written without one, or when the size on `i`, `I`, `s` or `!` falls outside the range 1 to 16. `c` takes a size of any width.
 - Raises when an integer read from `s` is too large to become a Lua integer.
 - Raises when the alignment an option would need is not a power of two.
 

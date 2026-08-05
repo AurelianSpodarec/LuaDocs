@@ -30,8 +30,8 @@ string.packsize(fmt)
 <Errors>
 
 - Raises when the format holds a variable-length option — `z`, or `s` in any width.
-- Raises when the format holds an option that is not defined, or a size outside the range 1 to 16.
-- Raises when an option that needs a size is written without one.
+- Raises when the format holds an option that is not defined.
+- Raises when an option that needs a size is written without one, or when the size on `i`, `I` or `!` falls outside the range 1 to 16. `c` takes a size of any width.
 - Raises when the alignment an option would need is not a power of two.
 
 </Errors>
@@ -54,7 +54,9 @@ whatever string goes into it, so a fixed-size string is measurable like any numb
 
 Because the answer depends only on the format, it is the natural stride for a run of
 identical records: divide the length of a buffer by it to count the records, and multiply
-it to reach the *n*th one.
+it to reach the *n*th one. It depends on the *machine* as well wherever the format leaves
+a width to it, so a size measured here describes bytes another machine will read only if
+[every width in the format was stated](/docs/standard-library/string/pack-formats).
 
 ## Examples
 
@@ -80,14 +82,6 @@ all — the call raises instead of returning a minimum, a maximum or `nil`. A fo
 mixes fixed and variable parts is refused whole. Where a length is genuinely needed,
 measure the fixed prefix on its own and add what the variable part actually holds, or
 pack the value and take `#` of the result.
-</Gotcha>
-
-<Gotcha title="The answer describes this machine">
-Several options take their width from the build rather than from the format, so the same
-format can measure differently elsewhere. A size computed here and used to lay out bytes
-that another machine will read is only right by coincidence. Naming every width and the
-byte order — `>i4` rather than `i` — makes the measurement portable as well as the
-layout.
 </Gotcha>
 
 ## See also
