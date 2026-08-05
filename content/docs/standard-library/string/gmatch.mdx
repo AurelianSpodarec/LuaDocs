@@ -35,8 +35,11 @@ right, and no two matches overlap. `"aa"` over `"aaa"` therefore produces one ma
 two: the second `a` has already been consumed by the first.
 
 `init` moves where the first search begins and leaves the rest of the walk alone. It is a
-position in `s` and follows [`string.sub()`](/docs/standard-library/string/sub)'s rules for
-one.
+position in `s`, counted from 1 or backwards from the end the way
+[`string.sub()`](/docs/standard-library/string/sub) counts one, and a position landing
+before the string begins the walk at the first byte. It may sit one byte past the end,
+where an empty pattern still has a turn to take; further out than that, what comes back is
+an iterator that yields nothing and a loop whose body never runs — not an error.
 
 The iterator is an ordinary function and nothing obliges you to put it in a `for`. Storing
 it in a name and calling it by hand is how a match is taken one at a time, out of step with

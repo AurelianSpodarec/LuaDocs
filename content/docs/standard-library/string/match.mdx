@@ -21,7 +21,7 @@ string.match(s, pattern [, init])
 <Parameters>
   <Param name="s">The string to search.</Param>
   <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) to match.</Param>
-  <Param name="init">Where the search begins, as a position in `s` — [`string.sub()`](/docs/standard-library/string/sub) has how positions are read. Omitted, it begins at the first byte.</Param>
+  <Param name="init">Where the search begins, as a position in `s` — [`string.sub()`](/docs/standard-library/string/sub) has how one is counted. Omitted, it begins at the first byte.</Param>
 </Parameters>
 
 <Returns>
@@ -39,6 +39,10 @@ That makes the parentheses load-bearing in a way they are not in most notations.
 the subject `timeout=30`, the pattern `"%a+=%d+"` returns `timeout=30`, `"(%a+)=(%d+)"`
 returns `timeout` and `30`, and `"(%a+)=%d+"` returns `timeout` alone. Nothing else in the
 call changes.
+
+`init` moves where the search begins. A position landing before the string starts at its
+first byte, and one sitting a byte past the end still lets an empty pattern match; further
+out than that the call returns `nil` whatever the pattern would have done.
 
 A failed match gives `nil`, which is falsy, so the call goes straight into an `if` or takes
 a default from `or` without a comparison in between. Together with the anchors `^` and `$`

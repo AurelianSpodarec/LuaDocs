@@ -17,7 +17,8 @@ Positions are counted in bytes from 1, not 0, and a negative position counts bac
 from the end: `-1` is the last byte, `-2` the one before it. What a function does with a
 position landing outside the string is not one rule for the whole library, though:
 [`string.sub()`](/docs/standard-library/string/sub) documents how it corrects a *range*,
-and the functions taking a place to start searching or reading each state their own reach.
+and a function taking a place to start searching or reading may do something else
+entirely — its own entry says what.
 
 <RunnableExample code={`local product_name = "cocoa powder"\nprint(product_name:upper())\nprint(product_name:sub(-6))\nprint(product_name)\n-- Expected output:\n-- COCOA POWDER\n-- powder\n-- cocoa powder`} />
 
