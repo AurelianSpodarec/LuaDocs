@@ -9,21 +9,21 @@ describe('ReviewStatus', () => {
   it('labels an unread entry as awaiting review', () => {
     render(<ReviewStatus path="standard-library/string/len.mdx" />);
     expect(status()).toHaveAttribute('data-reviewed', 'no');
-    expect(status()).toHaveTextContent('Awaiting human review');
+    expect(status()).toHaveTextContent('Awaiting review');
   });
 
   it('does not let "checked by machine" read as "checked by a person"', () => {
     // The whole point of the component: an entry can be manual-sourced, agent-reviewed
     // and have its examples executed, and still have had no human read it.
     render(<ReviewStatus path="standard-library/string/len.mdx" />);
-    expect(status()).not.toHaveTextContent(/^Human reviewed/);
+    expect(status()).not.toHaveTextContent(/^Reviewed/);
     expect(status()).toHaveTextContent(/checked against the reference manual/i);
   });
 
   it('labels a read entry and names the date', () => {
     render(<ReviewStatus date="2026-08-05" path="standard-library/string/len.mdx" />);
     expect(status()).toHaveAttribute('data-reviewed', 'yes');
-    expect(status()).toHaveTextContent('Human reviewed');
+    expect(status()).toHaveTextContent('Reviewed');
     expect(status()).toHaveTextContent('a person read this entry on 5 August 2026');
   });
 

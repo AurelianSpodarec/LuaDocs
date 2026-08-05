@@ -29,6 +29,10 @@ const linkClass =
  * is noise a reader learns to skip, and what it says is true of the process, not a fault
  * in the entry.
  *
+ * The label says "Reviewed", not "Human reviewed". Who did the reading is carried by the
+ * sentence, which names a person and a date; putting it in the badge foregrounds a
+ * human-versus-machine contrast the reader did not come here for.
+ *
  * The label carries the honesty on its own, so the sentence after it says what *has* been
  * done rather than restating what has not. Spelling out the absence twice was what made
  * an accurate line read as an apology.
@@ -62,7 +66,7 @@ export function ReviewStatus({ date, path }: { date?: string | null; path: strin
         />
         <span>
           <strong className="text-fd-foreground">
-            {checked ? 'Human reviewed' : 'Awaiting human review'}
+            {checked ? 'Reviewed' : 'Awaiting review'}
           </strong>
           {' — '}
           {checked ? (

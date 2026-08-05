@@ -163,11 +163,15 @@ The frontmatter key is `reviewed: YYYY-MM-DD`. Absent means nobody has. There is
 `reviewed: false`: an omission and a denial say the same thing, and one of them is a
 field an author can forget to update.
 
-**Why it says "Not human checked" rather than nothing.** Entries here are written from
+**Why it says "Awaiting review" rather than nothing.** Entries here are written from
 the reference manual, reviewed, and have every example executed on each build. None of
 that is a person reading the page. A site that shows no review state invites the reader
 to assume the better answer, and a site that says "reviewed" without qualifying it is
 simply wrong. The honest position is to name which of the two happened.
+
+The label does not say "human reviewed". Who read it is carried by the sentence, which
+names a person and a date; putting it in the badge foregrounds a human-versus-machine
+contrast a reader did not come for.
 
 It carries an **Improve this page** link to the file on GitHub and a **report a problem**
 link to a prefilled issue. Both stay when an entry has been checked, because a checked
