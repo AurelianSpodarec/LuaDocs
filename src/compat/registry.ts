@@ -1,4 +1,6 @@
 import { compatNodeSchema, type CompatNode } from './schema';
+import stringByte from './data/string.byte.json';
+import stringChar from './data/string.char.json';
 import stringFormat from './data/string.format.json';
 import stringLen from './data/string.len.json';
 import stringGsub from './data/string.gsub.json';
@@ -13,6 +15,8 @@ import mathTointeger from './data/math.tointeger.json';
  * support strip.
  */
 const raw: Record<string, unknown> = {
+  'string.byte': stringByte,
+  'string.char': stringChar,
   'string.format': stringFormat,
   'string.len': stringLen,
   'string.gsub': stringGsub,
