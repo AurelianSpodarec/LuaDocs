@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Rejects a `pos` outside `1` to `#list + 1`; 5.1 checks no bounds and stores the value at the position given.",
+    "5.3": "Reads and writes elements through the table's metamethods; 5.1 and 5.2 access them raw."
+  }
+}

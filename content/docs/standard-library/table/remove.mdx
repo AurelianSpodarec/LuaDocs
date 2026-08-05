@@ -1,8 +1,109 @@
 ---
 title: table.remove()
-description: ""
+description: Take an element out of a list and hand it back, closing the gap behind it.
+lua-compat: table.remove
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.remove
 ---
 
-{/* Not yet written. */}
+Takes one element out of a list and returns it, pulling everything above it down to close
+the gap. Left to itself it takes the last element, which is what lets a plain list work as
+a stack.
+
+<RunnableExample code={`local pending_tasks = {"wash", "iron", "fold"}\nlocal finished = table.remove(pending_tasks)\nprint(finished)\nprint(table.concat(pending_tasks, ", "))\n-- Expected output:\n-- fold\n-- wash, iron`} />
+
+## Syntax
+
+```lua
+table.remove(list [, pos])
+```
+
+<Parameters>
+  <Param name="list">The list to take an element out of.</Param>
+  <Param name="pos">Which element to take. Omitted, it is `#list`, so the last one goes.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">Whatever was stored at `pos`, of whatever type — or `nil` when nothing was stored there.</Return>
+</Returns>
+
+<Errors>
+
+- <Since v="5.2" /> Raises when `pos` is given and is not one of the positions described below.
+
+</Errors>
+
+## Description
+
+The value at `pos` is read first, then everything above it — `list[pos + 1]`,
+`list[pos + 2]`, on to `list[#list]` — moves down one place to close the gap, and the
+position at the end is emptied. The list is one element shorter afterwards and the value
+that left is what comes back.
+
+`pos` may be any position [`table.insert()`](/docs/standard-library/table/insert) accepts:
+`1` up to `#list + 1`, counted from the front, with nothing read backwards from the end.
+Two of those are worth naming on their own.
+
+`#list` is the default and the plain case — the last element leaves and nothing has to
+shift, so it is also the cheapest. `#list + 1` is the position past the last element, and it
+is accepted rather than rejected even though nothing lives there: the call finds no value,
+returns `nil`, and leaves the list as it was.
+
+One position belongs to this function alone. `0` is accepted, but only while the list is
+empty — and an empty list is exactly when the default resolves to `0`, since `#list` is
+then `0` itself. That is why `table.remove(list)` on a list that has run out answers `nil`
+instead of raising, and why a loop draining a list needs no guard on the turn that empties
+it.
+
+Exactly one value comes back, every time, and it is `nil` whenever the position held
+nothing. Like the rest of the library the function touches only integer keys, leaving named
+fields alone, and its reads and writes go through the table's metamethods rather than around
+them.
+
+## Examples
+
+### Taking the next item off the front
+
+<RunnableExample code={`local print_queue = {"invoice.pdf", "labels.pdf", "report.pdf"}\nlocal next_job = table.remove(print_queue, 1)\nprint(next_job)\nprint(table.concat(print_queue, ", "))\n-- Expected output:\n-- invoice.pdf\n-- labels.pdf, report.pdf`} />
+
+Position 1 is what turns a list into a queue rather than a stack. Everything behind the
+removed job moved down one place, so the next call finds the next job at position 1 again.
+
+### Removing every match without skipping any
+
+<RunnableExample code={`local guest_list = {"ada", "grace", "ada", "alan"}\nfor position = #guest_list, 1, -1 do\n  if guest_list[position] == "ada" then\n    table.remove(guest_list, position)\n  end\nend\nprint(table.concat(guest_list, ", "))\n-- Expected output: grace, alan`} />
+
+The loop runs backwards on purpose. Each removal disturbs only the positions above the one
+it happened at, and those are the positions the loop has already been past.
+
+### A list used as a stack
+
+<RunnableExample code={`local undo_history = {}\ntable.insert(undo_history, "typed a word")\ntable.insert(undo_history, "deleted a line")\nprint(table.remove(undo_history))\nprint(#undo_history)\n-- Expected output:\n-- deleted a line\n-- 1`} />
+
+Appending with [`table.insert()`](/docs/standard-library/table/insert) and removing with no
+position are a matched pair: both work at the end of the list, and neither shifts anything.
+
+## Gotchas
+
+<Gotcha title="Removing while counting upwards skips the element after each one removed">
+Every removal pulls the rest of the list down a place, so the element that slides into the
+position just vacated is never examined. A loop running `1` to `#guest_list` over
+`{"ada", "ada", "grace"}`, removing each `ada` it sees, leaves `ada, grace` behind: the
+second one moved into position 1 after the first had been passed. The loop's limit is also
+read once, before anything has gone. Counting downwards fixes both at once.
+</Gotcha>
+
+<Gotcha title="A nil does not mean the list was empty">
+`nil` is what comes back from an empty list *and* from the position past the last element,
+and neither of those raises. So a `nil` says only that nothing was stored where the call
+looked — never that there was nothing left to take, and never that the position was wrong.
+Where the difference matters, read `#list` before removing rather than testing what came
+back.
+</Gotcha>
+
+## See also
+
+- [`table.insert()`](/docs/standard-library/table/insert) — the inverse, and where the position rules are written out
+- [`table.concat()`](/docs/standard-library/table/concat) — joining what is left into a string
+- [`table.unpack()`](/docs/standard-library/table/unpack) — taking every element at once instead of one
+- [The length operator](/docs/language/expressions/length-operator) — what the default position is measured with

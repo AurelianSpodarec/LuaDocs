@@ -20,6 +20,8 @@ import stringSub from './data/string.sub.json';
 import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
 import utf8Library from './data/utf8.library.json';
+import tableInsert from './data/table.insert.json';
+import tableRemove from './data/table.remove.json';
 import mathTointeger from './data/math.tointeger.json';
 
 /**
@@ -58,6 +60,8 @@ const raw: Record<string, unknown> = {
   // encoding note does exactly that. So this node exists ahead of the entry it belongs
   // to, and says only when the library arrived.
   'utf8.library': utf8Library,
+  'table.insert': tableInsert,
+  'table.remove': tableRemove,
   'math.tointeger': mathTointeger,
 };
 

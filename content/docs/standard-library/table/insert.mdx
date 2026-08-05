@@ -1,8 +1,114 @@
 ---
 title: table.insert()
-description: ""
+description: Add a value to a list, at the end or at a position of your choosing.
+lua-compat: table.insert
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.insert
 ---
 
-{/* Not yet written. */}
+Adds one value to a list, and moves whatever was standing in its way along to make room.
+The list handed in is the list that changes — nothing is copied and nothing is returned.
+
+<RunnableExample code={`local shopping_list = {"cocoa", "flour"}\ntable.insert(shopping_list, "sugar")\ntable.insert(shopping_list, 1, "butter")\nprint(table.concat(shopping_list, ", "))\n-- Expected output: butter, cocoa, flour, sugar`} />
+
+## Syntax
+
+```lua
+table.insert(list, [pos,] value)
+```
+
+<Parameters>
+  <Param name="list">The list to add to.</Param>
+  <Param name="pos">Where the value goes. Omitted, it is `#list + 1`, so the value lands after the last element.</Param>
+  <Param name="value">What to add.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing at all. The list is changed where it stands.</Return>
+</Returns>
+
+<Errors>
+
+- <Since v="5.2" /> Raises when `pos` is given and is not one of the positions described below.
+- Raises when the call carries any number of arguments other than two or three. An extra one is not ignored, and there is no form in which `value` may be left out.
+
+</Errors>
+
+## Description
+
+Positions count from 1, as every index into a list does. The value is written at `pos`, and
+everything from there upwards — `list[pos]`, `list[pos + 1]`, on to `list[#list]` — moves
+one place along to make room for it. The list is one element longer afterwards and no
+element is lost.
+
+A position is valid from `1` up to `#list + 1`, and nothing outside that range is a
+position at all. `#list + 1` is the first place past the last element, so inserting there
+adds to the end and shifts nothing, which is exactly what leaving `pos` out does. Below the
+range there is no leniency and no second reading: `0` names nothing, and a negative `pos` is
+not counted backwards from the end the way
+[`string.sub()`](/docs/standard-library/string/sub) reads a negative index. Both are simply
+out of bounds.
+
+That upper limit is what makes a computed position safe to pass. A search that runs off the
+end of the list arrives at `#list + 1`, which is the append position rather than an error,
+so the two outcomes of "find where this belongs" — somewhere in the middle, or after
+everything — need no separate handling.
+
+Every rule above is stated in terms of `#list`, so the function is only as dependable as
+that length is. A list whose elements sit at `1` through `#list` with no gaps has one
+obvious length; a list with a gap in it does not, and all the
+[caveats of the length operator](/docs/language/expressions/length-operator) apply here in
+full.
+
+Only integer keys are touched. Named fields stored alongside the numbered ones are ignored
+and come through the call untouched, so a list that doubles as a record keeps its record
+half. The reads and writes go through the table's metamethods rather than around them, so a
+table standing in for another sees them as ordinary indexing.
+
+## Examples
+
+### Collecting the items that pass a test
+
+<RunnableExample code={`local readings = {18, 24, 31, 12, 27}\nlocal warm_days = {}\nfor day_number, temperature in ipairs(readings) do\n  if temperature >= 24 then\n    table.insert(warm_days, day_number)\n  end\nend\nprint(table.concat(warm_days, ", "))\n-- Expected output: 2, 3, 5`} />
+
+Appending with the two-argument form is what builds a list up: `warm_days` starts empty and
+each call puts one more day after the last.
+
+### Putting something in the middle
+
+<RunnableExample code={`local waiting_line = {"alice", "bob", "carol"}\ntable.insert(waiting_line, 2, "dave")\nprint(table.concat(waiting_line, ", "))\nprint(#waiting_line)\n-- Expected output:\n-- alice, dave, bob, carol\n-- 4`} />
+
+Everybody from position 2 onwards moved one place back, and the line is one longer.
+
+### Keeping a list in order as values arrive
+
+<RunnableExample code={`local high_scores = {95, 80, 62}\nlocal new_score = 88\nlocal position = 1\nwhile position <= #high_scores and high_scores[position] > new_score do\n  position = position + 1\nend\ntable.insert(high_scores, position, new_score)\nprint(table.concat(high_scores, ", "))\n-- Expected output: 95, 88, 80, 62`} />
+
+The loop stops at the first score the new one beats, or at `#high_scores + 1` when it beats
+none of them. Either way the position it settles on is one the call accepts, so a score
+lower than everything already there needs no special case.
+
+## Gotchas
+
+<Gotcha title="Two arguments always append, whatever the second one is">
+The second argument is a position only when a third follows it. `table.insert(page_numbers, 2)`
+therefore appends the number `2`; it does not insert anything at position 2. On a list of
+numbers the mistake leaves no trace — `{10, 20, 30}` becomes `10, 20, 30, 2`, which is a
+list of numbers still. A call meant to place a value at a position always has three
+arguments.
+</Gotcha>
+
+<Gotcha title="On a list with a gap, the end is not where it looks">
+The default position is measured with `#list`, and that measurement is only meaningful on a
+list with no gaps in it. Store a `nil` in the middle of one and the length becomes a choice
+between two answers, so an appended value can land somewhere other than after the last
+element you can see — quietly, and only sometimes. Lists that may contain `nil` want
+[`table.pack()`](/docs/standard-library/table/pack) and its explicit count instead.
+</Gotcha>
+
+## See also
+
+- [`table.remove()`](/docs/standard-library/table/remove) — taking an element back out, on the same positions
+- [`table.concat()`](/docs/standard-library/table/concat) — joining the finished list into a string
+- [`table.move()`](/docs/standard-library/table/move) — shifting a whole run of elements rather than one
+- [The length operator](/docs/language/expressions/length-operator) — what `#list + 1` is measured with
