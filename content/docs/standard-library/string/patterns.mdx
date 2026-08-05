@@ -1,8 +1,160 @@
 ---
 title: Patterns
-description: ""
+description: The matching notation Lua's string functions use in place of regular expressions.
+lua-compat: string.patterns
 entry-type: construct
 source: https://www.lua.org/manual/5.5/manual.html#6.5.1
 ---
 
-{/* Not yet written. */}
+Lua ships no regular-expression engine. What it has instead are *patterns* — ordinary
+strings, written to a much smaller notation, that
+[`string.find()`](/docs/standard-library/string/find),
+[`string.match()`](/docs/standard-library/string/match),
+[`string.gmatch()`](/docs/standard-library/string/gmatch) and
+[`string.gsub()`](/docs/standard-library/string/gsub) read as a description of the text
+to look for. Nothing marks a string as a pattern; it becomes one by being handed to one
+of those four.
+
+<RunnableExample code={`local log_line = "2026-08-05 disk full"\nlocal year, month, day = string.match(log_line, "(%d+)-(%d+)-(%d+)")\nprint(year, month, day)\n-- Expected output: 2026\t08\t05`} />
+
+## Character classes
+
+A class stands for a set of characters and matches exactly one of them.
+
+| Class | Matches |
+|---|---|
+| `.` | any character at all |
+| `%a` | a letter |
+| `%l` | a lower-case letter |
+| `%u` | an upper-case letter |
+| `%d` | a digit |
+| `%x` | a hexadecimal digit |
+| `%w` | a letter or a digit |
+| `%s` | a space character |
+| `%p` | a punctuation character |
+| `%g` | any printable character except a space |
+| `%c` | a control character |
+
+Every `%` class above has an upper-case twin that matches everything the lower-case one
+does not: `%D` is any character that is not a digit, `%S` anything that is not a space.
+`.` is the exception, having nothing left over to complement.
+
+Which characters count as letters, as spaces or as punctuation is settled by the locale
+the interpreter runs under rather than by Lua, so `%a` and `[a-z]` are not
+interchangeable even for text that looks like plain English.
+
+<Note>
+`%` is the escape character, not `\`. The characters that need escaping — the magic ones
+— are `^`, `$`, `(`, `)`, `%`, `.`, `[`, `]`, `*`, `+`, `-` and `?`, so a literal full
+stop is `%.` and a literal per cent sign is `%%`. Any non-alphanumeric character may
+carry a `%` and stand for itself, magic or not, which means escaping punctuation you are
+unsure about is always safe.
+</Note>
+
+## Sets
+
+Square brackets build a class of your own out of the pieces above. `[aeiou]` is a vowel,
+`[%a_]` a letter or an underscore, and a `-` between two characters makes a range with
+its low end written first, as in `[0-9]`. A `^` immediately after the opening bracket
+negates the whole set: `[^,]` is anything but a comma.
+
+Two characters have to be placed rather than simply typed. A closing bracket goes first
+in the set, as in `[]]`, and a hyphen goes first or last, as in `[-+]`. Escaping them
+with `%` works just as well. Combining a range with a class — `[%a-z]` — means nothing
+in particular, and Lua does not define what it does.
+
+## Repetition
+
+A quantifier written after a class matches a run of it.
+
+| Quantifier | Matches |
+|---|---|
+| `*` | zero or more, as many as possible |
+| `+` | one or more, as many as possible |
+| `-` | zero or more, as *few* as possible |
+| `?` | zero or one, taking the one where it can |
+
+A quantifier reaches back over exactly one class and no further. There is no bracket that
+groups several of them together, so a run of more than one character cannot be repeated.
+
+## Anchors
+
+`^` as the very first character of a pattern pins the match to the start of the subject,
+and `$` as the very last pins it to the end; a pattern carrying both has to account for
+the whole string. In any other position the two are literal characters — a `$` in the
+middle is a dollar sign, and a `^` is only a negation when it follows an opening square
+bracket.
+
+## Captures
+
+Parentheses mark the parts of a match you want back. They are numbered by their opening
+parenthesis, read left to right, so a capture nested inside another is numbered second:
+in `"(%a+(%d+))"` the whole run is capture 1 and the digits within it capture 2.
+`string.match()` returns them in order, `string.gmatch()` yields them on each turn, and
+`string.gsub()` offers them to its replacement as `%1` through `%9`.
+
+The same `%1` to `%9` written *inside* a pattern are back-references, matching the text
+the capture of that number matched rather than anything new — `"(%a)%1"` finds a doubled
+letter.
+
+An empty pair of parentheses is a *position capture*. It hands back a number instead of
+text: the index of the subject at that point in the pattern. `"()world()"` against
+`"hello world"` gives 7 and 12, where the word starts and the index one past where it
+ends.
+
+## Balanced and frontier items
+
+Two items look wider than a single character.
+
+`%bxy` matches from an `x` to the `y` that balances it, counting a `+1` for each `x` and
+a `-1` for each `y` and stopping at the first place the count falls back to zero. `%b()`
+therefore takes a parenthesised expression whole, however deeply the parentheses inside
+it nest.
+
+`%f[set]` is a *frontier*, and matches the empty string at a boundary rather than
+matching any character: the character before the boundary must be outside the set and the
+character after it inside. Both ends of the subject count as a zero byte for this, so a
+frontier fires at the start and end of the string as readily as in the middle. It is how
+a pattern gets word boundaries, which the notation otherwise lacks.
+
+## Examples
+
+### Trimming whitespace from both ends
+
+<RunnableExample code={`local padded_name = "   Ada Lovelace   "\nlocal trimmed_name = string.match(padded_name, "^%s*(.-)%s*$")\nprint("[" .. trimmed_name .. "]")\n-- Expected output: [Ada Lovelace]`} />
+
+### Splitting a line into fields
+
+<RunnableExample code={`local record = "flour,eggs,butter"\nfor ingredient in string.gmatch(record, "[^,]+") do\n  print(ingredient)\nend\n-- Expected output:\n-- flour\n-- eggs\n-- butter`} />
+
+### Replacing whole words only
+
+<RunnableExample code={`local shopping_note = "the cat scattered the catalogue"\nlocal corrected, match_count = string.gsub(shopping_note, "%f[%a]cat%f[%A]", "dog")\nprint(corrected)\nprint(match_count)\n-- Expected output:\n-- the dog scattered the catalogue\n-- 1`} />
+
+The two frontiers demand a boundary on each side of `cat`, which is why `scattered` and
+`catalogue` are left alone.
+
+## Gotchas
+
+<Gotcha title="These are not regular expressions">
+There is no alternation — no `|` — and no grouping. `(ab)+` does not mean one or more
+`ab`: the parentheses are a capture rather than a group, and the `+` has no class in
+front of it to repeat, so it is read as a plain plus sign and the pattern matches the
+text `ab+`. Where a regular expression would alternate, match twice and take whichever
+succeeded, or reach for a real regex library.
+</Gotcha>
+
+<Gotcha title="Outside a set, - is lazy rather than a range">
+`-` is the lazy quantifier, taking as few characters as it can get away with, and is the
+counterpart of `*` rather than a subtraction or a range. Ranges live only inside square
+brackets. Its shortest-run appetite is exactly what makes `"^%s*(.-)%s*$"` trim rather
+than swallow: a `.*` in the same place would eat the trailing spaces the `%s*` was meant
+to drop.
+</Gotcha>
+
+## See also
+
+- [`string.match()`](/docs/standard-library/string/match) — pulling captures out of a string
+- [`string.gsub()`](/docs/standard-library/string/gsub) — replacing what a pattern matches
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — iterating over every match
+- [`string.find()`](/docs/standard-library/string/find) — locating a match without extracting it
