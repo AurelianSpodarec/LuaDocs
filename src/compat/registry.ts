@@ -36,11 +36,11 @@ const raw: Record<string, unknown> = {
   'string.format': stringFormat,
   'string.gmatch': stringGmatch,
   'string.len': stringLen,
+  'string.gsub': stringGsub,
   // A section overview's own node. It describes the *library* — when the table
   // appeared, and when its membership changed — never the union of its members'
   // behaviour, which each member's node already carries.
   'string.library': stringLibrary,
-  'string.gsub': stringGsub,
   'string.lower': stringLower,
   'string.match': stringMatch,
   'string.pack': stringPack,

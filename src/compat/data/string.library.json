@@ -1,6 +1,6 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.3": "Adds `string.pack`, `string.packsize` and `string.unpack`; 5.2 has no binary packing."
+    "5.3": "Adds `string.pack`, `string.packsize` and `string.unpack`; the library has no binary packing before that."
   }
 }
