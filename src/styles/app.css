@@ -47,8 +47,45 @@
   color: var(--shiki-dark);
 }
 
+/*
+ * The same palette, for the editor that does not go through shiki.
+ *
+ * The playground highlights with CodeMirror rather than shiki — it has to, because it
+ * is colouring a live document rather than a static string — and two highlighters
+ * given their own opinions would make the same `local` two different reds on two pages
+ * of one site. These are github-light and github-dark, the themes shiki is already
+ * configured with in `highlightLua.ts`, written out as custom properties so
+ * `Editor.tsx` can name a colour without knowing which theme is on.
+ */
+:root {
+  --lua-keyword: #d73a49;
+  --lua-string: #032f62;
+  --lua-comment: #6a737d;
+  --lua-number: #005cc5;
+  --lua-function: #6f42c1;
+}
+
+.dark {
+  --lua-keyword: #ff7b72;
+  --lua-string: #a5d6ff;
+  --lua-comment: #8b949e;
+  --lua-number: #79c0ff;
+  --lua-function: #d2a8ff;
+}
+
 html {
   scrollbar-gutter: stable;
+}
+
+/*
+ * Except on the playground, which is exactly one viewport high and never scrolls the
+ * document. `stable` reserves the scrollbar's width whether or not a scrollbar appears —
+ * which is the point on a docs page, where it stops the content shifting sideways as you
+ * move between a short entry and a long one. Here nothing can ever scroll into it, so it
+ * was a 15px empty strip down the right of every screen the playground was drawn on.
+ */
+html:has([data-playground]) {
+  scrollbar-gutter: auto;
 }
 
 html > body[data-scroll-locked] {

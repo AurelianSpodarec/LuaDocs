@@ -1,3 +1,14 @@
+/**
+ * The Lua version the runtime actually executes. Wasmoon ships a single Lua, so code
+ * runs this version whatever the reader has selected — see
+ * `docs/plans/2026-08-04-per-version-lua-spike.md`. Until per-version runtimes exist,
+ * the mismatch is disclosed rather than hidden.
+ *
+ * It lives beside the runner rather than inside a component because both surfaces that
+ * execute Lua — the inline example and the playground — have to disclose the same fact.
+ */
+export const RUNTIME_LUA_VERSION = '5.4';
+
 export interface RunLuaOptions {
   timeoutMs?: number;
   /** Injectable worker factory, primarily for testing the timeout/message handling. */
