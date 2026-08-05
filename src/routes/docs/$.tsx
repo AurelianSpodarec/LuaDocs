@@ -28,7 +28,8 @@ import { LastUpdated } from '@/entry/LastUpdated';
 import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import { VersionNote } from '@/version/VersionNote';
+import { VersionChangeNote, VersionUnavailable } from '@/version/VersionNote';
+import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
 import { buildFullToc } from '@/entry/pageToc';
 import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
@@ -113,6 +114,10 @@ function Content({
     <DocsPage toc={fullToc} slots={{ breadcrumb: Breadcrumb }}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
+      {/* Above the copy row and the strip, because it is not a detail about the entry —
+          it invalidates it. Everything below describes something the reader cannot call,
+          and the further down this sits the more of that they read first. */}
+      {node && <VersionUnavailable node={node} />}
       {/* The version switcher used to sit here. It moved to the header, where it is
           visible on every page rather than only on entries (ADR 0007). */}
       <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
@@ -125,12 +130,17 @@ function Content({
       {node && (
         <div className="flex flex-col gap-3">
           <VersionSupportStrip node={node} />
-          <VersionNote node={node} />
+          <VersionChangeNote node={node} />
         </div>
       )}
-      <DocsBody>
-        <MDX components={useMDXComponents()} />
-      </DocsBody>
+      {/* The body needs to know too: a runnable example that fires on its own and prints
+          a result is a demonstration, and a demonstration outweighs a notice the reader
+          has already scrolled past. */}
+      <EntryAvailabilityProvider node={node}>
+        <DocsBody>
+          <MDX components={useMDXComponents()} />
+        </DocsBody>
+      </EntryAvailabilityProvider>
       {/* Derived, not authored — see the amendment in page-structure.md. Both sit
           after "See also" so neither is a thing an author has to remember to place. */}
       {node && <VersionMatrix node={node} />}

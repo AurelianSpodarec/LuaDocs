@@ -5,6 +5,7 @@ import { hashForProgram } from '@/playground/shareUrl';
 import { runLua, RUNTIME_LUA_VERSION } from './runLua';
 import { highlightLua, type LuaToken } from './highlightLua';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
+import { useEntryUnavailable } from '@/version/EntryAvailability';
 
 // Re-exported because it was defined here first and is imported from here in tests and
 // in content. It belongs to the runner: the playground has to disclose the same fact.
@@ -26,6 +27,7 @@ const codeLayer = 'px-4 py-3 font-mono text-[0.8125rem] leading-6 whitespace-pre
  */
 export function RunnableExample({ code }: { code: string }) {
   const { version } = useSelectedVersion();
+  const unavailable = useEntryUnavailable();
   const [source, setSource] = useState(code);
   const [output, setOutput] = useState('');
   const [failed, setFailed] = useState(false);
@@ -45,6 +47,15 @@ export function RunnableExample({ code }: { code: string }) {
   const [ran, setRan] = useState<{ ms?: number } | null>(null);
   const [highlighted, setHighlighted] = useState<LuaToken[][] | null>(null);
   const pre = useRef<HTMLPreElement>(null);
+  /**
+   * Which run the displayed output belongs to.
+   *
+   * A run is asynchronous and the selected version arrives after mount, so the run
+   * started at the default version can resolve *after* the reader turns out not to have
+   * this entry — putting its output back on a page that has just cleared it. Results
+   * from a superseded run are dropped rather than shown.
+   */
+  const runId = useRef(0);
 
   function show(text: string, isError: boolean) {
     setOutput(text);
@@ -52,16 +63,21 @@ export function RunnableExample({ code }: { code: string }) {
   }
 
   async function run(input: string) {
+    const id = ++runId.current;
+    const current = () => runId.current === id;
+
     setRunning(true);
     try {
       const r = await runLua(input);
+      if (!current()) return;
       show(r.error ? `error: ${r.error}` : r.output, Boolean(r.error));
       setRan({ ms: r.ms });
     } catch (err) {
+      if (!current()) return;
       show(`error: ${err instanceof Error ? err.message : String(err)}`, true);
       setRan({});
     } finally {
-      setRunning(false);
+      if (current()) setRunning(false);
     }
   }
 
@@ -70,8 +86,26 @@ export function RunnableExample({ code }: { code: string }) {
   // on mount, and only for the authored code — after that, running is the reader's
   // call, because their edit may be halfway through a thought.
   useEffect(() => {
+    // Not on an entry the reader's version does not have. Running would print a result
+    // for a function they cannot call, and an unasked-for demonstration outweighs a
+    // notice further up the page. The Run button still works — this withholds the
+    // claim, it does not withhold the tool.
+    //
+    // Clearing rather than merely skipping, because the selected version is not known
+    // on the first pass: `SelectedVersionProvider` renders the default so the prerender
+    // and the hydrating client agree, and resolves the reader's real version after
+    // mount. So an example on a 5.3-only entry has already run and printed by the time
+    // a 5.1 reader's version arrives, and skipping the *next* run would leave that
+    // output sitting there as though it were theirs.
+    if (unavailable) {
+      runId.current += 1; // Supersedes a run still in flight from the default version.
+      show('', false);
+      setRan(null);
+      setRunning(false);
+      return;
+    }
     void run(code);
-  }, [code]);
+  }, [code, unavailable]);
 
   // Highlighting is asynchronous (shiki loads on demand), so the `<pre>` paints the
   // raw text until the first pass lands. That is also what the prerendered HTML holds,
@@ -99,10 +133,21 @@ export function RunnableExample({ code }: { code: string }) {
     <div className="not-prose my-6 overflow-hidden rounded-xl border bg-fd-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b bg-fd-muted/50 px-4 py-2">
         <span className="font-mono text-xs text-fd-muted-foreground">example.lua</span>
-        {version !== RUNTIME_LUA_VERSION && (
-          <span role="note" aria-label="Runtime version" className="text-xs text-fd-muted-foreground">
-            Runs Lua {RUNTIME_LUA_VERSION}; output may differ from {version}.
+        {unavailable ? (
+          <span
+            role="note"
+            aria-label="Runtime version"
+            data-example-unavailable
+            className="text-xs text-amber-700 dark:text-amber-400"
+          >
+            Not in Lua {version}. Running this uses a newer Lua than you have selected.
           </span>
+        ) : (
+          version !== RUNTIME_LUA_VERSION && (
+            <span role="note" aria-label="Runtime version" className="text-xs text-fd-muted-foreground">
+              Runs Lua {RUNTIME_LUA_VERSION}; output may differ from {version}.
+            </span>
+          )
         )}
       </div>
 

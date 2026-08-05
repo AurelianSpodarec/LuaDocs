@@ -5,7 +5,7 @@ import type * as PageTree from 'fumadocs-core/page-tree';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
-import { VersionNote } from '@/version/VersionNote';
+import { VersionChangeNote, VersionUnavailable } from '@/version/VersionNote';
 import { compatNodeFor } from '@/compat/registry';
 import { createSidebarItem } from '@/sidebar/Sidebar';
 
@@ -16,7 +16,8 @@ function Entry() {
     <SelectedVersionProvider>
       <VersionSwitcher />
       <VersionSupportStrip node={node} />
-      <VersionNote node={node} />
+      <VersionUnavailable node={node} />
+      <VersionChangeNote node={node} />
     </SelectedVersionProvider>
   );
 }
@@ -78,7 +79,8 @@ describe('the assembled string.format entry', () => {
       <SelectedVersionProvider>
         <VersionSwitcher />
         <VersionSupportStrip node={introducedIn53} />
-        <VersionNote node={introducedIn53} />
+        <VersionUnavailable node={introducedIn53} />
+        <VersionChangeNote node={introducedIn53} />
       </SelectedVersionProvider>,
     );
 

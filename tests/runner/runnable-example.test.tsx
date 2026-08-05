@@ -6,7 +6,8 @@ import { runLua } from '@/runner/runLua';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { programFromHash } from '@/playground/shareUrl';
-import type { LuaVersion } from '@/compat/schema';
+import type { CompatNode, LuaVersion } from '@/compat/schema';
+import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
 
 // `RUNTIME_LUA_VERSION` moved into `runLua` when the playground began sharing the
 // runtime, and `RunnableExample` now re-exports it from there — so a mock replacing the
@@ -237,5 +238,61 @@ describe('the run marker', () => {
       expect(screen.getByLabelText('output')).toHaveTextContent('error: boom');
     });
     expect(document.querySelector('[data-ran]')).not.toBeNull();
+  });
+});
+
+describe('an example on an entry the reader does not have', () => {
+  const introducedIn53: CompatNode = { support: { lua: { version_added: '5.3' } } };
+
+  beforeEach(() => {
+    mockRunLua.mockReset();
+    mockRunLua.mockResolvedValue({ output: '', error: null });
+  });
+
+  /** Renders the example inside an entry whose availability the provider decides. */
+  function renderInEntry(version: LuaVersion) {
+    render(
+      <SelectedVersionProvider>
+        <VersionSwitcher />
+        <EntryAvailabilityProvider node={introducedIn53}>
+          <RunnableExample code="print(string.pack('i4', 1))" />
+        </EntryAvailabilityProvider>
+      </SelectedVersionProvider>,
+    );
+    fireEvent.change(screen.getByLabelText(/lua version/i), { target: { value: version } });
+  }
+
+  it('does not run itself, so nothing demonstrates what the reader cannot call', async () => {
+    renderInEntry('5.1');
+    await waitFor(() => {
+      expect(screen.getByRole('note', { name: /runtime version/i })).toHaveTextContent(
+        /not in lua 5\.1/i,
+      );
+    });
+    // The provider renders the default version first and resolves the reader's after
+    // mount, so the example has already run by the time 5.1 arrives. What must not
+    // survive is its output — otherwise the page shows a result the reader cannot get.
+    expect(screen.queryByLabelText('output')).toBeNull();
+    expect(document.querySelector('[data-ran]')).toBeNull();
+  });
+
+  it('still lets the reader run it on purpose', async () => {
+    mockRunLua.mockResolvedValue({ output: 'ok\n', error: null });
+    renderInEntry('5.1');
+
+    await waitFor(() => screen.getByRole('button', { name: /^run$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^run$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('output')).toHaveTextContent('ok');
+    });
+  });
+
+  it('runs as usual once the reader selects a version that has it', async () => {
+    mockRunLua.mockResolvedValue({ output: 'ok\n', error: null });
+    renderInEntry('5.4');
+
+    await waitFor(() => expect(mockRunLua).toHaveBeenCalled());
+    expect(screen.queryByRole('note', { name: /runtime version/i })).toBeNull();
   });
 });
