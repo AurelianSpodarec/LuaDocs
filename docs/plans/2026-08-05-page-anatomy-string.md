@@ -19,6 +19,8 @@
 - **Expected-output comment form.** One output line: `-- Expected output: 5`. More than one: a trailing block, `-- Expected output:` followed by one `--` line per output line.
 - The **Syntax** block quotes the manual's own parameter names (`formatstring`, `···`). ADR 0008's naming rules do not apply inside it.
 - Version facts come from the compat dataset, never from prose. If a fact belongs in `changed_in`, it does not get hand-written into a paragraph as well.
+- **Every factual claim in an entry traces to a passage in the reference manual.** Not to memory, not to a draft in this plan. Task 0 puts all five manuals on disk; read the passage, then write. The MDX in Tasks 11 and 13–15 is a **draft to check against the manual**, not text to paste — where the manual contradicts it, the manual wins and the correction gets noted in the commit.
+- **Rewrite, never copy.** [ADR 0003](../adr/0003-dual-license-prose-and-code.md) licenses the prose as ours because it is ours. Read the passage, close it, write the entry in the site's own voice and vocabulary. Reproducing the manual's sentences is the one failure this slice cannot ship.
 - `npm test`, `npm run types:check` and `npm run build` must pass at the end of every task.
 
 ## File Structure
@@ -56,6 +58,86 @@
 | `tests/content/entry-anatomy.test.ts` | Every written entry has its sections | **Create** |
 | `tests/content/examples.test.ts` | ADR 0008 rules 1 and 3 | **Create** |
 | `docs/plans/ROADMAP.md` | The slice list | Modify: split slice 2 |
+
+---
+
+### Task 0: Put all five manuals on disk
+
+Nothing in this slice may be written from memory, and the manual cannot be read over
+the network in one piece: `manual.html` runs from 255 KB (5.1) to 381 KB (5.5), and a
+web fetch truncates it partway through §4 — before the standard libraries chapter
+begins. Every attempt to "just look it up" therefore silently reads nothing.
+
+Downloading them once fixes that for the whole slice, and gives exact text rather than
+a summary of it.
+
+**Files:**
+- Create: five files under the session scratchpad. Nothing enters the repository.
+
+- [ ] **Step 1: Download every manual**
+
+```bash
+mkdir -p manuals
+for v in 5.1 5.2 5.3 5.4 5.5; do
+  curl -sS -o "manuals/$v.html" "https://www.lua.org/manual/$v/manual.html"
+done
+wc -c manuals/*.html
+```
+
+Run this inside the scratchpad directory named in your environment, **not** in the
+repository. Expected: five files, 255 KB through 381 KB, largest last.
+
+- [ ] **Step 2: Verify a passage can be read out of them**
+
+Save this as `manuals/passage.py` — every later task uses it:
+
+```python
+import html, re, sys
+
+# Usage: python passage.py <anchor> [version ...]
+#   python passage.py pdf-string.gsub 5.1 5.5
+#   python passage.py 6.5.1 5.5
+anchor, versions = sys.argv[1], sys.argv[2:] or ['5.1', '5.2', '5.3', '5.4', '5.5']
+
+for version in versions:
+    text = open(f'{version}.html', encoding='utf-8', errors='replace').read()
+    start = text.find(f'"{anchor}"')
+    if start < 0:
+        print(f'===== {version}: absent')
+        continue
+    end = text.find('<hr>', start)
+    body = html.unescape(re.sub(r'<[^>]+>', '', text[start:end]))
+    print(f'===== {version}\n{body.strip()}\n')
+```
+
+Run: `cd manuals && python passage.py pdf-string.gsub 5.1 5.5`
+
+Expected: both entries print in full. The 5.5 text ends with an examples block; the 5.1
+text says "if the pattern specifies no captures" separately for the table and function
+forms, where 5.5 states it once for both. Seeing that difference is the check — if the
+output is empty or identical, the extraction is broken and every later task is reading
+nothing.
+
+- [ ] **Step 3: Note the anchors this slice needs**
+
+| Entry | Anchor | Manual |
+|---|---|---|
+| `string.format()` | `pdf-string.format` | all five |
+| `string.len()` | `pdf-string.len` | all five |
+| `string.gsub()` | `pdf-string.gsub` | all five |
+| Patterns | `5.4.1` in 5.1; `6.4.1` in 5.2, 5.3 and 5.4; `6.5.1` in 5.5 | all five |
+
+The Patterns anchor moves twice, because the chapter moves twice: the standard libraries
+were §5 in 5.1 and became §6 in 5.2, then 5.5 inserted §6.1 and pushed String
+Manipulation from §6.4 to §6.5. That is the same fact ADR 0006 relies on when it refuses
+to order the sidebar by manual section number, and the reason the citation names the
+manual version it is citing.
+
+These four rows were themselves checked against the downloaded files rather than
+recalled — the first draft of this table had 5.2 at `5.4.1`, and it is wrong. Verify
+before trusting, including here.
+
+There is nothing to commit — the manuals stay out of the repository.
 
 ---
 
@@ -1495,6 +1577,18 @@ foot both come from the dataset; the Gotcha describes the trap itself, undated.
 **Files:**
 - Modify: `content/docs/standard-library/string/format.mdx`
 
+- [ ] **Step 0: Read the manual first**
+
+Run: `cd manuals && python passage.py pdf-string.format 5.5`
+
+Then read the C `printf` conversions the entry lists. The draft below names `%s %d %f
+%g %e %x %X %c %q %%` — confirm each against the passage, and confirm the manual does
+not document a conversion the draft omits. Check in particular what the manual says
+about `%q`'s output and about which conversions accept which argument types.
+
+Everything below is a **draft**. Where the manual disagrees, the manual wins. Write the
+entry in the site's own voice — do not paste the manual's sentences (ADR 0003).
+
 - [ ] **Step 1: Write the entry**
 
 Replace the whole file with:
@@ -1836,6 +1930,20 @@ renders **no** matrix at all.
 **Files:**
 - Modify: `content/docs/standard-library/string/len.mdx`
 
+- [ ] **Step 0: Read the manual first**
+
+Run: `cd manuals && python passage.py pdf-string.len`
+
+All five versions, because this entry's claim is that nothing changed. Confirm the
+wording is equivalent across them rather than glancing at 5.5 alone.
+
+The draft claims two things the manual must support: that the length is in **bytes**,
+and that embedded zeros are counted. Verify both — the second is the sort of detail a
+reader relies on and a writer half-remembers.
+
+Everything below is a **draft**. Where the manual disagrees, the manual wins. Write the
+entry in the site's own voice — do not paste the manual's sentences (ADR 0003).
+
 - [ ] **Step 1: Write the entry**
 
 Replace the whole file with:
@@ -1925,6 +2033,24 @@ value and each behaves differently.
 
 **Files:**
 - Modify: `content/docs/standard-library/string/gsub.mdx`
+
+- [ ] **Step 0: Read the manual first**
+
+Run: `cd manuals && python passage.py pdf-string.gsub`
+
+One difference is already known and is what makes this worth doing properly: **5.5
+states "if the pattern specifies no captures, then it behaves as if the whole pattern
+was inside a capture" once, covering all three forms of `repl`, where 5.1 states the
+no-capture fallback separately for the table form and the function form.** Decide
+whether that is a wording change or a behavioural one, and whether Task 9's
+`string.gsub.json` should carry a note for it.
+
+Then verify the draft's three claims about `repl`: that a string replacement reads `%1`
+to `%9` and `%0`, that a table is keyed by the first capture, and that a `nil` or
+`false` result keeps the original match rather than deleting it.
+
+Everything below is a **draft**. Where the manual disagrees, the manual wins. Write the
+entry in the site's own voice — do not paste the manual's sentences (ADR 0003).
 
 - [ ] **Step 1: Write the entry**
 
@@ -2048,6 +2174,33 @@ records that as a finding.
 
 **Files:**
 - Modify: `content/docs/standard-library/string/patterns.mdx`
+
+- [ ] **Step 0: Read the manual first**
+
+The anchor differs per manual, so run them separately:
+
+```bash
+cd manuals
+python passage.py 5.4.1 5.1
+python passage.py 6.4.1 5.2 5.3 5.4
+python passage.py 6.5.1 5.5
+```
+
+This is the entry with the most claims per paragraph, and the two tables are the part
+most likely to be wrong from memory. Check every row:
+
+- The ten character classes, and that the upper-case form of each is its complement.
+- The four quantifiers, and specifically that `-` is lazy rather than a range.
+- Whether the manual documents classes the draft omits — `%g` is one to look for, and
+  whether it is present in 5.1 — and whether `%f` (the frontier pattern) belongs here.
+- The position capture `()`, and what it returns.
+- Where `^` and `$` are anchors and where they are ordinary characters.
+
+Anything the five manuals disagree on is a `changed_in` note for
+`src/compat/data/string.patterns.json` from Task 9, not a sentence in the prose.
+
+Everything below is a **draft**. Where the manual disagrees, the manual wins. Write the
+entry in the site's own voice — do not paste the manual's sentences (ADR 0003).
 
 - [ ] **Step 1: Write the entry**
 
