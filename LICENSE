@@ -1,0 +1,55 @@
+# Licences
+
+LuaDocs is licensed in two parts, because prose and example code are used
+differently ([ADR 0003](docs/adr/0003-dual-license-prose-and-code.md)).
+
+## Prose — CC BY 4.0
+
+Everything written on this site — entry descriptions, guides, gotchas, notes —
+is licensed under the Creative Commons Attribution 4.0 International licence.
+
+https://creativecommons.org/licenses/by/4.0/
+
+You may share and adapt it, including commercially, provided you give
+appropriate credit and indicate whether changes were made.
+
+## Example code — CC0 1.0
+
+Every runnable example — anything inside a `<RunnableExample>` block, and any
+fenced Lua in an entry — is released into the public domain under CC0 1.0.
+
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Copy it into your own project without attribution, without asking, and without
+obligation. Requiring credit for a two-line example would be friction against the
+point of publishing it.
+
+## The boundary
+
+Prose is the sentences. Code is what you would paste into an editor. Where a
+sentence quotes a fragment of code, the fragment is CC0 and the sentence is
+CC BY.
+
+## What this does not cover
+
+**The Lua reference manual.** Entries are written from the official manual, and
+each one names the passage it was written from. That manual is not ours:
+
+    Copyright © 1994–2026 Lua.org, PUC-Rio.
+    Freely available under the terms of the Lua license.
+    https://www.lua.org/license.html
+
+The Lua licence is the MIT licence. Its terms cover the manual as well as the
+software, and any use of that material — by us or by anyone reusing this site —
+carries them.
+
+**Lua itself**, and the WebAssembly build that runs examples in the browser
+([Wasmoon](https://github.com/ceifa/wasmoon)), are the work of their own authors
+under their own licences.
+
+## Contributions
+
+Contributing prose to this repository means licensing it under CC BY 4.0, and
+contributing example code means releasing it under CC0. Content licences are
+close to irreversible once outside contributors have added work, which is why
+this is settled before the invitation to contribute is made rather than after.

@@ -124,3 +124,68 @@ describe('RunnableExample', () => {
     expect(textarea.value).toBe('print(1)');
   });
 });
+
+describe('the run marker', () => {
+  it('appears once a run finishes, as proof something executed', async () => {
+    mockRunLua.mockResolvedValue({ output: 'hello\n', error: null });
+    renderExample("print('hello')");
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-ran]')).not.toBeNull();
+    });
+    // The mock reports no duration, so the marker says only that it ran — which is the
+    // load-bearing half. The timed form is covered below.
+    expect(document.querySelector('[data-ran]')).toHaveTextContent('ran');
+  });
+
+  it('reports the chunk time when the runner measured one', async () => {
+    mockRunLua.mockResolvedValue({ output: 'hello\n', error: null, ms: 0.5 });
+    renderExample("print('hello')");
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-ran]')).not.toBeNull();
+    });
+    // Sub-millisecond runs keep their decimals — rounding a real 0.5 ms to `0 ms` would
+    // read as a broken measurement rather than a fast one.
+    expect(document.querySelector('[data-ran]')).toHaveTextContent('ran in 0.50 ms');
+  });
+
+  it('clears when the code is edited, so stale output cannot read as fresh', async () => {
+    mockRunLua.mockResolvedValue({ output: 'hello\n', error: null });
+    renderExample("print('hello')");
+    await waitFor(() => expect(document.querySelector('[data-ran]')).not.toBeNull());
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: "print('bye')" } });
+
+    // The output pane still shows the previous result — which is exactly why the marker
+    // must go. Output that belongs to code no longer on screen is the thing a reader
+    // must not mistake for a result.
+    expect(screen.getByLabelText('output')).toHaveTextContent('hello');
+    expect(document.querySelector('[data-ran]')).toBeNull();
+  });
+
+  it('comes back after running the edited code', async () => {
+    mockRunLua.mockResolvedValue({ output: 'hello\n', error: null });
+    renderExample("print('hello')");
+    await waitFor(() => expect(document.querySelector('[data-ran]')).not.toBeNull());
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: "print('bye')" } });
+    mockRunLua.mockResolvedValue({ output: 'bye\n', error: null });
+    fireEvent.click(screen.getByRole('button', { name: /^run$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('output')).toHaveTextContent('bye');
+    });
+    expect(document.querySelector('[data-ran]')).not.toBeNull();
+  });
+
+  it('marks a failed run too — it still ran', async () => {
+    mockRunLua.mockResolvedValue({ output: '', error: 'boom' });
+    renderExample("error('boom')");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('output')).toHaveTextContent('error: boom');
+    });
+    expect(document.querySelector('[data-ran]')).not.toBeNull();
+  });
+});

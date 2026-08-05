@@ -24,6 +24,15 @@ const linkClass =
  * looking at. Claiming "reviewed" without qualification would be the dishonest option;
  * saying nothing leaves the reader to assume the better one.
  *
+ * The unreviewed wording names a stage rather than a deficiency — "awaiting" rather than
+ * "not checked" — because on a site where every page starts here, a warning on every page
+ * is noise a reader learns to skip, and what it says is true of the process, not a fault
+ * in the entry.
+ *
+ * The label carries the honesty on its own, so the sentence after it says what *has* been
+ * done rather than restating what has not. Spelling out the absence twice was what made
+ * an accurate line read as an apology.
+ *
  * The links are the other half. An unchecked page is worth more when the reader who
  * spots the problem can fix it or report it without leaving the page they found it on.
  */
@@ -52,17 +61,14 @@ export function ReviewStatus({ date, path }: { date?: string | null; path: strin
           }`}
         />
         <span>
-          <strong className={checked ? 'text-fd-foreground' : 'text-fd-foreground'}>
-            {checked ? 'Human checked' : 'Not human checked'}
+          <strong className="text-fd-foreground">
+            {checked ? 'Human reviewed' : 'Awaiting human review'}
           </strong>
           {' — '}
           {checked ? (
             <>a person read this entry on {readable(date as string)}.</>
           ) : (
-            <>
-              written from the reference manual and its examples run on every build, but
-              nobody has read it through.
-            </>
+            <>checked against the reference manual, and by running every example.</>
           )}{' '}
           <a href={editUrl} target="_blank" rel="noreferrer noopener" className={linkClass}>
             Improve this page

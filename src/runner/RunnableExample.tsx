@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Play, RotateCcw, Terminal } from 'lucide-react';
+import { Check, Play, RotateCcw, Terminal } from 'lucide-react';
 import { runLua } from './runLua';
 import { highlightLua, type LuaToken } from './highlightLua';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
@@ -32,6 +32,19 @@ export function RunnableExample({ code }: { code: string }) {
   const [output, setOutput] = useState('');
   const [failed, setFailed] = useState(false);
   const [running, setRunning] = useState(false);
+  /**
+   * The last completed run, and whether it belongs to the code on screen.
+   *
+   * The output pane alone cannot say whether anything executed: examples run on mount,
+   * and ADR 0008 puts the expected output in the code as a comment, so a reader arriving
+   * cold sees text that could equally be an echo of that comment. `null` after an edit,
+   * because output from the previous source is exactly what a reader must not mistake
+   * for a result.
+   *
+   * `ms` is the chunk's own time, measured inside the worker. A caller that does not
+   * report one still gets the marker — that it ran is the point; how fast is the detail.
+   */
+  const [ran, setRan] = useState<{ ms?: number } | null>(null);
   const [highlighted, setHighlighted] = useState<LuaToken[][] | null>(null);
   const pre = useRef<HTMLPreElement>(null);
 
@@ -45,8 +58,10 @@ export function RunnableExample({ code }: { code: string }) {
     try {
       const r = await runLua(input);
       show(r.error ? `error: ${r.error}` : r.output, Boolean(r.error));
+      setRan({ ms: r.ms });
     } catch (err) {
       show(`error: ${err instanceof Error ? err.message : String(err)}`, true);
+      setRan({});
     } finally {
       setRunning(false);
     }
@@ -115,7 +130,10 @@ export function RunnableExample({ code }: { code: string }) {
         </pre>
         <textarea
           value={source}
-          onChange={(e) => setSource(e.target.value)}
+          onChange={(e) => {
+            setSource(e.target.value);
+            setRan(null);
+          }}
           // The layers scroll as one: the textarea is the only one the reader can
           // scroll, so it drags the `<pre>` along by hand.
           onScroll={(e) => {
@@ -149,6 +167,21 @@ export function RunnableExample({ code }: { code: string }) {
           <RotateCcw aria-hidden className="size-3.5" />
           Reset
         </button>
+
+        {/* Proof that something executed, here, just now. Without it the output pane is
+            indistinguishable from the expected-output comment sitting in the code above
+            it, and an edited example still showing the old result reads as a fresh one. */}
+        {ran && !running && (
+          <span
+            data-ran
+            className="ms-auto inline-flex items-center gap-1.5 font-mono text-xs text-fd-muted-foreground"
+          >
+            <Check aria-hidden className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            {ran.ms === undefined
+              ? 'ran'
+              : `ran in ${ran.ms < 1 ? ran.ms.toFixed(2) : Math.round(ran.ms)} ms`}
+          </span>
+        )}
       </div>
 
       {output && (

@@ -53,7 +53,9 @@ describe('executeLua', () => {
       throw new Error('close failed');
     });
     try {
-      await expect(executeLua('print("still works")')).resolves.toEqual({
+      // `toMatchObject`, not `toEqual`: the result also carries the chunk's run time,
+      // which is a real measurement and not worth pinning to a value.
+      await expect(executeLua('print("still works")')).resolves.toMatchObject({
         output: 'still works\n',
         error: null,
       });

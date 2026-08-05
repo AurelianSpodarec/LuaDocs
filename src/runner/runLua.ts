@@ -10,7 +10,7 @@ const defaultCreateWorker = (): Worker =>
 export function runLua(
   code: string,
   opts: RunLuaOptions = {},
-): Promise<{ output: string; error: string | null }> {
+): Promise<{ output: string; error: string | null; ms?: number }> {
   const timeoutMs = opts.timeoutMs ?? 3000;
   const createWorker = opts.createWorker ?? defaultCreateWorker;
   return new Promise((resolve) => {
@@ -19,7 +19,7 @@ export function runLua(
       worker.terminate();
       resolve({ output: '', error: `Execution timed out after ${timeoutMs}ms` });
     }, timeoutMs);
-    worker.onmessage = (e: MessageEvent<{ output: string; error: string | null }>) => {
+    worker.onmessage = (e: MessageEvent<{ output: string; error: string | null; ms?: number }>) => {
       clearTimeout(timer);
       worker.terminate();
       resolve(e.data);

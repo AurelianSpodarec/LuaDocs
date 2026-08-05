@@ -27,7 +27,14 @@ function print(...)
 end
 `;
 
-export async function executeLua(code: string): Promise<{ output: string; error: string | null }> {
+export interface LuaResult {
+  output: string;
+  error: string | null;
+  /** Milliseconds spent running the chunk — not the engine boot, which dwarfs it. */
+  ms: number;
+}
+
+export async function executeLua(code: string): Promise<LuaResult> {
   const factory = new LuaFactory();
   const lua = await factory.createEngine();
 
@@ -37,12 +44,21 @@ export async function executeLua(code: string): Promise<{ output: string; error:
     return typeof value === 'string' ? value : '';
   };
 
+  let started = 0;
   try {
     await lua.doString(PRINT);
+    // The clock starts here on purpose. Creating the engine loads and instantiates a
+    // WebAssembly module, which costs over a second and has nothing to do with the
+    // example; timing around it would report Lua as a thousand times slower than it is.
+    started = performance.now();
     await lua.doString(code);
-    return { output: printed(), error: null };
+    return { output: printed(), error: null, ms: performance.now() - started };
   } catch (e) {
-    return { output: printed(), error: e instanceof Error ? e.message : String(e) };
+    return {
+      output: printed(),
+      error: e instanceof Error ? e.message : String(e),
+      ms: started ? performance.now() - started : 0,
+    };
   } finally {
     // A failure while closing the engine must never turn a resolved
     // { output, error } result into a rejected promise — cleanup errors are

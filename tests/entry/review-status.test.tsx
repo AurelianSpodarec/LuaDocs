@@ -6,24 +6,24 @@ const status = () => document.querySelector('[data-reviewed]');
 const href = (name: RegExp) => screen.getByRole('link', { name }).getAttribute('href') ?? '';
 
 describe('ReviewStatus', () => {
-  it('labels an unread entry as not human checked', () => {
+  it('labels an unread entry as awaiting review', () => {
     render(<ReviewStatus path="standard-library/string/len.mdx" />);
     expect(status()).toHaveAttribute('data-reviewed', 'no');
-    expect(status()).toHaveTextContent('Not human checked');
+    expect(status()).toHaveTextContent('Awaiting human review');
   });
 
   it('does not let "checked by machine" read as "checked by a person"', () => {
     // The whole point of the component: an entry can be manual-sourced, agent-reviewed
     // and have its examples executed, and still have had no human read it.
     render(<ReviewStatus path="standard-library/string/len.mdx" />);
-    expect(status()).not.toHaveTextContent(/^Human checked/);
-    expect(status()).toHaveTextContent(/nobody has read it through/i);
+    expect(status()).not.toHaveTextContent(/^Human reviewed/);
+    expect(status()).toHaveTextContent(/checked against the reference manual/i);
   });
 
   it('labels a read entry and names the date', () => {
     render(<ReviewStatus date="2026-08-05" path="standard-library/string/len.mdx" />);
     expect(status()).toHaveAttribute('data-reviewed', 'yes');
-    expect(status()).toHaveTextContent('Human checked');
+    expect(status()).toHaveTextContent('Human reviewed');
     expect(status()).toHaveTextContent('a person read this entry on 5 August 2026');
   });
 
