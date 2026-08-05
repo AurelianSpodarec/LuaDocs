@@ -1,8 +1,114 @@
 ---
 title: string.gsub()
-description: ""
+description: Replace every match of a pattern in a string.
+lua-compat: string.gsub
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.gsub
 ---
 
-{/* Not yet written. */}
+Rewrites a string by replacing every match of a pattern, and hands back *two* values: the
+rewritten copy, and how many matches it found. Nothing is edited in place — Lua strings
+are immutable, so the string handed in still reads the same afterwards.
+
+<RunnableExample code={`local sentence = "the quick brown fox"\nlocal shouted, match_count = string.gsub(sentence, "%a+", string.upper)\nprint(shouted)\nprint(match_count)\n-- Expected output:\n-- THE QUICK BROWN FOX\n-- 4`} />
+
+## Syntax
+
+```lua
+string.gsub(s, pattern, repl [, n])
+```
+
+<Parameters>
+  <Param name="s">The string to search.</Param>
+  <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) to match.</Param>
+  <Param name="repl">What each match becomes — a string, a number, a table or a function. See Description.</Param>
+  <Param name="n">The most matches to handle. Omitted, the whole string is scanned.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A copy of `s` with the replacements applied.</Return>
+  <Return type="integer">How many matches the pattern found.</Return>
+</Returns>
+
+<Errors>
+
+- Raises `invalid capture index` when a replacement string names a capture the pattern does not have, such as `%2` against a pattern that captures once.
+- Raises `invalid use of '%' in replacement string` when a `%` in a replacement string is followed by anything other than a digit or a second `%` — including nothing at all, as in a trailing one.
+- Raises `invalid replacement value` when a table lookup or a function call answers with something that is neither a string, a number, `nil` nor `false`.
+- Raises `bad argument` when `repl` is none of the four kinds it accepts.
+
+</Errors>
+
+## Description
+
+Captures are the hinge between the pattern and the replacement, and there is always at
+least one of them: a pattern that captures nothing is treated as though the whole pattern
+sat inside a single capture. So `%1`, a table key and a function's first argument all
+mean *the text that matched*, and mean something narrower only once the pattern says so.
+
+`repl` decides what a match turns into, in one of three shapes:
+
+- *A string* is a template. `%1` through `%9` stand in for the capture of that number,
+  `%0` for the whole match, and `%%` for a literal per cent sign.
+- *A table* is a lookup. The first capture is used as the key, and whatever is stored
+  under it becomes the replacement.
+- *A function* is a computation. It runs once per match, receiving each capture as a
+  separate argument in the order they appear, and its result becomes the replacement.
+
+A lookup or a call may answer with a string or a number, either of which is used as
+written. It may also decline: `nil` and `false` both mean *leave this one alone*, and the
+matched text survives into the result untouched rather than being deleted. Declining is
+what makes a partial lookup table practical — text containing words the table has never
+heard of passes through instead of going missing.
+
+The second return value counts *matches*, not edits. A match a table declined still adds
+to it, and so does one a function replaced with an identical string. Read it as how many
+times the pattern hit, not how much of the string moved. `n` caps that same count: once
+that many matches have been handled, scanning stops and the rest of the string is copied
+through as it stands.
+
+<Note>
+Because the count arrives whether or not anything changed, `string.gsub()` doubles as a
+counter. Replacing every match with `%0` puts each match back exactly as it was, leaving
+a string identical to the original and a count of how many times the pattern matched —
+words, lines or delimiters totted up without writing a loop.
+</Note>
+
+## Examples
+
+### Reordering captures in the replacement string
+
+<RunnableExample code={`local release_date = "2026-08-05"\nlocal european_style, match_count = string.gsub(release_date, "(%d+)-(%d+)-(%d+)", "%3/%2/%1")\nprint(european_style)\nprint(match_count)\n-- Expected output:\n-- 05/08/2026\n-- 1`} />
+
+### A lookup table that leaves the rest alone
+
+<RunnableExample code={`local translations = { cat = "chat", dog = "chien" }\nlocal translated, match_count = string.gsub("the cat saw a dog", "%a+", translations)\nprint(translated)\nprint(match_count)\n-- Expected output:\n-- the chat saw a chien\n-- 5`} />
+
+Five words matched; the three the table has no entry for answered `nil` and were kept.
+
+### Stopping after a fixed number of matches
+
+<RunnableExample code={`local shopping_list = "eggs, eggs, eggs"\nlocal corrected, match_count = string.gsub(shopping_list, "eggs", "flour", 2)\nprint(corrected)\nprint(match_count)\n-- Expected output:\n-- flour, flour, eggs\n-- 2`} />
+
+## Gotchas
+
+<Gotcha title="It returns two values, and the second one travels">
+`string.gsub()` returns the new string *and* the count. Feeding the call straight into
+another function hands over both — `print(string.gsub(text, "a", "b"))` prints the count
+after the string, and `string.len(string.gsub(text, "a", "b"))` measures the wrong
+argument. Assign to two names, or wrap the call in a second pair of parentheses to keep
+the first value only.
+</Gotcha>
+
+<Gotcha title="A per cent sign in the replacement has to be doubled">
+`%` is the escape character on the replacement side too, so a replacement string carrying
+a literal one raises rather than passing it through: `string.gsub(price, "off", "20%")`
+fails, and `"20%%"` is what produces `20%`. The trap is that this is exactly where a
+percentage is likeliest to appear.
+</Gotcha>
+
+## See also
+
+- [Patterns](/docs/standard-library/string/patterns) — the notation `pattern` is written in
+- [`string.find()`](/docs/standard-library/string/find) — locating a match instead of replacing it
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — iterating over matches instead of replacing them
