@@ -1,8 +1,91 @@
 ---
 title: string.byte()
-description: ""
+description: Read part of a string as the numeric codes of its bytes.
+lua-compat: string.byte
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.byte
 ---
 
-{/* Not yet written. */}
+Reads a string as numbers rather than as text, giving the numeric code of every byte in a
+range — *one return value per byte*.
+[`string.char()`](/docs/standard-library/string/char) is the way back.
+
+<RunnableExample code={`local word = "Lua"\nprint(string.byte(word))\nprint(string.byte(word, 1, -1))\n-- Expected output:\n-- 76\n-- 76\t117\t97`} />
+
+## Syntax
+
+```lua
+string.byte(s [, i [, j]])
+```
+
+<Parameters>
+  <Param name="s">The string to read.</Param>
+  <Param name="i">Where the range starts. Omitted, it starts at the first byte.</Param>
+  <Param name="j">Where the range ends. Omitted, it ends where it started, so exactly one byte comes back.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">One value per byte in the range, in order — the code of `s[i]`, then `s[i+1]`, on to `s[j]`. A range holding no bytes returns nothing at all.</Return>
+</Returns>
+
+## Description
+
+Positions count from 1 for the first byte, and a negative position counts backwards from
+the end, so `-1` is the last byte and `-2` the one before it. The range is then trimmed to
+fit the string exactly as [`string.sub()`](/docs/standard-library/string/sub) trims one: a
+start before the beginning is pulled up to the first byte, an end past the last is pulled
+back to it, and a start left sitting after the end describes nothing. None of that raises
+— a range wholly outside the string simply produces no values.
+
+`string.byte(word, 1, -1)` is therefore the whole string, byte by byte, whatever its
+length.
+
+The codes are whatever the platform assigns to those bytes rather than something the
+language fixes, so a program that writes one in by hand — `65` for `A`, say — is relying
+on the machine it runs on and not on Lua.
+
+<Note>
+Strings carry a metatable whose `__index` points at the `string` table, so every function
+in the library is also reachable as a method on the string itself. `word:byte(1, -1)` and
+`string.byte(word, 1, -1)` are the same call, and the method form is the one most Lua code
+uses once the string is already in a name.
+</Note>
+
+## Examples
+
+### Testing a character by its code
+
+<RunnableExample code={`local user_input = "7"\nlocal character_code = string.byte(user_input)\nprint(character_code >= string.byte("0") and character_code <= string.byte("9"))\n-- Expected output: true`} />
+
+### Counting positions from the end
+
+<RunnableExample code={`local file_name = "report.csv"\nprint(string.byte(file_name, -3, -1))\n-- Expected output: 99\t115\t118`} />
+
+Those three are the codes for `c`, `s` and `v` — the extension, without needing to know how
+long the name in front of it was.
+
+## Gotchas
+
+<Gotcha title="Out of range gives nothing, not nil">
+A position past the end of the string produces *no values at all*, which is not the same as
+producing `nil`. In an argument list the call simply disappears:
+`print("code:", string.byte("Lua", 99))` prints `code:` and stops, and a function that
+insists on a value, such as `tostring()`, reports a missing argument rather than a `nil`
+one. Assign the result to a name first — an absent value does become `nil` there — or check
+the length before reading.
+</Gotcha>
+
+<Gotcha title="A multi-byte character arrives in pieces">
+The range is measured in bytes, so a character occupying more than one of them comes back
+as several codes, and none of them is the character. `("café"):byte(1, -1)` gives five
+values, the last two being the two halves of `é`. This is the same byte-versus-character
+split [`string.len()`](/docs/standard-library/string/len) counts on;
+[`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) is what gives one number per
+character.
+</Gotcha>
+
+## See also
+
+- [`string.char()`](/docs/standard-library/string/char) — the inverse, numbers back into a string
+- [`string.sub()`](/docs/standard-library/string/sub) — the same range rules, returning text instead of numbers
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — one number per character instead of per byte

@@ -1,8 +1,85 @@
 ---
 title: string.char()
-description: ""
+description: Build a string out of the numeric codes of its bytes.
+lua-compat: string.char
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.char
 ---
 
-{/* Not yet written. */}
+Builds a string out of numbers, one byte per argument, taking as many of them as you care
+to hand it. It is the inverse of
+[`string.byte()`](/docs/standard-library/string/byte).
+
+<RunnableExample code={`print(string.char(76, 117, 97))\n-- Expected output: Lua`} />
+
+## Syntax
+
+```lua
+string.char(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more byte values, each from 0 to 255. Each becomes one byte of the result, in the order given.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A string exactly as long as the argument list, whose bytes are the values handed in. With no arguments, the empty string.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when an argument falls outside what a single byte holds — below zero, or above 255.
+- Raises when an argument is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The result is always exactly one byte per argument: its length equals the number of values
+given, and no value ever expands into more than one byte. `0` is an argument like any
+other, producing a string with a zero byte in it, which Lua carries around like any other
+byte rather than treating as the end of the string.
+
+The codes are whatever the platform assigns rather than something the language fixes, so
+writing one in by hand — `65` for `A`, say — relies on the machine rather than on Lua. What
+`string.char()` does guarantee is the round trip: whatever
+[`string.byte()`](/docs/standard-library/string/byte) took apart on a machine,
+`string.char()` puts back together on that same machine.
+
+It is also the ordinary way to put a byte into a string that is awkward to type at all.
+`string.char(9)` is a tab and `string.char(27)` the escape byte that opens a terminal
+control sequence, neither of which survives being typed literally into source.
+
+## Examples
+
+### Rebuilding a string from its bytes
+
+<RunnableExample code={`local word = "Lua"\nlocal rebuilt = string.char(string.byte(word, 1, -1))\nprint(rebuilt)\nprint(rebuilt == word)\n-- Expected output:\n-- Lua\n-- true`} />
+
+`string.byte()` returns one value per byte, and those values land in `string.char()` as its
+whole argument list, so the two compose into a round trip with no loop between them.
+
+### Generating a run of characters
+
+<RunnableExample code={`local letters = {}\nfor code = string.byte("a"), string.byte("e") do\n  letters[#letters + 1] = string.char(code)\nend\nprint(table.concat(letters))\n-- Expected output: abcde`} />
+
+### Inserting a byte that cannot be typed
+
+<RunnableExample code={`local heading = "name" .. string.char(9) .. "score"\nprint(heading)\n-- Expected output: name\tscore`} />
+
+## Gotchas
+
+<Gotcha title="The arguments are bytes, not code points">
+Each argument fills exactly one byte, so a value above 255 raises rather than producing the
+character with that code point — `string.char(0x20AC)` does not give `€`. Building that
+character by hand means passing the three bytes it is encoded as,
+`string.char(226, 130, 172)`, and
+[`utf8.char()`](/docs/standard-library/utf8/char) is what does it from the code point
+directly.
+</Gotcha>
+
+## See also
+
+- [`string.byte()`](/docs/standard-library/string/byte) — the inverse, a string back into numbers
+- [`utf8.char()`](/docs/standard-library/utf8/char) — building from code points instead of bytes
+- [`string.format()`](/docs/standard-library/string/format) — `%c` writes a byte from its code inside a template
