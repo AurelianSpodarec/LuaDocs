@@ -67,9 +67,10 @@ section's entries** → See also → Source.
 
 > **Amendment, 2026-08-05 — this line is superseded in four places.** The first overview
 > built against the real components (`string`) needed a summary longer than "one or two
-> sentences" *before* the example and a callout after it; an index grouped by task, in
-> real `##` headings, rather than a flat or sidebar-shaped list; and a `lua-compat` key
-> the line does not mention. `Source` is derived by the route here as well, not authored.
+> sentences" *before* the example, and two paragraphs after it — a callout, and one on
+> immutability. The index is grouped, as the line says, but grouped **by task and in real
+> `##` headings**, which is what the line leaves open. It carries a `lua-compat` key the
+> line does not mention. And `Source` is derived by the route here as well, not authored.
 > See findings #9 and #10.
 
 ## Guide
@@ -188,9 +189,13 @@ indexes:
    demonstrates them. `string` opens with two paragraphs — method syntax, and positions
    counted from either end — and only then runs three lines using both. A third such
    fact, the one-byte-encoding assumption, ships as a callout *after* the example
-   instead, because it qualifies the library rather than the code above it. And `Source`
-   is listed as an authored step but is derived by the route, like the matrix and the
-   review status; the 2026-08-05 amendment applies to this fork too.
+   instead, because it qualifies the library rather than the code above it. A fourth
+   paragraph sits between the two — immutability, one clause tying the example's third
+   line to a property every function in the library shares. It is *not* preamble
+   material and belongs to no entry either, and it is there because the example had
+   already demonstrated it: what goes after the example is whatever the example earned.
+   And `Source` is listed as an authored step but is derived by the route, like the
+   matrix and the review status; the 2026-08-05 amendment applies to this fork too.
 
 10. **An overview carries `lua-compat`, and its node describes the library's own existence
     and membership — never the union of its members' behaviour.** Five uniform chips on a
