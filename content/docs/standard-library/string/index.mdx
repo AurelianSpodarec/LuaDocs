@@ -1,8 +1,80 @@
 ---
 title: string
-description: ""
+description: Lua's toolkit for text — searching, cutting, formatting, and reading or writing raw bytes.
+lua-compat: string.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.5
 ---
 
-{/* Not yet written. */}
+Everything Lua does to text on its own is here: finding a substring, cutting one out,
+matching a pattern, formatting values into a template, and reading or writing runs of
+raw bytes. The functions live in the table `string`, and Lua also gives every string a
+metatable whose `__index` is that same table — so `string.upper(text)` can equally be
+written `text:upper()`, and both forms appear throughout this section.
+
+Positions are counted in bytes from 1, not 0, and a negative position counts backwards
+from the end: `-1` is the last byte, `-2` the one before it.
+[`string.sub()`](/docs/standard-library/string/sub) carries the full rules for how a
+range is corrected when it runs off either end, and the functions that take positions
+follow them.
+
+<RunnableExample code={`local product_name = "cocoa powder"\nprint(product_name:upper())\nprint(product_name:sub(-6))\nprint(product_name)\n-- Expected output:\n-- COCOA POWDER\n-- powder\n-- cocoa powder`} />
+
+Nothing here edits a string in place. Every function that looks like it changes one
+hands back a new string, which is why the third line still reads as it did.
+
+<Note>
+The library assumes one-byte character encodings: lengths, positions and ranges are all
+counted in bytes, and a character written in more than one byte is simply several of
+them. The [`utf8` library](/docs/standard-library/utf8) is what measures and indexes
+UTF-8 text by character instead.
+</Note>
+
+## Searching and matching
+
+Four functions look for text described by a *pattern* — Lua's own notation, smaller than
+regular expressions — and all four read the same one.
+
+- [Patterns](/docs/standard-library/string/patterns) — the notation the four below take
+- [`string.find()`](/docs/standard-library/string/find) — where a match starts and ends
+- [`string.match()`](/docs/standard-library/string/match) — the captured parts of the first match
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — an iterator over every match in turn
+- [`string.gsub()`](/docs/standard-library/string/gsub) — a copy with every match replaced
+
+## Measuring and cutting
+
+- [`string.len()`](/docs/standard-library/string/len) — how many bytes a string holds
+- [`string.sub()`](/docs/standard-library/string/sub) — the piece lying between two positions
+
+## Building and transforming
+
+Each of these returns a new string built from the one handed in.
+
+- [`string.format()`](/docs/standard-library/string/format) — values inserted into a template
+- [`string.rep()`](/docs/standard-library/string/rep) — a string written out several times over
+- [`string.lower()`](/docs/standard-library/string/lower) — a copy with its uppercase letters lowered
+- [`string.upper()`](/docs/standard-library/string/upper) — a copy with its lowercase letters raised
+- [`string.reverse()`](/docs/standard-library/string/reverse) — a copy with its bytes back to front
+
+## Bytes and binary data
+
+Where the library stops treating a string as text and treats it as a run of bytes — byte
+codes one at a time, whole records laid out to a layout you describe, and the compiled
+form of a function.
+
+- [`string.byte()`](/docs/standard-library/string/byte) — the numeric codes of a string's bytes
+- [`string.char()`](/docs/standard-library/string/char) — a string built from numeric codes
+- [Format strings for pack and unpack](/docs/standard-library/string/pack-formats) — the layout notation the three below share
+- [`string.pack()`](/docs/standard-library/string/pack) — values written out to a byte layout
+- [`string.packsize()`](/docs/standard-library/string/packsize) — how many bytes a layout takes
+- [`string.unpack()`](/docs/standard-library/string/unpack) — values read back out of one
+- [`string.dump()`](/docs/standard-library/string/dump) — a function's compiled form, as a string
+
+## See also
+
+- [`string`](/docs/language/values-and-types/string) — the value type these functions work on
+- [String literals](/docs/language/lexical-conventions/string-literals) — writing one in source
+- [Concatenation](/docs/language/expressions/concatenation) — joining two strings with `..`
+- [`#` length operator](/docs/language/expressions/length-operator) — the operator form of `string.len()`
+- [`tostring()`](/docs/standard-library/globals/tostring) — turning any value into a string
+- [`utf8` library](/docs/standard-library/utf8) — the same text, counted in characters
