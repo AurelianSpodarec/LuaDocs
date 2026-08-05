@@ -1,8 +1,122 @@
 ---
 title: string.sub()
-description: ""
+description: Take the piece of a string that lies between two positions.
+lua-compat: string.sub
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.sub
 ---
 
-{/* Not yet written. */}
+Cuts a piece out of a string — everything from one position to another, both of them
+included. Nothing is removed from the original: Lua strings are immutable, so what comes
+back is a new string and the one handed in still reads the same.
+
+<RunnableExample code={`local file_name = "quarterly-report.csv"\nprint(string.sub(file_name, 1, 9))\nprint(string.sub(file_name, -3))\n-- Expected output:\n-- quarterly\n-- csv`} />
+
+## Syntax
+
+```lua
+string.sub(s, i [, j])
+```
+
+<Parameters>
+  <Param name="s">The string to take a piece of.</Param>
+  <Param name="i">Where the piece starts.</Param>
+  <Param name="j">Where the piece ends — that position is part of it. Omitted, it is `-1`, so the piece runs to the end of the string.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The bytes of `s` from `i` to `j`, both included. The empty string when the range holds no bytes.</Return>
+</Returns>
+
+## Description
+
+Positions are byte positions and they count from 1: `1` names the first byte of the
+string, not `0`. Both ends of the range belong to the piece, so `string.sub(text, 2, 4)`
+gives three bytes rather than two, and a range that stays inside the string is
+`j - i + 1` bytes long.
+
+A negative position is counted backwards from the end, so `-1` is the last byte, `-2` the
+one before it, and `-k` the *k*th byte from the end. That reading is not special to either
+end of the range: `i` and `j` are translated the same way and independently of each other,
+so a range may mix the two — `string.sub(line, 3, -3)` drops two bytes from each side
+without needing to know how long the line is.
+
+Once negative positions have been translated, the range is trimmed to fit the string, in
+one direction each. A start below 1 is pulled up to 1, so a range beginning before the
+string simply begins at its first byte. An end past the last byte is pulled back to it, so
+a range asking for more than is there stops where the string does. Nothing pulls a start
+*down* or an end *up*; those cases are left as they are, for the next rule to answer.
+
+If the start ends up after the end, the result is the empty string. That is the single
+answer to every range that describes nothing — a start past the end of the string, an end
+before its beginning, or a backwards pair such as `4, 2`. No position is ever out of
+bounds and no range raises: asking for a piece that is not there gives an empty string
+rather than an error.
+
+Position `0` therefore names no byte, and what it does depends on which end it sits at. As
+a start it is below 1 and is pulled up to it, so `string.sub(text, 0)` returns the whole
+string exactly as `string.sub(text, 1)` does. As an end it stays where it is, before every
+possible start, so `string.sub(text, 1, 0)` is empty. `0` is not negative, so nothing
+counts it back from the end.
+
+Three shapes follow from all this and cover most of what the function is used for.
+`string.sub(text, 1, -1)` is the whole string, and so is `string.sub(text, 1)`.
+`string.sub(text, 1, count)` is a prefix `count` bytes long. `string.sub(text, -count)` is
+a suffix that many bytes long. Neither of the last two needs a length check in front of it:
+a `count` larger than the string yields the whole of it.
+
+## Examples
+
+### Cutting a line at a separator
+
+<RunnableExample code={`local config_line = "timeout=30"\nlocal separator_position = string.find(config_line, "=")\nlocal setting_name = string.sub(config_line, 1, separator_position - 1)\nlocal setting_value = string.sub(config_line, separator_position + 1)\nprint(setting_name)\nprint(setting_value)\n-- Expected output:\n-- timeout\n-- 30`} />
+
+The separator itself belongs to neither piece, which is why the two calls step one position
+back and one position forward around it.
+
+### Dropping the last byte
+
+<RunnableExample code={`local csv_header = "name,role,team,"\nprint(string.sub(csv_header, 1, -2))\n-- Expected output: name,role,team`} />
+
+`-2` is the second byte from the end, so the range runs from the first byte to just short of
+the last one — a trailing comma, newline or slash removed without measuring anything.
+
+### Truncating without checking the length first
+
+<RunnableExample code={`local short_headline = "Release notes"\nlocal long_headline = "Release notes for the 2026 summer update"\nprint(string.sub(short_headline, 1, 20))\nprint(string.sub(long_headline, 1, 20) .. "...")\n-- Expected output:\n-- Release notes\n-- Release notes for th...`} />
+
+Both calls ask for twenty bytes. The short string has fewer, and the end is pulled back to
+what it actually holds instead of raising, so the guard most languages need here is
+unnecessary.
+
+## Gotchas
+
+<Gotcha title="The second argument is an end, not a length">
+Both positions are inclusive, so taking `count` bytes from `start` ends at
+`start + count - 1`. Passing the count itself — `string.sub(text, start, count)` — asks for
+the range between two positions that have nothing to do with each other: it is quietly
+wrong whenever `count` is larger than `start`, and empty whenever it is smaller.
+</Gotcha>
+
+<Gotcha title="A range that misses gives an empty string, not nil">
+Every range that describes nothing produces `""`, so an extraction that found nothing is
+indistinguishable from one that found nothing to find. The empty string is also *truthy* in
+Lua — only `nil` and `false` are not — so `if string.sub(line, 5, 8) then` runs its branch
+whether or not the line was ever that long. Compare the result against `""`, or check the
+length before cutting.
+</Gotcha>
+
+<Gotcha title="It cuts bytes, and a character can be cut in half">
+The range counts bytes with no notion of the encoding sitting on top of them, so a piece
+can end in the middle of a multi-byte character. `("café"):sub(1, 4)` returns four bytes,
+the last of which is the first half of `é` — not text any decoder will accept.
+[`utf8.offset()`](/docs/standard-library/utf8/offset) turns a character position into the
+byte position to cut at, which is what keeps a piece of UTF-8 whole.
+</Gotcha>
+
+## See also
+
+- [`string.len()`](/docs/standard-library/string/len) — how many positions there are to index
+- [`string.byte()`](/docs/standard-library/string/byte) — the same range rules, as byte codes rather than text
+- [`string.find()`](/docs/standard-library/string/find) — locating the positions to cut at
+- [`utf8.offset()`](/docs/standard-library/utf8/offset) — turning a character position into a byte position
