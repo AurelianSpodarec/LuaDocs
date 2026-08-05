@@ -1,7 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useState, type ReactNode } from 'react';
-import { LUA_VERSIONS, type LuaVersion } from '@/compat/schema';
+import { LUA_VERSIONS, DEFAULT_VERSION as DEFAULT, type LuaVersion } from '@/compat/schema';
 
-const DEFAULT: LuaVersion = '5.5';
 const KEY = 'luadocs.version';
 
 function isLuaVersion(v: string | null): v is LuaVersion {
