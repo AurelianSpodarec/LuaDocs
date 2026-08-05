@@ -33,17 +33,16 @@ The separator is exactly that — it goes between copies and never after the las
 `n` copies carry `n - 1` separators. One copy therefore has no separator anywhere in it,
 and the result of `string.rep("ab", 3, ", ")` is `ab, ab, ab` rather than `ab, ab, ab, `.
 
-A count that is not positive produces the empty string. Zero and every negative number
-behave alike, and neither raises — asking for no copies is a request the function
-answers rather than refuses, which is what lets a count computed at runtime pass straight
-in without being guarded first.
+A count that is not positive gives back the empty string — a request the function answers
+rather than refuses, which is what lets a count worked out while the program runs pass
+straight in without being guarded first.
 
 <Warning>
-The result is built whole, in memory, in one go, and its size is the count multiplied by
-the length of what is being repeated. A count that arrives from user input, a file or a
-network message can therefore ask for a string far larger than the machine has room for,
-and there is no partial result to fall back on. Bound the count before it reaches the
-call.
+The result is built whole, in memory, in one go, and its size is the count times the
+length of what is repeated, plus the separators sitting between the copies. A count that
+arrives from user input, a file or a network message can therefore ask for a string far
+larger than the machine has room for, and there is no partial result to fall back on.
+Bound the count before it reaches the call.
 </Warning>
 
 ## Examples

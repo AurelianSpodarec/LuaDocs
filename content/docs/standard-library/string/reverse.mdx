@@ -27,11 +27,6 @@ string.reverse(s)
 
 ## Description
 
-The original is untouched, as it must be — a Lua string cannot be changed once it exists,
-so the reversed text is a second string and the name handed in still holds the first one.
-The result always has the same length, because reversing only reorders what is already
-there.
-
 Nothing is inspected along the way: every byte is simply moved, whatever it holds. That
 makes the operation its own inverse, so reversing twice gives back exactly the string you
 started with, and it makes the empty string and any one-byte string come back unchanged.
@@ -40,11 +35,11 @@ Comparing a string against its own reversal is the whole of a palindrome test.
 ## Gotchas
 
 <Gotcha title="A multi-byte character comes out scrambled">
-The reordering happens byte by byte, so a character encoded in more than one byte has its
-bytes separated and put back in the wrong order — the result is no longer that character,
-and frequently no longer valid text at all. Reversing `"café"` moves the two bytes of `é`
-apart and leaves them in the order `169`, `195`, which spells nothing. This is the same
-byte-versus-character split [`string.len()`](/docs/standard-library/string/len) counts on;
+The reordering happens byte by byte, and a character encoded in more than one byte gets
+its own bytes turned around along with everything else — the result is no longer that
+character, and frequently no longer valid text at all. Reversing `"café"` keeps the two
+bytes of `é` next to each other but puts them back to front, `169` then `195`, and that
+pair spells nothing. This is the same byte-versus-character split [`string.len()`](/docs/standard-library/string/len) counts on;
 reversing text safely means walking it a character at a time with
 [`utf8.codes()`](/docs/standard-library/utf8/codes) and rebuilding it, not moving bytes.
 </Gotcha>

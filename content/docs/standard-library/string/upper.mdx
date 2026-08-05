@@ -11,7 +11,7 @@ uppercase form. Digits, punctuation, spaces and letters already uppercase come b
 exactly as they went in. [`string.lower()`](/docs/standard-library/string/lower) does the
 same job in the other direction.
 
-<RunnableExample code={`local product_code = "lua-5.5"\nprint(string.upper(product_code))\n-- Expected output: LUA-5.5`} />
+<RunnableExample code={`local product_code = "isbn-0-14-044913-6"\nprint(string.upper(product_code))\n-- Expected output: ISBN-0-14-044913-6`} />
 
 ## Syntax
 
@@ -29,36 +29,25 @@ string.upper(s)
 
 ## Description
 
-Nothing is modified in place. A Lua string cannot be changed once it exists, so the only
-way to alter one is to build another, and that other string is what comes back — the name
-handed in still holds the original. Each letter that changes is replaced by a single
-letter, so the result is always exactly as long as the input.
-
 Which letters count as lowercase is not settled by the language. It follows the locale the
 program is running under, and [`os.setlocale()`](/docs/standard-library/os/setlocale) is
 what changes that.
 
 Uppercasing is the usual way to hold identifiers that are meant to be case-insensitive —
 country codes, currency codes, header names — in one settled form, so that a later
-comparison is a plain equality test rather than a conversion at every use.
+comparison is a plain equality test rather than a conversion at every use. Keep that form
+alongside the text as it was typed rather than in place of it: two different spellings can
+convert to the same thing, and the result does not say which one it came from.
 
 ## Gotchas
 
 <Gotcha title="Accented letters are usually left alone">
-In the locale a Lua program starts in, only the twenty-six unaccented letters are
-recognised as having a case, so `("café"):upper()` gives `CAFé`. Nothing has gone wrong in
+In the locale the standalone interpreter starts in, only the twenty-six unaccented letters
+are recognised as having a case, so `("café"):upper()` gives `CAFé`. Nothing has gone wrong in
 the conversion — the bytes spelling `é` are simply not among the letters that locale knows
 about, and anything unrecognised is passed through untouched. Uppercasing text beyond that
 alphabet needs a library that understands the encoding, which this function does not claim
 to be.
-</Gotcha>
-
-<Gotcha title="Uppercasing is not always reversible">
-Case conversion loses information whenever two different inputs uppercase to the same
-thing, and lowering the result afterwards does not recover which one it was. `"Ada"` and
-`"ADA"` both give `"ADA"`. That is fine for comparing and for display, and wrong for
-storing text you intend to show back to whoever typed it — keep the original alongside the
-uppercased form rather than replacing it.
 </Gotcha>
 
 ## See also
