@@ -83,9 +83,11 @@ is what it compares against.
 - Rules 1 and 3 are mechanically checkable and are enforced by test over every
   `<RunnableExample>` in written content, not by review. Rules 2, 4 and 5 are
   judgement and stay human.
-- Existing examples predate this and are non-conforming. `string.format`'s current
-  example uses `"Ada"` and `36`, which is real data with no locals at all; entries
-  authored from here follow the rules, and older ones are corrected when touched.
+- **Nothing is grandfathered.** The two examples in the repo today — on
+  `string.format` and `math.tointeger` — were written to prove the version slice's
+  stack, not to be content. Both are rewritten to conform, and the test enforcing
+  rules 1 and 3 runs over all written content from the start rather than over new
+  entries only. There is no legacy tier to keep track of.
 - The `Syntax` carve-out means one entry shows two naming styles — the manual's in the
   signature, ours in the examples below it. That is the honest presentation: the
   signature is a quotation and the examples are ours.

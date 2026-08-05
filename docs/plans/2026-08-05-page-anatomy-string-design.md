@@ -30,6 +30,9 @@ In:
 - Compat data for `string.len`, `string.gsub` and Patterns.
 - Those four entries, authored.
 - [ADR 0008](../adr/0008-example-conventions.md) — how examples are written.
+- `math.tointeger`'s example, rewritten to conform. It is the only written example
+  outside the pilot, and the examples test runs over all written content — so there
+  is no grandfathered tier from the first commit onward.
 
 Out:
 
