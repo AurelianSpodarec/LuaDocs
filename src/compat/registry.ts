@@ -8,10 +8,14 @@ import stringLen from './data/string.len.json';
 import stringGsub from './data/string.gsub.json';
 import stringMatch from './data/string.match.json';
 import stringLower from './data/string.lower.json';
+import stringPack from './data/string.pack.json';
+import stringPackFormats from './data/string.pack-formats.json';
+import stringPacksize from './data/string.packsize.json';
 import stringPatterns from './data/string.patterns.json';
 import stringRep from './data/string.rep.json';
 import stringReverse from './data/string.reverse.json';
 import stringSub from './data/string.sub.json';
+import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
 import mathTointeger from './data/math.tointeger.json';
 
@@ -32,10 +36,14 @@ const raw: Record<string, unknown> = {
   'string.gsub': stringGsub,
   'string.lower': stringLower,
   'string.match': stringMatch,
+  'string.pack': stringPack,
+  'string.pack-formats': stringPackFormats,
+  'string.packsize': stringPacksize,
   'string.patterns': stringPatterns,
   'string.rep': stringRep,
   'string.reverse': stringReverse,
   'string.sub': stringSub,
+  'string.unpack': stringUnpack,
   'string.upper': stringUpper,
   'math.tointeger': mathTointeger,
 };
