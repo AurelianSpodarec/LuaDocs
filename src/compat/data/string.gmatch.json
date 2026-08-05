@@ -1,6 +1,6 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.4": "Takes an optional third argument, init, the position the first search starts from, and rejects an empty match ending where the previous match ended."
+    "5.4": "Takes an optional third argument, init, the position the first search starts from; rejects an empty match ending where the previous match ended."
   }
 }
