@@ -33,9 +33,9 @@ string.gsub(s, pattern, repl [, n])
 <Errors>
 
 - Raises `invalid capture index` when a replacement string names a capture the pattern does not have, such as `%2` against a pattern that captures once.
-- Raises `invalid use of '%' in replacement string` when a `%` in a replacement string is followed by anything other than a digit or a second `%` — including nothing at all, as in a trailing one.
+- <Since v="5.2" /> Raises `invalid use of '%' in replacement string` when a `%` in a replacement string is followed by anything other than a digit or a second `%` — including nothing at all, as in a trailing one.
 - Raises `invalid replacement value` when a table lookup or a function call answers with something that is neither a string, a number, `nil` nor `false`.
-- Raises `bad argument` when `repl` is none of the four kinds it accepts.
+- Raises `bad argument` when `repl` is not a string, a number, a table or a function.
 
 </Errors>
 
@@ -49,7 +49,8 @@ mean *the text that matched*, and mean something narrower only once the pattern 
 `repl` decides what a match turns into, in one of three shapes:
 
 - *A string* is a template. `%1` through `%9` stand in for the capture of that number,
-  `%0` for the whole match, and `%%` for a literal per cent sign.
+  `%0` for the whole match, and `%%` for a literal per cent sign. A number is accepted
+  wherever this form is, and is converted to a string before being read as one.
 - *A table* is a lookup. The first capture is used as the key, and whatever is stored
   under it becomes the replacement.
 - *A function* is a computation. It runs once per match, receiving each capture as a
@@ -86,25 +87,33 @@ words, lines or delimiters totted up without writing a loop.
 
 Five words matched; the three the table has no entry for answered `nil` and were kept.
 
-### Stopping after a fixed number of matches
+### Capping how many matches are handled
 
-<RunnableExample code={`local shopping_list = "eggs, eggs, eggs"\nlocal corrected, match_count = string.gsub(shopping_list, "eggs", "flour", 2)\nprint(corrected)\nprint(match_count)\n-- Expected output:\n-- flour, flour, eggs\n-- 2`} />
+Only the first separator in a configuration line divides the key from the value; any
+later one is part of the value and has to survive. `n` is what stops the scan there.
+
+<RunnableExample code={`local config_line = "greeting = hello = world"\nlocal key_and_value, match_count = string.gsub(config_line, " = ", ": ", 1)\nprint(key_and_value)\nprint(match_count)\n-- Expected output:\n-- greeting: hello = world\n-- 1`} />
 
 ## Gotchas
 
 <Gotcha title="It returns two values, and the second one travels">
 `string.gsub()` returns the new string *and* the count. Feeding the call straight into
-another function hands over both — `print(string.gsub(text, "a", "b"))` prints the count
-after the string, and `string.len(string.gsub(text, "a", "b"))` measures the wrong
-argument. Assign to two names, or wrap the call in a second pair of parentheses to keep
-the first value only.
+another function hands both over, as consecutive arguments —
+`print(string.gsub("banana", "a", "b"))` prints `bbnbnb` and then `3`. Where the receiving
+function has a second parameter, that is worse than noisy:
+`tonumber(string.gsub("1 0", "%s", ""))` raises
+`bad argument #2 to 'tonumber' (base out of range)`, because the count landed where the
+numeric base belongs. Assign to two names, or wrap the call in a second pair of
+parentheses to keep the first value only.
 </Gotcha>
 
 <Gotcha title="A per cent sign in the replacement has to be doubled">
-`%` is the escape character on the replacement side too, so a replacement string carrying
-a literal one raises rather than passing it through: `string.gsub(price, "off", "20%")`
-fails, and `"20%%"` is what produces `20%`. The trap is that this is exactly where a
-percentage is likeliest to appear.
+`%` is the escape character on the replacement side too, so a lone one never reaches the
+result: `string.gsub("discount: PENDING", "PENDING", "20%")` does not produce `20%`.
+It raises <Since v="5.2" /> `invalid use of '%' in replacement string`; before that it was
+swallowed silently, which is worse. Doubling it works everywhere — `"20%%"` gives
+`discount: 20%`. The trap is that a replacement is exactly where a percentage is likeliest
+to appear.
 </Gotcha>
 
 ## See also
