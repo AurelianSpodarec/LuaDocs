@@ -1,8 +1,51 @@
 ---
 title: string.len()
-description: ""
+description: Return the number of bytes in a string.
+lua-compat: string.len
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.len
 ---
 
-{/* Not yet written. */}
+Returns how long a string is, measured in **bytes**. The
+[`#` operator](/docs/language/expressions/length-operator) answers exactly the same
+question and is what most Lua code uses; `string.len()` exists so the same operation is
+available as an ordinary function — including through method syntax, as `text:len()`.
+
+<RunnableExample code={`local greeting = "hello"\nprint(string.len(greeting))\n-- Expected output: 5`} />
+
+## Syntax
+
+```lua
+string.len(s)
+```
+
+<Parameters>
+  <Param name="s">The string to measure.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">The number of bytes in `s`.</Return>
+</Returns>
+
+## Description
+
+`string.len(text)` and `#text` return the same number, and nothing in the string's
+contents changes how it is counted. The empty string measures `0`. A zero byte inside a
+string is counted like any other byte rather than ending it, so `"a\0bc\0"` measures 5 —
+a Lua string holds arbitrary bytes and carries its own length, so there is no terminator
+to stop at.
+
+## Gotchas
+
+<Gotcha title="Bytes are not characters">
+A Lua string is a sequence of bytes with no encoding attached to it, so a UTF-8 string
+reports the bytes it occupies rather than the characters it spells — `"café"` measures
+five, not four, because `é` takes two of them. Reach for
+[`utf8.len()`](/docs/standard-library/utf8/len) when you mean characters.
+</Gotcha>
+
+## See also
+
+- [`#` length operator](/docs/language/expressions/length-operator) — the same operation, as an operator
+- [`utf8.len()`](/docs/standard-library/utf8/len) — counting characters instead of bytes
+- [`string.sub()`](/docs/standard-library/string/sub) — taking part of a string
