@@ -5,7 +5,13 @@ export const docsImageRoute = '/og/docs';
 export const gitConfig = {
   user: 'AurelianSpodarec',
   repo: 'LuaDocs',
-  branch: 'main',
+  /**
+   * `dev`, not `main` — every link built from this points at a file, and `main` does not
+   * have the files. All work stays on `dev` (CLAUDE.md), so `main` carries none of
+   * `content/docs`, and "Open on GitHub" and "Improve this page" both 404 against it.
+   * Change this when, and only when, content reaches `main`.
+   */
+  branch: 'dev',
 };
 
 export function encodeMarkdownUrl(slugs: string[], locale?: string) {

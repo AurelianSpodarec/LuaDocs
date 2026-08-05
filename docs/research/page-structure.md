@@ -40,6 +40,8 @@ Top to bottom:
 10. **See also** — curated: reference → guides, internal before external,
     alphabetical/simple-first within a group.
 11. **Source** — attribution link to the original manual entry.
+12. **Review status** — whether a person has read the entry, and the two ways to act on
+    the answer.
 
 > **Amendment, 2026-08-05 — 9 and 10 are swapped.** See also comes last in the
 > authored body; the matrix and Source render after it. Both are derived — the matrix
@@ -151,3 +153,26 @@ Four `string` entries built against the real components rather than by hand:
    to the `b` when a dangling quantifier has nothing to repeat. The rule that every
    factual claim traces to a passage is what caught them, and it earned a home outside
    the plan that happened to state it.
+
+## Review status (2026-08-05)
+
+Every entry states at its foot whether a person has read it, beside the manual
+attribution — the two are both provenance and belong together.
+
+The frontmatter key is `reviewed: YYYY-MM-DD`. Absent means nobody has. There is no
+`reviewed: false`: an omission and a denial say the same thing, and one of them is a
+field an author can forget to update.
+
+**Why it says "Not human checked" rather than nothing.** Entries here are written from
+the reference manual, reviewed, and have every example executed on each build. None of
+that is a person reading the page. A site that shows no review state invites the reader
+to assume the better answer, and a site that says "reviewed" without qualifying it is
+simply wrong. The honest position is to name which of the two happened.
+
+It carries an **Improve this page** link to the file on GitHub and a **report a problem**
+link to a prefilled issue. Both stay when an entry has been checked, because a checked
+entry can still be wrong and removing the way to say so would be the worse failure.
+
+This is not the contribution surface the roadmap plans (slice 7) — that is edit-to-PR
+flow, feedback widgets and the licence footer. This is the smallest thing that lets a
+reader who has just found a mistake do something about it.

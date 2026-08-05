@@ -24,6 +24,14 @@ export const docs = defineDocs({
         .optional(),
       /** Attribution link to the manual passage this entry is a rewrite of. */
       source: z.url().optional(),
+      /**
+       * The date a person read this entry, `YYYY-MM-DD`. Absent means nobody has.
+       *
+       * Every entry is written against the reference manual, reviewed, and has its
+       * examples executed on each build — none of which is a person having read it. The
+       * two are worth telling apart, and only the reader can decide what that is worth.
+       */
+      reviewed: z.iso.date().optional(),
     }),
     postprocess: {
       includeProcessedMarkdown: true,

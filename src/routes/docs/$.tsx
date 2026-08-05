@@ -23,6 +23,7 @@ import { compatNodeFor } from '@/compat/registry';
 import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
+import { ReviewStatus } from '@/entry/ReviewStatus';
 import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
@@ -67,6 +68,7 @@ const loader = createServerFn({
       path: page.path,
       luaCompat: page.data['lua-compat'] ?? null,
       source: page.data.source ?? null,
+      reviewed: page.data.reviewed ?? null,
       compatByUrl,
       markdownUrl: encodeMarkdownUrl(page.slugs, page.locale),
       pageTree: await source.serializePageTree(source.getPageTree()),
@@ -78,12 +80,14 @@ function Content({
   markdownUrl,
   luaCompat,
   sourceUrl,
+  reviewed,
   Breadcrumb,
 }: {
   path: string;
   markdownUrl: string;
   luaCompat: string | null;
   sourceUrl: string | null;
+  reviewed: string | null;
   Breadcrumb: FC<BreadcrumbProps>;
 }) {
   const page = docs.getPage(path);
@@ -128,12 +132,15 @@ function Content({
           after "See also" so neither is a thing an author has to remember to place. */}
       {node && <VersionMatrix node={node} />}
       {sourceUrl && <EntrySource url={sourceUrl} />}
+      {/* Provenance sits together: what the entry was rewritten from, and whether a
+          person has since read it. */}
+      <ReviewStatus date={reviewed} path={path} />
     </DocsPage>
   );
 }
 
 function Page() {
-  const { pageTree, path, markdownUrl, luaCompat, compatByUrl, source: sourceUrl } =
+  const { pageTree, path, markdownUrl, luaCompat, compatByUrl, source: sourceUrl, reviewed } =
     useFumadocsLoader(Route.useLoaderData());
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
   const { pathname } = useLocation();
@@ -210,6 +217,7 @@ function Page() {
             markdownUrl={markdownUrl}
             luaCompat={luaCompat}
             sourceUrl={sourceUrl}
+            reviewed={reviewed}
             Breadcrumb={Breadcrumb}
           />
         </Suspense>
