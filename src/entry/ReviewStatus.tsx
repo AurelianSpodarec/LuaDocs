@@ -56,7 +56,7 @@ export function ReviewStatus({ date, path }: { date?: string | null; path: strin
   const Icon = checked ? CircleCheck : CircleDashed;
 
   return (
-    <div data-reviewed={checked ? 'yes' : 'no'} className="not-prose mt-3 text-sm">
+    <div data-reviewed={checked ? 'yes' : 'no'} className="not-prose text-sm">
       <p className="flex items-start gap-2 text-fd-muted-foreground">
         <Icon
           aria-hidden

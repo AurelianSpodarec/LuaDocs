@@ -11,6 +11,10 @@ export const docs = defineDocs({
   dir: 'content/docs',
   docs: {
     async: true,
+    // Derived from git rather than authored. A hand-written date is wrong the moment
+    // someone edits the page and forgets it, which is exactly when a reader is most
+    // entitled to distrust it.
+    lastModified: true,
     schema: pageSchema.extend({
       /** Key into the compat dataset — the entry's single source of version facts. */
       'lua-compat': z.string().optional(),

@@ -24,6 +24,7 @@ import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
 import { ReviewStatus } from '@/entry/ReviewStatus';
+import { LastUpdated } from '@/entry/LastUpdated';
 import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
@@ -93,7 +94,9 @@ function Content({
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
 
-  const { toc } = use(page.load());
+  // `lastModified` rides with the loaded content rather than the frontmatter: it is
+  // derived at build time from git, not authored, so it is not part of the sync entry.
+  const { toc, lastModified } = use(page.load());
   const MDX = page.body;
   const node = compatNodeFor(luaCompat);
 
@@ -134,7 +137,12 @@ function Content({
       {sourceUrl && <EntrySource url={sourceUrl} />}
       {/* Provenance sits together: what the entry was rewritten from, and whether a
           person has since read it. */}
-      <ReviewStatus date={reviewed} path={path} />
+      {/* How vetted, and how old — two different questions, answered side by side.
+          The date sits right so it reads as a stamp rather than as a sentence. */}
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+        <ReviewStatus date={reviewed} path={path} />
+        <LastUpdated at={lastModified} />
+      </div>
     </DocsPage>
   );
 }
