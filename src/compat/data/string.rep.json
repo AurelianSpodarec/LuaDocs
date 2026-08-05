@@ -1,6 +1,6 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.2": "Takes an optional third argument, a separator placed between the copies; 5.1's signature is string.rep(s, n)."
+    "5.2": "Takes an optional third argument, a separator placed between the copies; 5.1's signature is `string.rep(s, n)`."
   }
 }

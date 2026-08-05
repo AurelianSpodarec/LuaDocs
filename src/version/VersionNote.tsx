@@ -1,6 +1,7 @@
 import { changeNoteFor, isAvailable } from '@/compat/resolve';
 import type { CompatNode } from '@/compat/schema';
 import { Callout } from '@/entry/Callout';
+import { renderChangeNote } from './changeNote';
 import { useSelectedVersion } from './SelectedVersionProvider';
 
 /**
@@ -38,7 +39,7 @@ export function VersionNote({ node }: { node: CompatNode }) {
   return (
     <Callout kind="changed">
       <span data-note="changed">
-        <strong>Changed in Lua {version}:</strong> {note}
+        <strong>Changed in Lua {version}:</strong> {renderChangeNote(note)}
       </span>
     </Callout>
   );
