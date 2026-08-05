@@ -1,6 +1,7 @@
 import { compatNodeSchema, type CompatNode } from './schema';
 import stringByte from './data/string.byte.json';
 import stringChar from './data/string.char.json';
+import stringDump from './data/string.dump.json';
 import stringFind from './data/string.find.json';
 import stringFormat from './data/string.format.json';
 import stringGmatch from './data/string.gmatch.json';
@@ -29,6 +30,7 @@ import mathTointeger from './data/math.tointeger.json';
 const raw: Record<string, unknown> = {
   'string.byte': stringByte,
   'string.char': stringChar,
+  'string.dump': stringDump,
   'string.find': stringFind,
   'string.format': stringFormat,
   'string.gmatch': stringGmatch,
