@@ -7,6 +7,7 @@ import stringFormat from './data/string.format.json';
 import stringGmatch from './data/string.gmatch.json';
 import stringLen from './data/string.len.json';
 import stringGsub from './data/string.gsub.json';
+import stringLibrary from './data/string.library.json';
 import stringMatch from './data/string.match.json';
 import stringLower from './data/string.lower.json';
 import stringPack from './data/string.pack.json';
@@ -35,6 +36,10 @@ const raw: Record<string, unknown> = {
   'string.format': stringFormat,
   'string.gmatch': stringGmatch,
   'string.len': stringLen,
+  // A section overview's own node. It describes the *library* — when the table
+  // appeared, and when its membership changed — never the union of its members'
+  // behaviour, which each member's node already carries.
+  'string.library': stringLibrary,
   'string.gsub': stringGsub,
   'string.lower': stringLower,
   'string.match': stringMatch,
