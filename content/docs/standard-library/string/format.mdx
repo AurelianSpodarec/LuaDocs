@@ -6,16 +6,85 @@ entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.format
 ---
 
-Builds a string by inserting values into a template, using the same directives as
-C's `printf`. The first argument is the template; every directive in it consumes one
-of the arguments that follow.
+Builds a string by inserting values into a template, using the same directives as C's
+`printf`. The first argument is the template; every directive in it consumes one of the
+arguments that follow.
 
-<RunnableExample code={`print(string.format("%s is %d years old", "Ada", 36))`} />
+<RunnableExample code={`local person_name = "Ada"\nlocal person_age = 36\nprint(string.format("%s is %d years old", person_name, person_age))\n-- Expected output: Ada is 36 years old`} />
 
-## Common directives
+## Syntax
 
-- `%s` — the value as a string
-- `%d` — an integer
-- `%f` — a float
-- `%q` — a value written so Lua can read it back
-- `%%` — a literal percent sign
+```lua
+string.format(formatstring, ···)
+```
+
+<Parameters>
+  <Param name="formatstring">The template — literal text with `%` directives embedded in it.</Param>
+  <Param name="···">One value per directive, in the order the directives appear. `%%` consumes nothing.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A copy of `formatstring` with every directive replaced by its formatted value.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a directive is not one Lua recognises, such as `%y`.
+- Raises `bad argument` when a value is missing, or is the wrong kind for its directive.
+- <Since v="5.3" /> Raises `number has no integer representation` when a float with a fractional part reaches an integer directive such as `%d`.
+
+</Errors>
+
+## Description
+
+Every directive begins with `%`, may carry flags, a width and a precision, and ends
+with a letter naming the conversion:
+
+- `%s` — the value as a string. A value that is not already a string is converted first, by the rules `tostring()` uses.
+- `%d`, `%i` — an integer, in decimal.
+- `%f` — a number, in fixed-point notation.
+- `%e`, `%E` — a number, in exponential notation, with a lower- or upper-case `e`.
+- `%g`, `%G` — a number, in whichever of the two above is shorter.
+- `%a`, `%A` — a number, as a hexadecimal float, which loses no precision.
+- `%x`, `%X` — an integer, in lower- or upper-case hexadecimal.
+- `%o` — an integer, in octal.
+- `%u` — an integer, read as unsigned.
+- `%c` — the character whose byte value the integer gives.
+- `%p` — the address behind a table, function, thread, string or userdata, which makes a unique identifier for it. Every other kind of value formats as a null pointer.
+- `%q` — a value written so that Lua can read it back.
+- `%%` — a literal `%`, consuming no argument.
+
+Flags and sizing follow C: `%5d` pads to five columns, `%-5d` pads on the right instead,
+and `%.3f` keeps three decimal places. The flags are `-`, `+`, `#`, `0` and a space; a
+width and a precision are two digits at most. C's length modifiers — `l`, `h`, `L`, `n`
+and the `*` placeholder — have no meaning here and are not accepted.
+
+<Note>
+`%q` writes a value Lua itself can read back, which makes it the directive to reach for
+when saving simple data as source code rather than as text. It covers strings, numbers,
+booleans and `nil`; floats come out in hexadecimal, so no precision is lost on the round
+trip. It is also the one directive that takes no flags, width or precision.
+</Note>
+
+## Examples
+
+### Padding and precision
+
+<RunnableExample code={`local item_count = 42\nprint(string.format("[%5d]", item_count))\nprint(string.format("[%-5d]", item_count))\nprint(string.format("%.3f", math.pi))\n-- Expected output:\n-- [   42]\n-- [42   ]\n-- 3.142`} />
+
+### Quoting a value so Lua can read it back
+
+<RunnableExample code={`local quoted_line = string.format("%q", 'she said "hello"')\nprint(quoted_line)\n-- Expected output: "she said \\"hello\\""`} />
+
+## Gotchas
+
+<Gotcha title="Integer directives reject fractional floats">
+`%d` needs a value with an exact integer representation. `string.format("%d", 3.0)`
+works, because 3.0 *is* 3 — but `string.format("%d", 3.5)` raises. Reach for `%g`, or
+round with `math.floor()`, whenever the value might be fractional.
+</Gotcha>
+
+## See also
+
+- [`string.rep()`](/docs/standard-library/string/rep) — repeating a string rather than filling a template
+- [`tostring()`](/docs/standard-library/globals/tostring) — the conversion `%s` performs
