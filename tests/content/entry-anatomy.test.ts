@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { CONTENT_TREE, sourceUrl, type Section } from '@/content-tree/manifest';
 import { listContentFiles, PLACEHOLDER } from '@/content-tree/scaffold';
+import { compatNodeFor } from '@/compat/registry';
 
 const DEST = 'content/docs';
 
@@ -34,6 +35,17 @@ function fieldOf(frontmatter: string, key: string): string | null {
 
 const functions = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') === 'function');
 
+/**
+ * The construct fork — Patterns and, later, `#`, `for`, the operators. It is the shape
+ * this slice invented, and it is deliberately *not* the function shape: pilot finding
+ * #4 records that a concept entry has no call to quote, so Syntax, Parameters and
+ * Return values are all absent by design and must not be required here.
+ */
+const constructs = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') === 'construct');
+
+/** Every entry that documents something, of either fork. */
+const entries = [...functions, ...constructs];
+
 /** Every entry's expected source URL, keyed the way `listContentFiles` reports paths. */
 const expectedSource = new Map<string, string>();
 (function collect(sections: Section[], prefix: string): void {
@@ -52,6 +64,9 @@ describe('the anatomy of a written entry', () => {
     // A guard that silently checks nothing is worse than no guard.
     expect(written.length).toBeGreaterThan(1);
     expect(functions.length).toBeGreaterThan(0);
+    // Every other assertion below used to filter to `function`, which left the fork
+    // this slice invented completely unguarded.
+    expect(constructs.length).toBeGreaterThan(0);
   });
 
   it('gives every function entry a Syntax section', () => {
@@ -70,6 +85,30 @@ describe('the anatomy of a written entry', () => {
   it('ends every function entry with a See also section', () => {
     for (const entry of functions) {
       expect(entry.body, entry.rel).toContain('## See also');
+    }
+  });
+
+  it('ends every construct entry with a See also section', () => {
+    // The only structural rule the construct fork shares with the function one. It
+    // deliberately has no Syntax, Parameters or Return values — see `constructs`.
+    for (const entry of constructs) {
+      expect(entry.body, entry.rel).toContain('## See also');
+    }
+  });
+
+  it('links every entry of either fork to a registered compat node', () => {
+    // Pilot finding #7: Patterns was authored from a stub whose frontmatter had no
+    // `lua-compat` key, and nothing would have said so — the entry would simply have
+    // rendered no support strip, no change note and no matrix, silently claiming to
+    // be version-invariant. A stub legitimately has no compat key, which is why this
+    // runs over written entries only.
+    for (const entry of entries) {
+      const key = fieldOf(entry.frontmatter, 'lua-compat');
+      expect(key, `${entry.rel} declares no lua-compat key`).not.toBeNull();
+      expect(
+        compatNodeFor(key),
+        `${entry.rel} declares lua-compat: ${key}, which no dataset is registered under`,
+      ).not.toBeNull();
     }
   });
 

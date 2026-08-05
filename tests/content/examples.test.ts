@@ -57,7 +57,13 @@ function boundNamesIn(code: string): string[] {
 
 describe('every example follows ADR 0008', () => {
   it('has examples to check at all', () => {
-    expect(examples.length).toBeGreaterThan(0);
+    // A concrete floor, not `> 0`. `EXAMPLE` is the single point of failure for the
+    // only guard on every runnable example in the tree: were it to stop being global,
+    // or to stop spanning newlines, it would still capture the first example in each
+    // file and this guard would still pass while checking a fraction of the content.
+    // The number is the four `string` entries the page-anatomy slice authored —
+    // format 3, gsub 4, len 1, Patterns 4 — and rises as entries are written.
+    expect(examples.length).toBeGreaterThanOrEqual(12);
   });
 
   it('spells its names out — no single-letter identifiers', () => {
