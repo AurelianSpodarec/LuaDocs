@@ -40,12 +40,12 @@ string.format(formatstring, ···)
 Every directive begins with `%`, may carry flags, a width and a precision, and ends
 with a letter naming the conversion:
 
-- `%s` — the value as a string. A value that is not already a string is converted first, by the rules `tostring()` uses.
+- `%s` — a string. A value that is not already one is converted first, by the rules `tostring()` uses.
 - `%d`, `%i` — an integer, in decimal.
 - `%f` — a number, in fixed-point notation.
 - `%e`, `%E` — a number, in exponential notation, with a lower- or upper-case `e`.
 - `%g`, `%G` — a number, in whichever of the two above is shorter.
-- `%a`, `%A` — a number, as a hexadecimal float, which loses no precision.
+- `%a`, `%A` — a number, as a hexadecimal float, with lower- or upper-case letters.
 - `%x`, `%X` — an integer, in lower- or upper-case hexadecimal.
 - `%o` — an integer, in octal.
 - `%u` — an integer, read as unsigned.
@@ -54,16 +54,16 @@ with a letter naming the conversion:
 - `%q` — a value written so that Lua can read it back.
 - `%%` — a literal `%`, consuming no argument.
 
-Flags and sizing follow C: `%5d` pads to five columns, `%-5d` pads on the right instead,
-and `%.3f` keeps three decimal places. The flags are `-`, `+`, `#`, `0` and a space; a
-width and a precision are two digits at most. C's length modifiers — `l`, `h`, `L`, `n`
-and the `*` placeholder — have no meaning here and are not accepted.
+Flags and sizing follow C, from a set Lua fixes: the flags are `-`, `+`, `#`, `0` and a
+space, and a width and a precision run to two digits at most. `%5d` pads to five
+columns, `%-5d` pads on the right instead, and `%.3f` keeps three decimal places. Those
+flags and the conversions listed above are the whole of what a directive may hold.
 
 <Note>
 `%q` writes a value Lua itself can read back, which makes it the directive to reach for
 when saving simple data as source code rather than as text. It covers strings, numbers,
 booleans and `nil`; floats come out in hexadecimal, so no precision is lost on the round
-trip. It is also the one directive that takes no flags, width or precision.
+trip. It takes no flags, width or precision of its own.
 </Note>
 
 ## Examples

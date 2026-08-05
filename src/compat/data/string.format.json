@@ -3,6 +3,6 @@
   "changed_in": {
     "5.2": "Adds %a/%A (hexadecimal float).",
     "5.3": "Integer directives require an integer representation or raise.",
-    "5.4": "%q handles more value kinds (floats, nil)."
+    "5.4": "Adds %p, extends %q to more value kinds (floats, nil), and caps width and precision at two digits."
   }
 }
