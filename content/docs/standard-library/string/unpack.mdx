@@ -33,7 +33,7 @@ string.unpack(fmt, s [, pos])
 <Errors>
 
 - Raises when `s` runs out before the format does.
-- Raises when `pos` is past the end of `s`.
+- Raises when `pos` is further out than one byte past the end of `s`.
 - Raises when the format holds an option that is not defined.
 - Raises when an option that needs a size is written without one, or when the size on `i`, `I`, `s` or `!` falls outside the range 1 to 16. `c` takes a size of any width.
 - Raises when an integer read from `s` is too large to become a Lua integer.
@@ -60,8 +60,15 @@ why the number is there rather than left to the caller to work out.
 `pos` starts the read anywhere in `s` rather than only at its beginning, so a single field
 can be pulled out of a record without reading the fields in front of it. A negative `pos`
 counts back from the end of `s` the way an index does
-[elsewhere in the library](/docs/standard-library/string/sub). A position past the end of
-`s` raises rather than returning nothing.
+[elsewhere in the library](/docs/standard-library/string/sub), and one landing before the
+string starts the read at its first byte.
+
+The far end is a byte looser than it looks. `pos` may sit one *past* the last byte — which
+is the position a call that consumed everything hands back — and reading nothing from there
+succeeds, returning that same position. Asking for a value there fails as a record too
+short for its format rather than as a bad position, which is the same failure as running
+out of bytes anywhere else. Only a `pos` further out than that is rejected as a position at
+all.
 
 `s` may hold more bytes than the format asks for; the extra bytes are simply left, and the
 returned index says where they begin. Too *few* bytes is an error rather than a short
