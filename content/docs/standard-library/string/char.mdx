@@ -40,15 +40,17 @@ given, and no value ever expands into more than one byte. `0` is an argument lik
 other, producing a string with a zero byte in it, which Lua carries around like any other
 byte rather than treating as the end of the string.
 
-The codes are whatever the platform assigns rather than something the language fixes, so
-writing one in by hand — `65` for `A`, say — relies on the machine rather than on Lua. What
-`string.char()` does guarantee is the round trip: whatever
-[`string.byte()`](/docs/standard-library/string/byte) took apart on a machine,
-`string.char()` puts back together on that same machine.
+Which byte a given number stands for is settled by the platform rather than by the
+language. What `string.char()` does promise is that it undoes
+[`string.byte()`](/docs/standard-library/string/byte): a string taken apart into numbers
+and handed straight back comes out unchanged, whatever those numbers happened to mean on
+that machine.
 
-It is also the ordinary way to put a byte into a string that is awkward to type at all.
-`string.char(9)` is a tab and `string.char(27)` the escape byte that opens a terminal
-control sequence, neither of which survives being typed literally into source.
+Reaching for it to put one known byte into a literal is not what it is for. Lua's string
+syntax already writes bytes directly — `"\t"` is a tab, and `"\27"` is any byte named by
+its decimal value — so `string.char(9)` produces nothing `"\t"` does not, only longer.
+`string.char()` earns its place when the number is *not* written down: held in a variable,
+read out of data, or computed.
 
 ## Examples
 
@@ -59,13 +61,16 @@ control sequence, neither of which survives being typed literally into source.
 `string.byte()` returns one value per byte, and those values land in `string.char()` as its
 whole argument list, so the two compose into a round trip with no loop between them.
 
-### Generating a run of characters
+### Turning escaped byte values back into text
 
-<RunnableExample code={`local letters = {}\nfor code = string.byte("a"), string.byte("e") do\n  letters[#letters + 1] = string.char(code)\nend\nprint(table.concat(letters))\n-- Expected output: abcde`} />
+<RunnableExample code={`local encoded_path = "caf%C3%A9%20au%20lait"\nlocal decoded_path = string.gsub(encoded_path, "%%(%x%x)", function(hex_digits)\n  return string.char(tonumber(hex_digits, 16))\nend)\nprint(decoded_path)\n-- Expected output: café au lait`} />
 
-### Inserting a byte that cannot be typed
-
-<RunnableExample code={`local heading = "name" .. string.char(9) .. "score"\nprint(heading)\n-- Expected output: name\tscore`} />
+Each `%C3` in that text is one byte written as two hexadecimal digits. `tonumber()` reads
+the digits and `string.char()` turns the number back into the byte — and the two that
+spell `é` are exactly the pair
+[`string.byte()`](/docs/standard-library/string/byte) would have produced from it. Every
+number reaching `string.char()` here is worked out while the program runs, from text it
+had not seen when it was written — which is the situation the function exists for.
 
 ## Gotchas
 
