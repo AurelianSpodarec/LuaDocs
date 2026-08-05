@@ -1,8 +1,75 @@
 ---
 title: string.rep()
-description: ""
+description: Build a string by repeating another one a given number of times.
+lua-compat: string.rep
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.rep
 ---
 
-{/* Not yet written. */}
+Builds a new string by writing a string out a given number of times, one copy after
+another. An optional separator goes *between* the copies.
+
+<RunnableExample code={`local progress_bar = string.rep("#", 7)\nprint("[" .. progress_bar .. "]")\n-- Expected output: [#######]`} />
+
+## Syntax
+
+```lua
+string.rep(s, n [, sep])
+```
+
+<Parameters>
+  <Param name="s">The string to repeat.</Param>
+  <Param name="n">How many copies to write.</Param>
+  <Param name="sep">Placed between one copy and the next. Omitted, the copies run together with nothing between them.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The copies of `s` joined end to end, with `sep` between each pair. The empty string when `n` is not positive.</Return>
+</Returns>
+
+## Description
+
+The separator is exactly that — it goes between copies and never after the last one, so
+`n` copies carry `n - 1` separators. One copy therefore has no separator anywhere in it,
+and the result of `string.rep("ab", 3, ", ")` is `ab, ab, ab` rather than `ab, ab, ab, `.
+
+A count that is not positive produces the empty string. Zero and every negative number
+behave alike, and neither raises — asking for no copies is a request the function
+answers rather than refuses, which is what lets a count computed at runtime pass straight
+in without being guarded first.
+
+<Warning>
+The result is built whole, in memory, in one go, and its size is the count multiplied by
+the length of what is being repeated. A count that arrives from user input, a file or a
+network message can therefore ask for a string far larger than the machine has room for,
+and there is no partial result to fall back on. Bound the count before it reaches the
+call.
+</Warning>
+
+## Examples
+
+### An underline as wide as what it underlines
+
+<RunnableExample code={`local heading = "Inventory"\nprint(heading)\nprint(string.rep("=", string.len(heading)))\n-- Expected output:\n-- Inventory\n-- =========`} />
+
+### A list of placeholders, separated
+
+<RunnableExample code={`local placeholders = string.rep("?", 4, ", ")\nprint("insert into orders values (" .. placeholders .. ")")\n-- Expected output: insert into orders values (?, ?, ?, ?)`} />
+
+The separator makes the difference between a run of `????` and a properly punctuated list,
+without a loop and without a trailing comma to strip off afterwards.
+
+## Gotchas
+
+<Gotcha title="It repeats one string, it does not join several">
+The separator makes `string.rep()` look like a join, and it is not one: every copy is the
+*same* string. Putting the elements of a list together, each one different, is
+[`table.concat()`](/docs/standard-library/table/concat) — reaching for `string.rep()`
+there means building the pieces separately and then still having to join them.
+</Gotcha>
+
+## See also
+
+- [`table.concat()`](/docs/standard-library/table/concat) — joining a list of different strings with a separator
+- [`string.format()`](/docs/standard-library/string/format) — filling a template rather than repeating one string
+- [`..` concatenation](/docs/language/expressions/concatenation) — joining two strings by hand

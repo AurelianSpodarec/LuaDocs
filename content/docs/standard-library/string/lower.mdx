@@ -1,8 +1,62 @@
 ---
 title: string.lower()
-description: ""
+description: Return a copy of a string with its uppercase letters lowercased.
+lua-compat: string.lower
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.lower
 ---
 
-{/* Not yet written. */}
+Returns a copy of a string in which every uppercase letter has been replaced by its
+lowercase form. Everything else — digits, punctuation, spaces, and letters already
+lowercase — comes back exactly as it went in.
+[`string.upper()`](/docs/standard-library/string/upper) does the same job in the other
+direction.
+
+<RunnableExample code={`local stored_tag = "Fiction"\nlocal search_term = "FICTION"\nprint(string.lower(stored_tag))\nprint(string.lower(stored_tag) == string.lower(search_term))\n-- Expected output:\n-- fiction\n-- true`} />
+
+## Syntax
+
+```lua
+string.lower(s)
+```
+
+<Parameters>
+  <Param name="s">The string to lowercase.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A new string, the same length as `s`, with its uppercase letters lowercased.</Return>
+</Returns>
+
+## Description
+
+Nothing is modified in place. A Lua string cannot be changed once it exists, so the only
+way to alter one is to build another, and that other string is what comes back — the name
+handed in still holds the original. Each letter that changes is replaced by a single
+letter, so the result is always exactly as long as the input.
+
+Which letters count as uppercase is not settled by the language. It follows the locale the
+program is running under, and [`os.setlocale()`](/docs/standard-library/os/setlocale) is
+what changes that.
+
+The common reason to reach for it is comparison. Lua compares strings byte for byte, so
+`"Fiction" == "FICTION"` is false; lowering both sides first asks the question the program
+usually means to ask. Lowering a value before storing it, so that later comparisons need
+no conversion at all, is the other half of the same idea.
+
+## Gotchas
+
+<Gotcha title="Accented letters are usually left alone">
+In the locale a Lua program starts in, only the twenty-six unaccented letters are
+recognised as having a case, so `("CAFÉ"):lower()` gives `cafÉ`. Nothing has gone wrong in
+the conversion — the bytes spelling `É` are simply not among the letters that locale knows
+about, and anything unrecognised is passed through untouched. Case-folding text beyond
+that alphabet needs a library that understands the encoding, which this function does not
+claim to be.
+</Gotcha>
+
+## See also
+
+- [`string.upper()`](/docs/standard-library/string/upper) — the same conversion, the other way
+- [`string.gsub()`](/docs/standard-library/string/gsub) — changing the case of only part of a string
+- [`os.setlocale()`](/docs/standard-library/os/setlocale) — what decides which letters have a case

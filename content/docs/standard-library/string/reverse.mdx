@@ -1,8 +1,56 @@
 ---
 title: string.reverse()
-description: ""
+description: Return a copy of a string with its bytes in the opposite order.
+lua-compat: string.reverse
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.reverse
 ---
 
-{/* Not yet written. */}
+Returns a copy of a string with its contents back to front — the last byte first, the
+first byte last.
+
+<RunnableExample code={`local word = "stressed"\nprint(string.reverse(word))\n-- Expected output: desserts`} />
+
+## Syntax
+
+```lua
+string.reverse(s)
+```
+
+<Parameters>
+  <Param name="s">The string to reverse.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A new string holding the bytes of `s` in the opposite order.</Return>
+</Returns>
+
+## Description
+
+The original is untouched, as it must be — a Lua string cannot be changed once it exists,
+so the reversed text is a second string and the name handed in still holds the first one.
+The result always has the same length, because reversing only reorders what is already
+there.
+
+Nothing is inspected along the way: every byte is simply moved, whatever it holds. That
+makes the operation its own inverse, so reversing twice gives back exactly the string you
+started with, and it makes the empty string and any one-byte string come back unchanged.
+Comparing a string against its own reversal is the whole of a palindrome test.
+
+## Gotchas
+
+<Gotcha title="A multi-byte character comes out scrambled">
+The reordering happens byte by byte, so a character encoded in more than one byte has its
+bytes separated and put back in the wrong order — the result is no longer that character,
+and frequently no longer valid text at all. Reversing `"café"` moves the two bytes of `é`
+apart and leaves them in the order `169`, `195`, which spells nothing. This is the same
+byte-versus-character split [`string.len()`](/docs/standard-library/string/len) counts on;
+reversing text safely means walking it a character at a time with
+[`utf8.codes()`](/docs/standard-library/utf8/codes) and rebuilding it, not moving bytes.
+</Gotcha>
+
+## See also
+
+- [`string.len()`](/docs/standard-library/string/len) — the byte count that reversing preserves
+- [`string.sub()`](/docs/standard-library/string/sub) — taking part of a string instead of reordering all of it
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — walking a string one character at a time
