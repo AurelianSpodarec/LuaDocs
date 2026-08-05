@@ -1,4 +1,5 @@
 import { citationFor, parseManualUrl } from './manualSource';
+import { sectionHeadingClass } from './pageToc';
 
 /**
  * The attribution line at the foot of an entry (ADR 0003 — the prose is a rewrite,
@@ -13,8 +14,8 @@ export function EntrySource({ url }: { url: string }) {
   if (!ref) return null;
 
   return (
-    <section id="source" className="not-prose mt-10 border-t pt-4">
-      <h2 className="mb-2 text-sm font-semibold text-fd-foreground">Source</h2>
+    <section id="source" className="not-prose mt-12 border-t pt-6">
+      <h2 className={sectionHeadingClass}>Source</h2>
       <p className="text-sm text-fd-muted-foreground">
         Rewritten from the{' '}
         <a

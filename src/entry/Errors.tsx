@@ -11,7 +11,12 @@ export function Errors({ children }: { children: ReactNode }) {
   return (
     <>
       <h3 className={subheadingClass}>Errors</h3>
-      <div className="text-sm [&_li]:mb-1 [&_ul]:list-disc [&_ul]:ps-5">{children}</div>
+      {/* Both list kinds. Preflight strips `list-style` and padding from `ul` and `ol`
+          alike, so an ordered list authored in here would render unmarked and flush
+          left — wrong, and silently so, with no error anywhere to say why. */}
+      <div className="text-sm [&_li]:mb-1 [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5">
+        {children}
+      </div>
     </>
   );
 }

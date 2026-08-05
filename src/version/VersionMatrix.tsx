@@ -1,5 +1,6 @@
 import { changeNoteFor, supportRow, varies } from '@/compat/resolve';
 import type { CompatNode } from '@/compat/schema';
+import { sectionHeadingClass } from '@/entry/pageToc';
 import { VersionChip, type ChipState } from './VersionChip';
 
 /** The word behind the colour. A row that only differs by hue says nothing. */
@@ -20,8 +21,8 @@ export function VersionMatrix({ node }: { node: CompatNode }) {
   if (!varies(node)) return null;
 
   return (
-    <section id="version-support" className="not-prose mt-10">
-      <h2 className="mb-3 text-xl font-semibold text-fd-foreground">Version support</h2>
+    <section id="version-support" className="not-prose mt-12">
+      <h2 className={sectionHeadingClass}>Version support</h2>
       <div className="overflow-x-auto rounded-xl border bg-fd-card">
         <table className="w-full text-sm">
           <thead className="border-b bg-fd-muted/50 text-fd-muted-foreground">
