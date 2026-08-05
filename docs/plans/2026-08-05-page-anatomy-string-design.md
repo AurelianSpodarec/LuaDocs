@@ -109,8 +109,14 @@ New feature folder `src/entry/`, following `src/version/`, `src/sidebar/`,
 CONTEXT.md calls it "a first-class callout" and "LuaDocs's signature callout"; a
 callout that looks like a Note is a Note.
 
-`<SeeAlso>` wraps a markdown list and renders its own heading, so the list stays
-markdown and the heading stays consistent.
+**Every H2 a reader sees is a real markdown heading** — `## Syntax`, `## Description`,
+`## Examples`, `## Gotchas`, `## See also`. None of them is a component, because the
+TOC is extracted from the MDX headings and a component's heading is invisible to it.
+Components handle only what sits *below* H2, which the H2-only TOC never lists anyway.
+
+That leaves the two route-rendered blocks with no TOC entry, so the route splices them
+in: `[...toc, 'Version support', 'Source']`. Without it the right rail claims the page
+ends at See also while two sections follow.
 
 **Syntax is a plain ` ```lua ` fence, not a component.** It is code, fumadocs already
 highlights fences at build time through `rehype-code`, and it would be the first
