@@ -16,7 +16,9 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | 1.5 | Content tree — the blueprint | [2026-08-04-content-tree.md](2026-08-04-content-tree.md) | Done |
 | 1.6 | Sidebar IA — order, grouping, labels | [2026-08-04-sidebar-ia.md](2026-08-04-sidebar-ia.md) | Done |
 | 2 | Page anatomy — piloted on `string` | [2026-08-05-page-anatomy-string.md](2026-08-05-page-anatomy-string.md) | Done |
-| 2.5 | Page anatomy — the rest of `string`, and the bespoke UI | — | Next |
+| 2.5 | `string` section — the remaining sixteen entries | [2026-08-05-string-section.md](2026-08-05-string-section.md) | Done |
+| 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Next |
+| 2.7 | The bespoke UI — replacing Fumadocs's chrome | — | Not started |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
 | 5 | Playground | [2026-08-05-playground.md](2026-08-05-playground.md) | Done |
@@ -234,3 +236,31 @@ the sidebar, search index and `llms.txt` first.
 - **Blog** — optional, explicitly deferred.
 - **Sentiment metric (👍/👎)** — parked; did not clear the "is this worth a backend?"
   bar (ADR 0004).
+
+## `string` is finished (2026-08-05)
+
+All twenty entries are authored: sixteen functions, two concepts (Patterns, Format
+strings for pack and unpack) and the section overview. It is the first complete section,
+and the proof that the template survives contact with a whole library rather than four
+hand-picked entries.
+
+What the section cost, and what it bought:
+
+- **Twenty entries needed 6, 5, 9, 11 and more corrections against the manuals**, several
+  of them flatly false rather than stylistic. [ADR 0010](../adr/0010-entries-are-written-from-the-manual.md)
+  is the rule that catches them and the evidence for why it exists.
+- **Three template forks now have a built example**, not just a specification: the
+  function fork, the concept fork (findings #4, #9) and the overview fork (#9, #10).
+  `table` and `math` follow these rather than the original spec lines, which carry
+  in-place amendments saying so.
+- **Five guards** now hold the section: entry anatomy, ADR 0008's mechanical example
+  rules, every example executed against its expected output, an overview's index against
+  its directory, and change notes against unbalanced markup.
+
+Two things the section surfaced that are **not** content problems and are owed elsewhere:
+
+- **The index and See-also lists make no per-entry version claim.** The sidebar dims an
+  entry the selected version does not have; a link in an overview's body does not. The
+  route already loads the map that would fix it. Slice 3 or the version-filter work.
+- **`math.tointeger` is an unwritten stub no slice claims.** It was reverted during the
+  anatomy pilot rather than authored, and `math`'s own slice should pick it up.
