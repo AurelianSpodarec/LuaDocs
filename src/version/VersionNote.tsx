@@ -24,19 +24,27 @@ export function VersionUnavailable({ node }: { node: CompatNode }) {
   const added = node.support.lua.version_added;
 
   return (
-    <Callout kind="unavailable">
-      <span data-note="unavailable">
-        {/* Subject-free on purpose. Building the sentence from the entry's title read
-            "Format strings for pack and unpack was introduced in Lua 5.3" — the verb
-            cannot agree with a title it does not know the number of, and the title is
-            directly above the callout anyway. */}
-        <strong>Not in Lua {version}.</strong>{' '}
-        {added === false
-          ? 'Not part of any documented Lua version.'
-          : `Introduced in Lua ${added}.`}{' '}
-        Everything below describes it as it exists from then on.
-      </span>
-    </Callout>
+    /* Sticky, not merely first. Moving it to the top only helps a reader who has not
+       scrolled — and an entry a reader cannot use is a fact that stays true all the way
+       down, past the syntax, the parameters and every example. Pinned under the header,
+       it cannot be read once and left behind.
+       `bg-fd-background` is load-bearing: a translucent callout would let the entry
+       scroll visibly through the thing contradicting it. */
+    <div className="sticky top-(--fd-header-height) z-10 -mx-1 bg-fd-background px-1">
+      <Callout kind="unavailable">
+        <span data-note="unavailable">
+          {/* Subject-free on purpose. Building the sentence from the entry's title read
+              "Format strings for pack and unpack was introduced in Lua 5.3" — the verb
+              cannot agree with a title it does not know the number of, and the title is
+              directly above the callout anyway. */}
+          <strong>Not in Lua {version}.</strong>{' '}
+          {added === false
+            ? 'Not part of any documented Lua version.'
+            : `Introduced in Lua ${added}.`}{' '}
+          Everything below describes it as it exists from then on.
+        </span>
+      </Callout>
+    </div>
   );
 }
 
