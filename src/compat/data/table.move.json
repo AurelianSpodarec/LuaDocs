@@ -1,0 +1,3 @@
+{
+  "support": { "lua": { "version_added": "5.3" } }
+}

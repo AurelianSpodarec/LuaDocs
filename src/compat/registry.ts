@@ -22,8 +22,11 @@ import stringUpper from './data/string.upper.json';
 import utf8Library from './data/utf8.library.json';
 import tableConcat from './data/table.concat.json';
 import tableInsert from './data/table.insert.json';
+import tableMove from './data/table.move.json';
+import tablePack from './data/table.pack.json';
 import tableRemove from './data/table.remove.json';
 import tableSort from './data/table.sort.json';
+import tableUnpack from './data/table.unpack.json';
 import mathTointeger from './data/math.tointeger.json';
 
 /**
@@ -64,8 +67,11 @@ const raw: Record<string, unknown> = {
   'utf8.library': utf8Library,
   'table.concat': tableConcat,
   'table.insert': tableInsert,
+  'table.move': tableMove,
+  'table.pack': tablePack,
   'table.remove': tableRemove,
   'table.sort': tableSort,
+  'table.unpack': tableUnpack,
   'math.tointeger': mathTointeger,
 };
 

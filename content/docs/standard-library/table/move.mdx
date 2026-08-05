@@ -1,8 +1,127 @@
 ---
 title: table.move()
-description: ""
+description: Copy a run of elements to another position, within one list or between two.
+lua-compat: table.move
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.move
 ---
 
-{/* Not yet written. */}
+Writes a run of a list's elements into another position — somewhere else in the same list,
+or into a second list altogether. What arrives is a copy: the run is read, never emptied,
+and the destination is handed back.
+
+<RunnableExample code={`local weekdays = {"mon", "tue", "wed", "thu", "fri"}\nlocal first_half = table.move(weekdays, 1, 3, 1, {})\nprint(table.concat(first_half, ", "))\n-- Expected output: mon, tue, wed`} />
+
+## Syntax
+
+```lua
+table.move(a1, f, e, t [, a2])
+```
+
+<Parameters>
+  <Param name="a1">The list to read the run from.</Param>
+  <Param name="f">The first position of the run.</Param>
+  <Param name="e">The last position of the run. Both ends are included.</Param>
+  <Param name="t">The position in the destination the run is written at.</Param>
+  <Param name="a2">The list to write into. Omitted, it is `a1`, and the run moves within one list.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The destination — `a2` when it was given, and `a1` when it was not. It is the very table that was passed in, changed where it stands, and never a copy of it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `a1` or `a2` is a value that cannot be indexed as a table.
+- Raises when the run holds more elements than an integer can count.
+- Raises when writing the run would carry a destination position past the largest integer there is.
+
+</Errors>
+
+## Description
+
+The run is the positions `f` to `e`, both ends included, and it lands at `t` upwards:
+`f` goes to `t`, `f + 1` to `t + 1`, and so on to `e`. The run keeps its length, so
+`e - f + 1` positions are written and no others.
+
+Nothing leaves the source. The elements are read and written elsewhere, and `a1` comes
+away holding everything it held before — unless the destination *is* `a1`, in which case
+the positions the run lands on are overwritten like any other. That is the only way this
+function removes anything.
+
+Source and destination may overlap, and the result is what reading the whole run before
+writing any of it would give. No element is overwritten before it has been read, whichever
+direction the run is travelling, so shifting a stretch of a list along by one place is a
+single call and needs no temporary in between.
+
+When `e` is before `f` the run is empty and nothing at all is written. The destination is
+handed back exactly as it arrived, so a run worked out from data that turns out to be
+empty needs no guard around the call.
+
+The destination is written at the run's positions and nowhere else. Whatever sat past them
+stays where it is, so writing a short run over a longer list leaves the longer list's tail
+in place rather than truncating it. Going the other way, reading past the end of `a1` is
+not an error either: those positions hold nothing, nothing is what gets written, and the
+matching destination positions are emptied.
+
+Every position here is given rather than worked out — there is no default measured with
+`#a1`, which sets this function apart from the rest of the library. The
+[caveats of the length operator](/docs/language/expressions/length-operator) reach it only
+through a `#` the caller writes into the arguments, and a run named by plain numbers is
+unaffected by a gap in the list.
+
+Only numbered positions take part. Named fields stored beside them are neither read nor
+written, so a list that doubles as a record keeps its record half at both ends of the
+move. The reads and writes go through the tables' metamethods rather than around them, so
+a table standing in for another can be either end of one.
+
+## Examples
+
+### Copying a list before rearranging it
+
+<RunnableExample code={`local arrival_order = {"carol", "alice", "bob"}\nlocal alphabetical = table.move(arrival_order, 1, #arrival_order, 1, {})\ntable.sort(alphabetical)\nprint(table.concat(arrival_order, ", "))\nprint(table.concat(alphabetical, ", "))\n-- Expected output:\n-- carol, alice, bob\n-- alice, bob, carol`} />
+
+An empty table as the destination makes the call a copy, and the call returns it, so the
+copy and the sort read as one thought. [`table.sort()`](/docs/standard-library/table/sort)
+then rearranges the copy and leaves the order the names arrived in alone.
+
+### Appending one list onto another
+
+<RunnableExample code={`local morning_tasks = {"wash", "iron"}\nlocal evening_tasks = {"fold", "sort"}\ntable.move(evening_tasks, 1, #evening_tasks, #morning_tasks + 1, morning_tasks)\nprint(table.concat(morning_tasks, ", "))\n-- Expected output: wash, iron, fold, sort`} />
+
+`#morning_tasks + 1` is the first position past the end of the first list, which is where
+the second one has to start. Joining two lists is one call rather than a loop of
+[`table.insert()`](/docs/standard-library/table/insert) calls.
+
+### Shifting a run along inside one list
+
+<RunnableExample code={`local waiting_line = {"alice", "bob", "carol", "dave"}\ntable.move(waiting_line, 2, 4, 1)\nwaiting_line[4] = nil\nprint(table.concat(waiting_line, ", "))\n-- Expected output: bob, carol, dave`} />
+
+Leaving `a2` out moves the run within `waiting_line` itself, and the source and
+destination ranges overlap on positions 2 and 3 without either losing anything. The list
+is not shortened by the move, so the copy left behind at the end is cleared separately.
+
+## Gotchas
+
+<Gotcha title="It copies — the source keeps everything">
+The name says move and the behaviour is a copy: after
+`table.move(ingredients, 1, 2, 1, {})` the two elements are in the new table *and* still
+in `ingredients`. Only a move whose destination is the source list disturbs anything, and
+even then it disturbs the positions written to, never the positions read from. Where the
+source really has to give the elements up, clear them afterwards.
+</Gotcha>
+
+<Gotcha title="The destination is never shortened to fit">
+Only the run's own positions are written, so a destination that was longer keeps its tail:
+moving one element into `{"butter", "sugar"}` at position 1 leaves `sugar` at position 2
+and a two-element list behind. A call meant to replace a list's contents rather than
+overwrite its front has to empty the destination first, or start from a new table.
+</Gotcha>
+
+## See also
+
+- [`table.insert()`](/docs/standard-library/table/insert) — placing one value and shifting the rest along, rather than writing a whole run
+- [`table.remove()`](/docs/standard-library/table/remove) — taking one element out and closing the gap behind it
+- [`table.unpack()`](/docs/standard-library/table/unpack) — reading the same kind of run out as separate values instead
+- [`table.concat()`](/docs/standard-library/table/concat) — reading a run out as a single string instead
+- [The length operator](/docs/language/expressions/length-operator) — what a `#` written into the arguments is measured with

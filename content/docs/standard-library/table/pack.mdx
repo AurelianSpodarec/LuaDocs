@@ -1,8 +1,108 @@
 ---
 title: table.pack()
-description: ""
+description: Collect every argument into a new table, with a count that survives the nils.
+lua-compat: table.pack
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-table.pack
 ---
 
-{/* Not yet written. */}
+Gathers the values it is called with into a new table, at positions `1` upwards, and
+records how many there were in a field named `n`. That count is the point of the
+function: it is right even when some of the values were `nil`.
+
+<RunnableExample code={`local measurements = table.pack(3.5, 1.2, 4.8)\nprint(measurements.n)\nprint(measurements[1])\n-- Expected output:\n-- 3\n-- 3.5`} />
+
+## Syntax
+
+```lua
+table.pack(···)
+```
+
+<Parameters>
+  <Param name="···">Every value to collect, in order. Any number of them, of any type, `nil` included.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">A new table holding the values at `1` upwards, with the number of them in a field named `n`.</Return>
+</Returns>
+
+## Description
+
+Every value handed in is counted, and `n` is that count. Nothing is inferred from what
+arrived: a call carrying three values produces `n` of `3` whether or not any of the three
+was `nil`, and a call carrying none produces `n` of `0`.
+
+The values go to positions `1` through `n`, each at the place it was given in. A value
+that was `nil` leaves its position holding nothing, because storing `nil` at a position is
+how a position is emptied — which is exactly why the count cannot be recovered from the
+table afterwards and has to be carried beside it.
+
+So the table that comes back is not necessarily a list. A `nil` anywhere but at the end
+leaves a gap in the run of positions, and the
+[length operator](/docs/language/expressions/length-operator) has more than one answer on
+a table like that. Reading `n` is the way to ask how many values there were; reading
+`#` is a different question with a different answer.
+
+That is the whole difference from writing `{...}`. A table constructor fills the same
+positions and stops there, leaving the count to be worked out from the table — which is
+the one thing a `nil` among the values makes impossible. `table.pack()` is the constructor
+plus the count.
+
+The table is built fresh on every call and holds nothing beyond the positions and `n`. It
+is not connected to anything the caller already had, so changing it changes nothing else.
+
+`n` is an ordinary field, and nothing keeps it in step once the call has returned. Storing
+at a position past `n` does not raise it, and removing an element does not lower it. A
+table used as a counted collection is maintained by the code that holds it, or built again
+by another call.
+
+## Examples
+
+### Counting the arguments a function was given
+
+<RunnableExample code={`local function report_arguments(...)\n  local given = table.pack(...)\n  print("received " .. given.n)\nend\nreport_arguments("cocoa", "flour")\nreport_arguments()\nreport_arguments(nil, nil)\n-- Expected output:\n-- received 2\n-- received 0\n-- received 2`} />
+
+The last call is the one that matters. Two `nil` arguments are still two arguments, and
+`n` is the only part of the result that says so.
+
+### Keeping every result of a call that may return nothing
+
+<RunnableExample code={`local results = table.pack(pcall(function() return nil, "flour" end))\nprint(results.n)\nprint(tostring(results[2]))\nprint(results[3])\n-- Expected output:\n-- 3\n-- nil\n-- flour`} />
+
+[`pcall()`](/docs/standard-library/globals/pcall) hands back a success flag followed by
+whatever the function returned, and here the first of those returned values is `nil`.
+Collecting the lot with `table.pack()` keeps the shape of the call: three values, the
+middle one empty.
+
+### The count and the length are different questions
+
+<RunnableExample code={`local packed_readings = table.pack(18, 24, nil)\nprint(packed_readings.n)\nprint(#packed_readings)\n-- Expected output:\n-- 3\n-- 2`} />
+
+Three values went in, so `n` is `3`. The third position holds nothing, so the length
+operator stops at `2`. Both answers are correct about different things.
+
+## Gotchas
+
+<Gotcha title="`n` is a field, not a length">
+`packed.n` and `#packed` ask different questions and routinely disagree. `n` is what the
+call was given; `#` is where the run of stored positions ends, and a `nil` among the
+values moves that somewhere else — or leaves it with no single answer at all, when the gap
+is in the middle. Code that iterates a packed table counts `1` to `packed.n`, never `1` to
+`#packed`.
+</Gotcha>
+
+<Gotcha title="The count does not follow the table">
+`n` is written once and then left alone. Appending with
+[`table.insert()`](/docs/standard-library/table/insert) puts the value after the last
+*stored* element and does not touch `n`, so the two can fall out of step in either
+direction and nothing will say so. A packed table is best treated as the finished record
+of one call rather than as a collection to keep adding to.
+</Gotcha>
+
+## See also
+
+- [`table.unpack()`](/docs/standard-library/table/unpack) — the near-inverse, and where `n` is handed back as the run to read
+- [`select()`](/docs/standard-library/globals/select) — counting or reaching into a run of arguments without building a table
+- [`table.insert()`](/docs/standard-library/table/insert) — building a list up one value at a time, where a `nil` cannot be stored
+- [Varargs](/docs/language/expressions/varargs) — the `···` this collects
+- [The length operator](/docs/language/expressions/length-operator) — the question `n` is deliberately not an answer to
