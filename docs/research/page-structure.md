@@ -41,6 +41,14 @@ Top to bottom:
     alphabetical/simple-first within a group.
 11. **Source** — attribution link to the original manual entry.
 
+> **Amendment, 2026-08-05 — 9 and 10 are swapped.** See also comes last in the
+> authored body; the matrix and Source render after it. Both are derived — the matrix
+> entirely from the compat node, Source from `source` frontmatter — so grouping them
+> below everything authored is what keeps them out of an author's hands. The
+> alternative was a `<VersionMatrix />` placed by hand in all 292 entries, which is
+> data pretending to be prose and a thing to forget. See
+> [the page-anatomy design](../plans/2026-08-05-page-anatomy-string-design.md).
+
 Plus a right-rail **"In this article" TOC** — flat, H2-only, sticky on desktop and
 collapsing to the top on mobile.
 
