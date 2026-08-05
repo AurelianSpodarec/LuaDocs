@@ -1,8 +1,139 @@
 ---
 title: string.dump()
-description: ""
+description: Turn a Lua function into a binary chunk that can be loaded back.
+lua-compat: string.dump
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-string.dump
 ---
 
-{/* Not yet written. */}
+Hands back the compiled form of a function — a *binary chunk* — as an ordinary Lua string.
+Nothing in the library reads it: it is written for
+[`load()`](/docs/standard-library/globals/load), which turns it back into a callable
+function. It is the one `string` function that takes code rather than text, and the reason
+to reach for it is to put a function somewhere a function cannot go — a file, a cache, a
+message.
+
+<RunnableExample code={`local function shipping_cost(weight_grams)\n  return 4.5 + weight_grams * 0.002\nend\n\nlocal compiled = string.dump(shipping_cost)\nlocal restored = load(compiled)\nprint(type(compiled))\nprint(restored(1500))\n-- Expected output:\n-- string\n-- 7.5`} />
+
+## Syntax
+
+```lua
+string.dump(function [, strip])
+```
+
+<Parameters>
+  <Param name="function">The Lua function to compile. It must be written in Lua rather than in C.</Param>
+  <Param name="strip">When true, debug information may be left out of the chunk to save space. Omitted, everything is kept.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">A binary chunk holding the compiled function.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the value given is not a function.
+- Raises `unable to dump given function` when the function was written in C rather than in Lua.
+
+</Errors>
+
+## Description
+
+The result is a Lua string like any other — it can be measured, concatenated, kept in a
+table or written to a file — but it is a run of bytes with no text in it. It opens with a
+fixed signature, an escape byte followed by the letters `Lua`, which is what a loader
+looks at to tell a compiled chunk from source text.
+
+<RunnableExample code={`local function greet_customer(name)\n  return "hello, " .. name\nend\n\nlocal compiled = string.dump(greet_customer)\nprint(string.byte(compiled, 1, 4))\n-- Expected output: 27\t76\t117\t97`} />
+
+Reading it back is [`load()`](/docs/standard-library/globals/load), which accepts source
+text and binary chunks alike and decides between them by looking. Its `mode` argument
+narrows that: `"t"` for text only, `"b"` for binary only, `"bt"` — the default — for
+either. What comes back is a *copy* of the function, not the function itself; loading the
+same chunk twice gives two independent functions.
+
+A chunk records how many upvalues the function has and nothing about what they held. On
+reload they come back fresh, and `load()` fills them: the first gets the environment —
+the `env` argument if one was passed, otherwise the globals table — and the rest get
+`nil`. So a closure over a counter, a cache or a configuration table comes back having
+lost the value it closed over, and the original keeps its own copy untouched.
+
+<RunnableExample code={`local order_count = 0\nlocal function record_order()\n  order_count = order_count + 1\n  return order_count\nend\n\nprint(record_order())\nlocal restored_recorder = load(string.dump(record_order))\nlocal upvalue_name, upvalue_value = debug.getupvalue(restored_recorder, 1)\nprint(upvalue_name, type(upvalue_value))\nprint(order_count)\n-- Expected output:\n-- 1\n-- order_count\ttable\n-- 1`} />
+
+The copy still knows the upvalue is called `order_count`; what it holds is the globals
+table that `load()` put there, because it happened to be first in the list. Carrying the
+values across is a separate job, and
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) and
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) are what it is done with.
+
+`strip` asks for a smaller chunk in exchange for debug information. Exactly how much goes
+is not promised — only that some of it *may* be left out — so what survives is an
+implementation matter rather than a contract. What goes first is the material that names
+things: the chunk's source name, and the names of parameters and locals. A stripped
+function still runs identically.
+
+<RunnableExample code={`local function total_price(unit_price, quantity)\n  return unit_price * quantity\nend\n\nlocal full_chunk = string.dump(total_price)\nlocal stripped_chunk = string.dump(total_price, true)\nprint(#stripped_chunk < #full_chunk)\nprint(load(stripped_chunk)(2.5, 4))\nprint(debug.getinfo(load(stripped_chunk), "S").short_src)\nprint(debug.getlocal(load(full_chunk), 1))\n-- Expected output:\n-- true\n-- 10.0\n-- ?\n-- unit_price`} />
+
+Every one of those names is stored in the chunk as a string, so how much is saved depends
+on how many the function carried. The cost is paid later, and by somebody else: a
+traceback through a stripped function has no source and no position to report, and an
+error raised inside one arrives with no idea where it came from. Strip a chunk you are
+shipping; keep a whole one for anything you expect to debug.
+
+<Warning>
+A binary chunk belongs to the Lua that produced it. The internal representation of a
+compiled chunk is free to change between Lua versions, and chunks are not compatible
+across them, so one stored today is readable only by the version that wrote it — there is
+no forward or backward guarantee and no version negotiation to fall back on. Keep the
+source alongside anything you cache.
+
+Loading one is a separate hazard. Lua does not check that a binary chunk is internally
+consistent, and a crafted one can crash the interpreter — unlike source text, which can
+only ever fail to compile. `load()` accepts binary chunks by default, so code that loads
+input from a file, a socket or a user must pass `"t"` to refuse them.
+</Warning>
+
+## Examples
+
+### Compiling once and loading twice
+
+<RunnableExample code={`local function apply_discount(price, percent_off)\n  return price - price * percent_off / 100\nend\n\nlocal cached_chunk = string.dump(apply_discount, true)\nlocal first_copy = load(cached_chunk)\nlocal second_copy = load(cached_chunk)\nprint(first_copy(200, 10))\nprint(second_copy(200, 25))\nprint(first_copy == second_copy)\n-- Expected output:\n-- 180.0\n-- 150.0\n-- false`} />
+
+Compiling is done once and the chunk is reused, which is the whole reason to keep one. The
+two copies behave the same and are separate values, so giving one away does not hand over
+the other.
+
+### Refusing a binary chunk that arrived from elsewhere
+
+<RunnableExample code={`local function format_receipt(total)\n  return "total: " .. total\nend\n\nlocal incoming_chunk = string.dump(format_receipt)\nlocal text_only, refusal = load(incoming_chunk, "receipt", "t")\nprint(text_only)\nprint(refusal)\nprint(load(incoming_chunk, "receipt", "b")(12.5))\n-- Expected output:\n-- nil\n-- attempt to load a binary chunk (mode is 't')\n-- total: 12.5`} />
+
+The `mode` argument is the switch: `"t"` declines the chunk without running any of it,
+`"b"` insists on one. Deciding which of the two you are loading, rather than letting the
+loader decide, is the difference between running code you compiled and running bytes
+somebody sent you.
+
+## Gotchas
+
+<Gotcha title="Only a function written in Lua can be dumped">
+There is no compiled form to hand back for a function implemented in C — every function
+the standard library provides, and every function a host program installs. The call raises
+rather than returning `nil`, so a program that dumps whatever it is given needs
+[`pcall()`](/docs/standard-library/globals/pcall) around it.
+
+<RunnableExample code={`local dump_succeeded, dump_error = pcall(string.dump, string.format)\nprint(dump_succeeded)\nprint(dump_error)\n-- Expected output:\n-- false\n-- unable to dump given function`} />
+</Gotcha>
+
+<Gotcha title="Anything but nil and false strips">
+`strip` is read as a truth value, not as a flag that has to be `true`, and in Lua only
+`nil` and `false` are false. `0` and `""` therefore both strip, which is the opposite of
+what someone writing `string.dump(handler, 0)` from a C habit intends.
+
+<RunnableExample code={`local function label_order(order_id)\n  return "order " .. order_id\nend\n\nprint(#string.dump(label_order, 0) < #string.dump(label_order, false))\nprint(#string.dump(label_order, nil) == #string.dump(label_order))\n-- Expected output:\n-- true\n-- true`} />
+</Gotcha>
+
+## See also
+
+- [`load()`](/docs/standard-library/globals/load) — turning the chunk back into a function, and refusing binary chunks
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — restoring the upvalues a chunk does not carry
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — the debug information `strip` leaves out
+- [`string.pack()`](/docs/standard-library/string/pack) — producing bytes from values rather than from code
