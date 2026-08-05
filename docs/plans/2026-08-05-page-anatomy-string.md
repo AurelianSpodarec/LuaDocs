@@ -1854,6 +1854,10 @@ const SHADOWED = [
 
 const EXAMPLE = /<RunnableExample\s+code=\{`([\s\S]*?)`\}/g;
 const LOCAL = /\blocal\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)/g;
+// ADR 0008 rule 1 says "including loop variables", and `for index, item in ...` binds
+// names no `local` ever mentions. Checking locals alone would let `for i, v` through —
+// the single most common place a one-letter name appears in Lua.
+const LOOP = /\bfor\s+([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*(?:=|\bin\b)/g;
 
 interface Example {
   rel: string;
@@ -1873,11 +1877,14 @@ for (const rel of await listContentFiles(DEST)) {
   }
 }
 
-/** Every name bound by a `local` in this example, including `local first, second`. */
-function localsIn(code: string): string[] {
-  return [...code.matchAll(LOCAL)].flatMap((match) =>
-    match[1].split(',').map((name) => name.trim()),
-  );
+/** Every name this example binds — by `local`, or as a `for` loop variable. */
+function boundNamesIn(code: string): string[] {
+  const names = (pattern: RegExp) =>
+    [...code.matchAll(pattern)].flatMap((match) =>
+      match[1].split(',').map((name) => name.trim()),
+    );
+
+  return [...names(LOCAL), ...names(LOOP)];
 }
 
 describe('every example follows ADR 0008', () => {
@@ -1887,14 +1894,21 @@ describe('every example follows ADR 0008', () => {
 
   it('spells its names out — no single-letter identifiers', () => {
     for (const example of examples) {
-      const short = localsIn(example.code).filter((name) => name.replace(/_/g, '').length < 2);
+      const short = boundNamesIn(example.code).filter((name) => name.replace(/_/g, '').length < 2);
       expect(short, example.rel).toEqual([]);
     }
   });
 
+  it('catches a one-letter loop variable, not only a one-letter local', () => {
+    // The rule's most common violation is `for i, v in ipairs(t)`, which binds nothing
+    // with `local`. Pinning it here means the LOOP pattern cannot quietly rot.
+    expect(boundNamesIn('for index, item in ipairs(list) do end')).toContain('index');
+    expect(boundNamesIn('for i = 1, 10 do end')).toEqual(['i']);
+  });
+
   it('never binds over a name the standard library defines', () => {
     for (const example of examples) {
-      const shadowed = localsIn(example.code).filter((name) => SHADOWED.includes(name));
+      const shadowed = boundNamesIn(example.code).filter((name) => SHADOWED.includes(name));
       expect(shadowed, example.rel).toEqual([]);
     }
   });
