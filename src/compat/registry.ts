@@ -8,6 +8,7 @@ import stringLower from './data/string.lower.json';
 import stringPatterns from './data/string.patterns.json';
 import stringRep from './data/string.rep.json';
 import stringReverse from './data/string.reverse.json';
+import stringSub from './data/string.sub.json';
 import stringUpper from './data/string.upper.json';
 import mathTointeger from './data/math.tointeger.json';
 
@@ -28,6 +29,7 @@ const raw: Record<string, unknown> = {
   'string.patterns': stringPatterns,
   'string.rep': stringRep,
   'string.reverse': stringReverse,
+  'string.sub': stringSub,
   'string.upper': stringUpper,
   'math.tointeger': mathTointeger,
 };
