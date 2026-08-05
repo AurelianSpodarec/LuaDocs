@@ -23,6 +23,7 @@ import { compatNodeFor } from '@/compat/registry';
 import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
+import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionNote } from '@/version/VersionNote';
@@ -99,7 +100,9 @@ function Content({
     ...(node && varies(node)
       ? [{ title: 'Version support', url: '#version-support', depth: 2 }]
       : []),
-    ...(sourceUrl ? [{ title: 'Source', url: '#source', depth: 2 }] : []),
+    ...(sourceUrl && parseManualUrl(sourceUrl)
+      ? [{ title: 'Source', url: '#source', depth: 2 }]
+      : []),
   ];
 
   return (
