@@ -110,10 +110,8 @@ parentheses to keep the first value only.
 <Gotcha title="A per cent sign in the replacement has to be doubled">
 `%` is the escape character on the replacement side too, so a lone one never reaches the
 result: `string.gsub("discount: PENDING", "PENDING", "20%")` does not produce `20%`.
-It raises <Since v="5.2" /> `invalid use of '%' in replacement string`; before that it was
-swallowed silently, which is worse. Doubling it works everywhere — `"20%%"` gives
-`discount: 20%`. The trap is that a replacement is exactly where a percentage is likeliest
-to appear.
+Doubling it works everywhere — `"20%%"` gives `discount: 20%`. The trap is that a
+replacement is exactly where a percentage is likeliest to appear.
 </Gotcha>
 
 ## See also
