@@ -1,7 +1,7 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.2": "Dumps a function that has upvalues; 5.1 documents that the function must have none, and reloads the chunk with loadstring rather than load.",
+    "5.2": "Dumps a function that has upvalues, and the chunk is read back by load; 5.1 requires a function without upvalues, and its chunk is read back by loadstring.",
     "5.3": "Takes an optional second argument, strip, asking for a chunk without all of its debug information; 5.2's signature is string.dump(function)."
   }
 }

@@ -23,7 +23,7 @@ string.dump(function [, strip])
 
 <Parameters>
   <Param name="function">The Lua function to compile. It must be written in Lua rather than in C.</Param>
-  <Param name="strip">When true, debug information may be left out of the chunk to save space. Omitted, everything is kept.</Param>
+  <Param name="strip">Anything other than `nil` or `false` asks for a chunk that may leave some debug information out, to save space. Omitted, everything is kept.</Param>
 </Parameters>
 
 <Returns>
@@ -40,11 +40,17 @@ string.dump(function [, strip])
 ## Description
 
 The result is a Lua string like any other — it can be measured, concatenated, kept in a
-table or written to a file — but it is a run of bytes with no text in it. It opens with a
-fixed signature, an escape byte followed by the letters `Lua`, which is what a loader
-looks at to tell a compiled chunk from source text.
+table or written to a file. It is not text: most of it is byte values with no printable
+character behind them, and it begins with an escape byte, which is the one byte a loader
+consults to tell a compiled chunk from source. The three that follow spell `Lua` and are
+checked when the chunk is read rather than when it is recognised.
 
-<RunnableExample code={`local function greet_customer(name)\n  return "hello, " .. name\nend\n\nlocal compiled = string.dump(greet_customer)\nprint(string.byte(compiled, 1, 4))\n-- Expected output: 27\t76\t117\t97`} />
+None of that hides anything. Every string constant the function used sits in the chunk
+exactly as it was written, and the names of the function, its parameters and its locals
+are there beside them until `strip` removes them — the literals stay even then, because
+the function needs them to run.
+
+<RunnableExample code={`local function greet_customer(name)\n  return "hello, " .. name\nend\n\nlocal compiled = string.dump(greet_customer)\nprint(string.byte(compiled, 1, 4))\nprint(string.find(compiled, "hello, ", 1, true) ~= nil)\nprint(string.find(string.dump(greet_customer, true), "hello, ", 1, true) ~= nil)\n-- Expected output:\n-- 27\t76\t117\t97\n-- true\n-- true`} />
 
 Reading it back is [`load()`](/docs/standard-library/globals/load), which accepts source
 text and binary chunks alike and decides between them by looking. Its `mode` argument
@@ -76,16 +82,15 @@ function still runs identically.
 
 Every one of those names is stored in the chunk as a string, so how much is saved depends
 on how many the function carried. The cost is paid later, and by somebody else: a
-traceback through a stripped function has no source and no position to report, and an
-error raised inside one arrives with no idea where it came from. Strip a chunk you are
-shipping; keep a whole one for anything you expect to debug.
+traceback through a stripped function has no source name to print and cannot say where in
+the function it was, so the frame reads `?`, and an error raised inside one arrives with
+no position on it at all. Strip a chunk you are shipping; keep a whole one for anything
+you expect to debug.
 
 <Warning>
-A binary chunk belongs to the Lua that produced it. The internal representation of a
-compiled chunk is free to change between Lua versions, and chunks are not compatible
-across them, so one stored today is readable only by the version that wrote it — there is
-no forward or backward guarantee and no version negotiation to fall back on. Keep the
-source alongside anything you cache.
+A binary chunk belongs to the Lua that produced it. Nothing holds the layout of a compiled
+chunk still from one Lua version to the next, so a chunk written today is readable only by
+the version that wrote it. Keep the source alongside anything you cache.
 
 Loading one is a separate hazard. Lua does not check that a binary chunk is internally
 consistent, and a crafted one can crash the interpreter — unlike source text, which can
