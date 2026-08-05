@@ -1313,12 +1313,18 @@ function Content({
   // The matrix and the citation are rendered by the route, so neither heading is in
   // the MDX-derived TOC. Without these the right rail claims the page ends at "See
   // also" while two sections follow it.
+  //
+  // Each condition mirrors its component's own null-check exactly, or the rail links
+  // to a section that never renders. `source` is typed `z.url().optional()`, so it
+  // accepts any well-formed URL — a non-manual one parses to null and renders nothing.
   const fullToc = [
     ...toc,
     ...(node && varies(node)
       ? [{ title: 'Version support', url: '#version-support', depth: 2 }]
       : []),
-    ...(sourceUrl ? [{ title: 'Source', url: '#source', depth: 2 }] : []),
+    ...(sourceUrl && parseManualUrl(sourceUrl)
+      ? [{ title: 'Source', url: '#source', depth: 2 }]
+      : []),
   ];
 
   return (
@@ -1358,6 +1364,7 @@ Add the imports at the top of the file:
 import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
+import { parseManualUrl } from '@/entry/manualSource';
 ```
 
 - [ ] **Step 4: Pass the new field through `Page`**
