@@ -85,6 +85,11 @@ the whole string. In any other position the two are literal characters — a `$`
 middle is a dollar sign, and a `^` is only a negation when it follows an opening square
 bracket.
 
+[`string.gmatch()`](/docs/standard-library/string/gmatch) is the one exception, and it
+applies to `^` alone: a leading caret does not anchor there, because an iterator that
+could only ever match at the start of the subject would have nowhere to go after its
+first turn. The other three functions all honour it.
+
 ## Captures
 
 Parentheses mark the parts of a match you want back. They are numbered by their opening
@@ -109,12 +114,15 @@ Two items look wider than a single character.
 `%bxy` matches from an `x` to the `y` that balances it, counting a `+1` for each `x` and
 a `-1` for each `y` and stopping at the first place the count falls back to zero. `%b()`
 therefore takes a parenthesised expression whole, however deeply the parentheses inside
-it nest.
+it nest. The two characters have to be different ones: a delimiter that opens and closes
+alike, as a quotation mark does, is outside what `%b` is defined for.
 
 `%f[set]` is a *frontier*, and matches the empty string at a boundary rather than
 matching any character: the character before the boundary must be outside the set and the
-character after it inside. Both ends of the subject count as a zero byte for this, so a
-frontier fires at the start and end of the string as readily as in the middle. It is how
+character after it inside. Past either end of the subject there is no character to
+consult, so a zero byte stands in for one. That is what decides an end — `%f[%a]` fires
+before a word that opens the string, because a zero byte is not a letter, while
+`cat%f[%a]` does not fire at the end of `"cat"`, for the same reason. Frontiers are how
 a pattern gets word boundaries, which the notation otherwise lacks.
 
 ## Examples
@@ -125,7 +133,7 @@ a pattern gets word boundaries, which the notation otherwise lacks.
 
 ### Splitting a line into fields
 
-<RunnableExample code={`local record = "flour,eggs,butter"\nfor ingredient in string.gmatch(record, "[^,]+") do\n  print(ingredient)\nend\n-- Expected output:\n-- flour\n-- eggs\n-- butter`} />
+<RunnableExample code={`local ingredient_line = "flour,eggs,butter"\nfor ingredient in string.gmatch(ingredient_line, "[^,]+") do\n  print(ingredient)\nend\n-- Expected output:\n-- flour\n-- eggs\n-- butter`} />
 
 ### Replacing whole words only
 
@@ -138,10 +146,11 @@ The two frontiers demand a boundary on each side of `cat`, which is why `scatter
 
 <Gotcha title="These are not regular expressions">
 There is no alternation — no `|` — and no grouping. `(ab)+` does not mean one or more
-`ab`: the parentheses are a capture rather than a group, and the `+` has no class in
-front of it to repeat, so it is read as a plain plus sign and the pattern matches the
-text `ab+`. Where a regular expression would alternate, match twice and take whichever
-succeeded, or reach for a real regex library.
+`ab`: the parentheses are a capture rather than a group, so the `+` has no class in front
+of it to repeat and nothing repeats. What a quantifier left dangling like that then means
+is not something the notation defines, and it is not worth relying on either way. Where a
+regular expression would alternate, match twice and take whichever succeeded, or reach
+for a real regex library.
 </Gotcha>
 
 <Gotcha title="Outside a set, - is lazy rather than a range">
