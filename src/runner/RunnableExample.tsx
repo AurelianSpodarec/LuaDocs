@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Play, RotateCcw, Terminal } from 'lucide-react';
-import { runLua } from './runLua';
+import { Link } from '@tanstack/react-router';
+import { Check, Play, RotateCcw, SquareTerminal, Terminal } from 'lucide-react';
+import { hashForProgram } from '@/playground/shareUrl';
+import { runLua, RUNTIME_LUA_VERSION } from './runLua';
 import { highlightLua, type LuaToken } from './highlightLua';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
 
-/**
- * The Lua version the runtime actually executes. Wasmoon ships a single Lua, so
- * examples run this version whatever the reader has selected — see
- * `docs/plans/2026-08-04-per-version-lua-spike.md`. Until per-version runtimes
- * exist, the mismatch is disclosed rather than hidden.
- */
-export const RUNTIME_LUA_VERSION = '5.4';
+// Re-exported because it was defined here first and is imported from here in tests and
+// in content. It belongs to the runner: the playground has to disclose the same fact.
+export { RUNTIME_LUA_VERSION };
 
 /** Shared by the two layers below — they only line up while these stay identical. */
 const codeLayer = 'px-4 py-3 font-mono text-[0.8125rem] leading-6 whitespace-pre-wrap break-words';
@@ -167,6 +165,19 @@ export function RunnableExample({ code }: { code: string }) {
           <RotateCcw aria-hidden className="size-3.5" />
           Reset
         </button>
+
+        {/* The seam between an entry and the playground, and the reason the playground
+            is worth having: a reader who has outgrown four lines in a card leaves with
+            their own edits, not with the authored example. The program travels in the
+            link (`shareUrl.ts`), so there is nothing to hand over and nothing to store. */}
+        <Link
+          to="/playground"
+          hash={hashForProgram(source)}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground"
+        >
+          <SquareTerminal aria-hidden className="size-3.5" />
+          Open in Playground
+        </Link>
 
         {/* Proof that something executed, here, just now. Without it the output pane is
             indistinguishable from the expected-output comment sitting in the code above

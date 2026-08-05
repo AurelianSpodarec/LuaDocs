@@ -5,6 +5,7 @@ import { RunnableExample, RUNTIME_LUA_VERSION } from '@/runner/RunnableExample';
 import { runLua } from '@/runner/runLua';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
+import { programFromHash } from '@/playground/shareUrl';
 import type { LuaVersion } from '@/compat/schema';
 
 // `RUNTIME_LUA_VERSION` moved into `runLua` when the playground began sharing the
@@ -140,6 +141,37 @@ describe('RunnableExample', () => {
     fireEvent.click(screen.getByRole('button', { name: /reset/i }));
 
     expect(textarea.value).toBe('print(1)');
+  });
+});
+
+describe('the handoff to the playground', () => {
+  beforeEach(() => {
+    mockRunLua.mockReset();
+    mockRunLua.mockResolvedValue({ output: '', error: null });
+  });
+
+  /** The program a link hands over, read back out of its href. */
+  const handedOver = (link: HTMLElement) =>
+    programFromHash(new URL(link.getAttribute('href')!, 'https://luadocs.test').hash);
+
+  it('links to the playground carrying the authored program', () => {
+    renderExample('print(42)');
+
+    const link = screen.getByRole('link', { name: /open in playground/i });
+    expect(link.getAttribute('href')).toContain('/playground');
+    expect(handedOver(link)).toBe('print(42)');
+  });
+
+  it("carries the reader's edits, not the authored example", () => {
+    // The whole point of the seam. Somebody who has changed the example and wants more
+    // room must not lose the change on the way there.
+    renderExample('print(1)');
+
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'print(1 + 1)' } });
+
+    expect(handedOver(screen.getByRole('link', { name: /open in playground/i }))).toBe(
+      'print(1 + 1)',
+    );
   });
 });
 
