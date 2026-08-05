@@ -1,7 +1,7 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.2": "Rejects a `pos` the list has no position for; 5.1 returns no value at all and leaves the list untouched instead.",
+    "5.2": "Rejects a `pos` outside `1` to `#list + 1`, and always returns exactly one value; 5.1 checks no bounds and accepts only `1` to `#list` — every other position, including `#list + 1` and the default on an empty list, returns no value at all and leaves the list untouched.",
     "5.3": "Reads and writes elements through the table's metamethods; 5.1 and 5.2 access them raw."
   }
 }

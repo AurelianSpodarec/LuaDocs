@@ -24,7 +24,7 @@ table.remove(list [, pos])
 </Parameters>
 
 <Returns>
-  <Return type="any">Whatever was stored at `pos`, of whatever type — or `nil` when nothing was stored there.</Return>
+  <Return type="any">Whatever was stored at `pos`, of whatever type. A position holding no element — past the end of the list, or any position in an empty one — has nothing to hand back.</Return>
 </Returns>
 
 <Errors>
@@ -46,19 +46,19 @@ Two of those are worth naming on their own.
 
 `#list` is the default and the plain case — the last element leaves and nothing has to
 shift, so it is also the cheapest. `#list + 1` is the position past the last element, and it
-is accepted rather than rejected even though nothing lives there: the call finds no value,
-returns `nil`, and leaves the list as it was.
+is accepted rather than rejected even though nothing lives there: no element is found, none
+leaves, and the list is left exactly as it was.
 
 One position belongs to this function alone. `0` is accepted, but only while the list is
 empty — and an empty list is exactly when the default resolves to `0`, since `#list` is
-then `0` itself. That is why `table.remove(list)` on a list that has run out answers `nil`
-instead of raising, and why a loop draining a list needs no guard on the turn that empties
-it.
+then `0` itself. That is why `table.remove(list)` on a list that has run out is not an
+error, and why a loop draining a list needs no guard on the turn that empties it.
 
-Exactly one value comes back, every time, and it is `nil` whenever the position held
-nothing. Like the rest of the library the function touches only integer keys, leaving named
-fields alone, and its reads and writes go through the table's metamethods rather than around
-them.
+A position holding an element hands that element back. A position holding nothing has
+nothing to hand back, which is a weaker statement than it looks: what a caller receives in
+that case is not something to lean on, and *how much* it receives is not either. Like the
+rest of the library the function touches only integer keys, leaving named fields alone, and
+its reads and writes go through the table's metamethods rather than around them.
 
 ## Examples
 
@@ -93,12 +93,14 @@ second one moved into position 1 after the first had been passed. The loop's lim
 read once, before anything has gone. Counting downwards fixes both at once.
 </Gotcha>
 
-<Gotcha title="A nil does not mean the list was empty">
-`nil` is what comes back from an empty list *and* from the position past the last element,
-and neither of those raises. So a `nil` says only that nothing was stored where the call
+<Gotcha title="What comes back cannot tell you the list was empty">
+An empty list and the position past the last element both come back empty-handed, and
+neither of them raises. So the result says only that nothing was stored where the call
 looked — never that there was nothing left to take, and never that the position was wrong.
-Where the difference matters, read `#list` before removing rather than testing what came
-back.
+Testing it is doubly unsafe in an argument list, where an empty-handed removal may not
+occupy a slot at all: `table.insert(archive, table.remove(inbox))` reads as two arguments
+and can arrive as one. Read `#list` before removing, and assign the result to a name before
+using it.
 </Gotcha>
 
 ## See also
