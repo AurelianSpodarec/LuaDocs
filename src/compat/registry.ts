@@ -19,6 +19,7 @@ import stringReverse from './data/string.reverse.json';
 import stringSub from './data/string.sub.json';
 import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
+import utf8Library from './data/utf8.library.json';
 import mathTointeger from './data/math.tointeger.json';
 
 /**
@@ -52,6 +53,11 @@ const raw: Record<string, unknown> = {
   'string.sub': stringSub,
   'string.unpack': stringUnpack,
   'string.upper': stringUpper,
+  // A stub entry legitimately has no compat key, but a *section overview* is where a
+  // reader is sent to find out whether the library is there at all — `string`'s
+  // encoding note does exactly that. So this node exists ahead of the entry it belongs
+  // to, and says only when the library arrived.
+  'utf8.library': utf8Library,
   'math.tointeger': mathTointeger,
 };
 
