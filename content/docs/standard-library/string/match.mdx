@@ -21,7 +21,7 @@ string.match(s, pattern [, init])
 <Parameters>
   <Param name="s">The string to search.</Param>
   <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) to match.</Param>
-  <Param name="init">The position to start searching from. Omitted, the search starts at the first byte.</Param>
+  <Param name="init">Where the search begins, as a position in `s` — [`string.sub()`](/docs/standard-library/string/sub) has how positions are read. Omitted, it begins at the first byte.</Param>
 </Parameters>
 
 <Returns>
@@ -45,10 +45,6 @@ a default from `or` without a comparison in between. Together with the anchors `
 described in [Patterns](/docs/standard-library/string/patterns), that turns the function
 into a validator as readily as an extractor: a pattern accounting for the whole subject
 either returns it or returns nothing.
-
-`init` moves the starting point, and is a position in `s` read the way
-[`string.sub()`](/docs/standard-library/string/sub) reads one — counting from 1 at the
-front, and backwards from the end when it is negative.
 
 ## Examples
 

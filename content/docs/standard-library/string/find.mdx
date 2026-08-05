@@ -37,11 +37,10 @@ string.find(s, pattern [, init [, plain]])
 The search runs from left to right and stops at the earliest position where the pattern
 matches, so what comes back describes the *first* match and never a later or a longer one.
 
-`init` moves that starting point. It is a position in `s` and is read the way
-[`string.sub()`](/docs/standard-library/string/sub) reads one, counting from 1 at the
-front and backwards from the end when it is negative. Passing the previous match's end
-index back in — one past it, to clear the match just found — is how a single call becomes
-a walk over every match in the string, and it is the loop
+`init` moves that starting point. It is a position in `s`, read the way
+[`string.sub()`](/docs/standard-library/string/sub) reads one. Passing the previous match's
+end index back in — one past it, to clear the match just found — is how a single call
+becomes a walk over every match in the string, and it is the loop
 [`string.gmatch()`](/docs/standard-library/string/gmatch) writes for you.
 
 `plain` switches the pattern machinery off entirely. Nothing in `pattern` is magic then:
