@@ -65,6 +65,13 @@ Parameters/Return.
 Breadcrumb + title → summary → common-patterns example → **grouped index of the
 section's entries** → See also → Source.
 
+> **Amendment, 2026-08-05 — this line is superseded in four places.** The first overview
+> built against the real components (`string`) needed a summary longer than "one or two
+> sentences" *before* the example and a callout after it; an index grouped by task, in
+> real `##` headings, rather than a flat or sidebar-shaped list; and a `lua-compat` key
+> the line does not mention. `Source` is derived by the route here as well, not authored.
+> See findings #9 and #10.
+
 ## Guide
 
 Title → intro → TOC → narrative headings with inline runnable examples → See also
@@ -175,12 +182,15 @@ indexes:
    silently omit a sibling — so it wants a guard asserting an overview's links and its
    directory's `.mdx` files are the same set, both directions.
 
-   Two smaller corrections. The fork needs a slot the line does not name, between the
-   example and the index, for the **library-wide facts the manual's section preamble
-   carries and no entry owns** — for `string`, method syntax, byte positions counted from
-   either end, and the one-byte-encoding assumption. And `Source` is listed as an authored
-   step but is derived by the route, like the matrix and the review status; the 2026-08-05
-   amendment applies to this fork too.
+   Two smaller corrections. The **summary is not "one or two sentences" on this fork**:
+   it carries the library-wide facts the manual's section preamble states and no entry
+   owns, and those have to come *before* the example, because the example is what
+   demonstrates them. `string` opens with two paragraphs — method syntax, and positions
+   counted from either end — and only then runs three lines using both. A third such
+   fact, the one-byte-encoding assumption, ships as a callout *after* the example
+   instead, because it qualifies the library rather than the code above it. And `Source`
+   is listed as an authored step but is derived by the route, like the matrix and the
+   review status; the 2026-08-05 amendment applies to this fork too.
 
 10. **An overview carries `lua-compat`, and its node describes the library's own existence
     and membership — never the union of its members' behaviour.** Five uniform chips on a
