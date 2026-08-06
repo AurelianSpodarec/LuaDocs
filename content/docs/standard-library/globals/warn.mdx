@@ -82,14 +82,16 @@ free to read `@` messages differently or not at all.
 ## Where a warning goes
 
 With the warning function Lua ships with, a warning is written to the standard error stream,
-each one on a line of its own and with something in front of it to mark it as a warning.
+each one on a line of its own and with something in front of it to mark it as a warning —
+provided the warning system is switched on. While it is switched off the call still runs and
+still returns, and nothing is written anywhere.
 
-That function writes nothing until warnings have been switched on. The interpreter that comes
-with Lua starts with them off and takes a
+Whether it is on is not this call's decision, and it is not the language's either. The
+interpreter that comes with Lua starts with warnings off and takes a
 [command-line option](/docs/standalone/command-line-options) to turn them on; a program can
-also turn them on for itself by sending `@on`. A program that embeds Lua supplies its own
-warning function and settles both questions for itself, so a warning may end up in a log
-file, in a window, or nowhere.
+turn them on for itself by sending `@on`, and off again by sending `@off`. A program that
+embeds Lua installs a warning function of its own and settles every one of these questions
+for itself, so a warning may end up in a log file, in a window, or nowhere.
 
 The consequence is worth stating plainly: emitting a warning is worth doing and is not worth
 relying on. Whether anybody sees it is decided somewhere else, by somebody else.

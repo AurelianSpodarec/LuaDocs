@@ -375,14 +375,16 @@ const raw: Record<string, unknown> = {
   // to `lua_callk` with a `dofilecont` continuation. ADR 0010 rule 3, the same shape as
   // `pcall`'s 5.2 note above, and probed on 5.3 and 5.4 from the positive side.
   'globals.dofile': globalsDofile,
-  // Three unrelated functions. `select` has not changed a line since 5.1 —
-  // `luaB_select` is the same handful of statements at every release tag from v5.1 to
-  // v5.5.0, negative index included. The 5.2 manual is where that negative index is first
-  // *described*, which is a documentation change and not a `changed_in`, on the ruling
-  // `math.huge` set for reworded passages. What is recorded is the one thing that really
-  // moved, and it moved for the whole language rather than for this function: from 5.3 an
-  // argument standing in for a whole number has to be one, where `luaL_checkint` used to
-  // truncate. `error` and `tonumber` record the same shift on the same reasoning.
+  // Three unrelated functions. `select`'s *structure* is the same at every release tag from
+  // v5.1 to v5.5.0 — `if (i < 0) i = n + i;` and the `1 <= i` bounds check are verbatim
+  // throughout, so the negative index works in 5.1 even though only the 5.2 manual describes
+  // it. That is a documentation change and not a `changed_in`, on the ruling `math.huge` set
+  // for reworded passages. Exactly one line of the function did move, and it is the one
+  // recorded here: `int i = luaL_checkint(L, 1)` became
+  // `lua_Integer i = luaL_checkinteger(L, 1)` at v5.3.0, so from 5.3 an argument standing in
+  // for a whole number has to be one where it used to be truncated. That is a language-wide
+  // shift rather than a change to this function; `error` and `tonumber` record it on the same
+  // reasoning, for their own numeric arguments.
   'globals.select': globalsSelect,
   // `print` carries the only Incompatibilities entry any of the three appears in — 5.4 §8.2,
   // which G1 established belongs here rather than on `tostring`. `luaB_print` opens with
