@@ -20,15 +20,15 @@ load(chunk [, chunkname [, mode [, env]]])
 ```
 
 <Parameters>
-  <Param name="chunk">The source to compile — either the text of it, or a function that hands it over a piece at a time. See [Reading the source a piece at a time](#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
+  <Param name="chunk">The source to compile — either the text of it, or a function that hands it over a piece at a time. See [Reading the source a piece at a time](/docs/standard-library/globals/load#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
   <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, source text is named after itself and a supplying function gets a fixed placeholder instead.</Param>
   <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
-  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — see [Choosing the environment](#choosing-the-environment).</Param>
+  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — see [Choosing the environment](/docs/standard-library/globals/load#choosing-the-environment).</Param>
 </Parameters>
 
 <Returns>
   <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
-  <Return type="string">A message describing what went wrong. It is there on the failing path only; a call that compiled something hands back the function and nothing after it.</Return>
+  <Return type="any">What went wrong, present on the failing path only; a call that compiled something hands back the function and nothing after it. Lua's own objections — source that will not compile, a `mode` that refuses the chunk — arrive as a string describing them. A failure raised inside a supplying function is reported here too, and what arrives then is not necessarily a string, so code that concatenates this value straight into a report is relying on something only the first kind guarantees.</Return>
 </Returns>
 
 <Errors>
@@ -72,11 +72,11 @@ A *chunk* is the unit Lua compiles: a run of statements, the same thing a `.lua`
 Lua handles one as the body of an anonymous function taking a variable number of arguments,
 and three things follow from that.
 
-- **It can take arguments.** `...` inside the chunk holds whatever the returned function was
+- *It can take arguments.* `...` inside the chunk holds whatever the returned function was
   called with, so a chunk is parameterisable without being rewritten.
-- **It can return values.** A `return` at the end of the chunk becomes the returned
+- *It can return values.* A `return` at the end of the chunk becomes the returned
   function's result, and a caller reads it like any other.
-- **Its locals are its own.** A `local` declared in the chunk is invisible to the code that
+- *Its locals are its own.* A `local` declared in the chunk is invisible to the code that
   loaded it. Only what the chunk returns, and what it writes into its environment, comes back
   out — though a function the chunk returns keeps hold of the locals it closed over, as any
   closure does.
@@ -107,9 +107,11 @@ the chunk before the second one, and what was gathered up to that point is what 
 — which will sometimes be valid Lua doing the wrong thing rather than a visible failure.
 
 A failure inside the supplier does not escape either. An error raised while it is running is
-caught here and reported the way a syntax error is, as `nil` and a message, so a supplier
-reading from somewhere unreliable is checked through this call's own return values rather
-than by wrapping the call in a protected one.
+caught here and reported the way a syntax error is, through the two return values rather than
+by propagating, so a supplier reading from somewhere unreliable is checked through this call's
+own results rather than by wrapping the call in a protected one. What arrives as the second
+value then is that failure rather than a sentence the compiler wrote, and it need not be a
+string — which is why nothing on this page promises that it is.
 
 ## Choosing the environment
 
@@ -118,19 +120,20 @@ the field `paper_size` of that table, and assigning to that name writes there. L
 chunk uses the same global environment as the rest of the program, so a chunk that assigns to
 a global changes the program's globals.
 
-`env` replaces that table with one of your choosing. The chunk then reads and writes only that
-table's fields: a name the table does not hold reads as `nil`, and a metatable on the table is
-what turns that miss into a lookup somewhere else. Handing over a small table holding just the
-globals the source is meant to see is the usual way to run code of unknown provenance.
+`env` replaces that table with one of your choosing. The chunk's global names then land in that
+table rather than in the program's globals: a name the table does not hold reads as `nil`, and a
+metatable on the table is what turns that miss into a lookup somewhere else. Handing over a
+small table holding just the globals the source is meant to see is the usual way to run code of
+unknown provenance.
 
 Leaving the argument out and passing `nil` are different requests. Leaving it out means *the
 global environment*; passing `nil` means *this value*, and a chunk with `nil` where its
 environment should be fails on the first global name it touches.
 
-All of that describes a chunk compiled from source, which has its environment as its first and
-only upvalue. A precompiled chunk that was dumped from an ordinary function rather than from a
-whole chunk can carry any number of upvalues, and there is no promise that the first of them is
-an environment at all — what `env` sets is the first upvalue, whatever that turns out to be.
+All of that describes a chunk compiled from source. A precompiled chunk that was dumped from an
+ordinary function rather than from a whole chunk can carry any number of upvalues, and there is
+no promise that the first of them is an environment at all — what `env` sets is the first
+upvalue, whatever that turns out to be.
 
 ## Examples
 
@@ -139,8 +142,8 @@ an environment at all — what `env` sets is the first upvalue, whatever that tu
 <RunnableExample code={`local rules = {\n  standard = "return unit_price * quantity",\n  bulk = "return unit_price * quantity - 5",\n}\n\nlocal function total_for(rule_name, unit_price, quantity)\n  local source = "local unit_price, quantity = ... " .. rules[rule_name]\n  local rule = assert(load(source, rule_name))\n  return rule(unit_price, quantity)\nend\n\nprint(total_for("standard", 20, 4))\nprint(total_for("bulk", 20, 4))\n-- Expected output:\n-- 80\n-- 75`} />
 
 The rule arrives as text and leaves as a function that takes arguments. Naming the chunk after
-the rule is what makes a later failure inside it point at `bulk` rather than at a truncated
-copy of the source, which is what an unnamed chunk of text is identified by.
+the rule is what makes a later failure inside it point at `bulk` rather than at the source text
+itself, which is what an unnamed chunk of text is identified by.
 
 ### Checking that source compiles before doing anything with it
 
