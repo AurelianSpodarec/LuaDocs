@@ -1,8 +1,135 @@
 ---
 title: math.ult()
-description: ""
+description: Compare two integers as unsigned, so the sign bit counts as value rather than as sign.
+lua-compat: math.ult
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.ult
 ---
 
-{/* Not yet written. */}
+Answers whether one integer is below another when both are read as unsigned — that is, with
+the top bit counted as part of the value instead of as a minus sign. This is deliberately not
+the comparison `<` performs, and the two disagree exactly when one argument is negative and
+the other is not.
+
+<RunnableExample code={`print(math.ult(3, 10))\nprint(math.ult(-1, 10))\n-- Expected output:\n-- true\n-- false`} />
+
+Three is below ten either way. Minus one is below ten only if it is read as a negative number;
+read as a bit pattern it is the largest pattern there is, and nothing is above it.
+
+## Syntax
+
+```lua
+math.ult(m, n)
+```
+
+<Parameters>
+  <Param name="m">The integer on the left of the comparison.</Param>
+  <Param name="n">The integer on the right.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true` when `m` comes before `n` in unsigned order, and `false` otherwise — including when the two are equal.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when either argument is missing, or is neither a number nor a string that reads as one.
+- Raises when an argument has no exact integer value — a number carrying a fraction, one too large for an integer to hold, an infinity, a not-a-number value, or a string that reads as any of those. The comparison is defined on integers, and nothing outside them is rounded to fit.
+
+</Errors>
+
+## Description
+
+An integer in Lua occupies a fixed width, and every bit pattern in that width names two things
+at once: a signed value, where the top bit means *negative*, and an unsigned value, where the
+top bit is simply the largest place. Lua's own `<` reads the signed one. This function reads
+the unsigned one, and it is the only function in the `math` library that does.
+
+Nothing is converted, nothing is masked and no new value is produced. The same two integers
+are compared under a different reading of the same bits, and the answer is a boolean.
+
+## What unsigned comparison means
+
+Under `<`, the numbers run from the most negative up through zero to the most positive. Under
+this function they run from zero up through the largest positive value and then straight on
+into what `<` would call the negative ones — so every negative integer sits *above* every
+non-negative one, and `-1`, the pattern with every bit set, sits at the very top.
+
+Three things follow.
+
+*A mixed pair reverses the answer you expected.* `-1 < 1` is true and `math.ult(-1, 1)` is
+false. Where both arguments are negative, or both are not, the two orderings agree — `-5 < -9`
+and `math.ult(-5, -9)` are both false — so the disagreement is confined to pairs with one of
+each. There is no rounding or error involved; the two are answering different questions about
+the same bits.
+
+*Zero is the bottom.* Nothing is below zero in unsigned order, so `math.ult(anything, 0)` is
+always false and `math.ult(0, anything)` is true for everything except zero itself.
+
+*Equal values give false.* This is a strictly-below test, like `<` and unlike `<=`. That also
+makes it a valid ordering to hand to [`table.sort()`](/docs/standard-library/table/sort).
+
+The reason to want any of this is that a fixed-width bit pattern arriving from outside Lua —
+a hash, an identifier, a field lifted out of a binary record with
+[`string.unpack()`](/docs/standard-library/string/unpack) — often means an unsigned number,
+and Lua has no unsigned type to put it in. It lands in an integer, and half of the possible
+patterns land there looking negative. Comparing those with `<` sorts them wrongly and silently.
+
+## Examples
+
+### The same pair, two different questions
+
+Two values of opposite sign are where the orderings part; a pair on the same side of zero is
+ordered identically by both.
+
+<RunnableExample code={`local left_operand = -1\nlocal right_operand = 1\nprint(left_operand < right_operand)\nprint(math.ult(left_operand, right_operand))\n-- Expected output:\n-- true\n-- false`} />
+
+### The step across the top of the range
+
+<RunnableExample code={`local low_half_marker = 0x7FFFFFFFFFFFFFFF\nlocal high_half_marker = 0x8000000000000000\nprint(low_half_marker < high_half_marker)\nprint(math.ult(low_half_marker, high_half_marker))\n-- Expected output:\n-- false\n-- true`} />
+
+These two patterns are neighbours: the second is the first plus one. Under `<` the step from
+one to the other is a fall from the largest positive integer to the most negative one, so the
+comparison says *false*. Read as unsigned it is an ordinary step upward, and the comparison
+says *true*.
+
+### Sorting identifiers by bit pattern
+
+<RunnableExample code={`local record_ids = { 5, -3, 0, math.maxinteger, -1 }\ntable.sort(record_ids, math.ult)\nprint(table.concat(record_ids, " "))\n-- Expected output: 0 5 9223372036854775807 -3 -1`} />
+
+Passing this function straight to [`table.sort()`](/docs/standard-library/table/sort) sorts by
+bit pattern. The three non-negative values come first in the order anyone would expect, and the
+two that print with a minus sign land at the end, because as bit patterns they are the two
+largest values in the list.
+
+## Gotchas
+
+<Gotcha title="It compares, it does not convert">
+`math.ult(m, n)` gives back a boolean and nothing else. There is no companion that turns a
+negative integer into the unsigned number it stands for, because that number does not fit in a
+Lua integer — the pattern `-1` reads as a value a shade over twice
+[`math.maxinteger`](/docs/standard-library/math/maxinteger). Printing such a value means
+formatting the bits yourself; comparing them is what this function is for.
+</Gotcha>
+
+<Gotcha title="A float is not accepted just because it looks whole enough">
+`math.ult(3.0, 4)` works, because `3.0` names an integer exactly. `math.ult(3.5, 4)` raises,
+and so does any float too large for an integer to hold. There is no unsigned reading of a
+fraction, so the function refuses rather than rounding — which is the right refusal, but it
+means a value that came out of a division needs
+[`math.tointeger()`](/docs/standard-library/math/tointeger) before it gets here.
+</Gotcha>
+
+<Gotcha title="Equal is not below">
+Like `<`, this is strict: `math.ult(4, 4)` is false. Code translating a C `<=` on unsigned
+values wants `not math.ult(n, m)` rather than a call with the arguments as they stand.
+</Gotcha>
+
+## See also
+
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — getting a value into the integer form this requires
+- [`math.maxinteger`](/docs/standard-library/math/maxinteger) — the largest value `<` will call positive, and the midpoint of unsigned order
+- [`math.mininteger`](/docs/standard-library/math/mininteger) — the pattern one step above it in unsigned order
+- [`string.unpack()`](/docs/standard-library/string/unpack) — where an unsigned field from a binary record arrives from
+- [Bitwise operators](/docs/language/expressions/bitwise-operators) — the other place an integer is treated as a row of bits
+- [Relational operators](/docs/language/expressions/relational-operators) — `<`, the signed comparison this one is defined against

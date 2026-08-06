@@ -1,8 +1,125 @@
 ---
 title: math.randomseed()
-description: ""
+description: Set the state Lua's pseudo-random generator draws from, so a sequence can be repeated.
+lua-compat: math.randomseed
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.randomseed
 ---
 
-{/* Not yet written. */}
+Sets the state that [`math.random()`](/docs/standard-library/math/random) draws from. Equal
+seeds pick out equal sequences, so this is the switch between a run nobody can reproduce and
+one that comes out the same every time.
+
+<RunnableExample code={`math.randomseed(20260805)\nlocal first_draw = math.random(1000)\nmath.randomseed(20260805)\nlocal second_draw = math.random(1000)\nprint(first_draw == second_draw)\n-- Expected output: true`} />
+
+## Syntax
+
+```lua
+math.randomseed([x [, y]])
+```
+
+<Parameters>
+  <Param name="x">Optional. The first component of the seed.</Param>
+  <Param name="y">Optional. The second component. Left out, it counts as zero.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">The first component of the seed that was actually used.</Return>
+  <Return type="integer">The second component. Passing this pair back sets the same state again.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when an argument is neither a number nor a string that reads as one.
+- <Since v="5.4" /> Raises when an argument is a number carrying a fraction, or one too large to be written as an integer.
+
+</Errors>
+
+## Description
+
+There is one generator in a Lua program and this sets its state. Every part of the program
+that draws a number is drawing from that one stream, so a seed set anywhere lands everywhere,
+including inside libraries that never asked for it.
+
+Called with arguments, it uses them. Called with none, it builds a seed from whatever the run
+can offer that varies — a weak attempt at unpredictability, not a strong one, and never a
+source of secrets.
+
+Either way it hands back the two components of the seed it settled on. That return is what
+makes an unpredictable run reproducible after the fact: let the run choose its own seed, write
+the two numbers down, and a later run given the same pair takes the same path. It is the
+difference between a bug that happened once and a bug that can be made to happen again.
+
+## Seeding and reproducibility
+
+The generator's output follows from its state, and nothing else. Two consequences run in
+opposite directions, and picking the one you want is the whole use of this function.
+
+*Seed it deliberately and the run repeats.* A fixed seed makes a simulation, a test fixture or
+a generated data set come out identically every time it is run. Debugging a failure that only
+appears for certain draws is nearly impossible without this and routine with it.
+
+*Leave it alone and the run does not repeat* — provided the generator was started from
+somewhere varying to begin with, which is not something every line of Lua does on its own.
+That unrepeatability is what a game, a sample or a jittered retry delay wants.
+
+Two limits are worth stating plainly. A seed picks out a sequence *for the generator that
+consumed it*, so the same seed does not promise the same numbers to a different Lua — the
+sequence is a property of the algorithm, and the algorithm is not the same everywhere. And a
+seed is not a secret: anything that can guess the seed can reproduce every number the program
+will draw.
+
+## Examples
+
+### Replaying a whole sequence, not just one draw
+
+<RunnableExample code={`local function three_draws()\n  local draws = {}\n  for position = 1, 3 do\n    draws[position] = math.random(1000)\n  end\n  return table.concat(draws, ",")\nend\n\nmath.randomseed(1998)\nlocal first_run = three_draws()\nmath.randomseed(1998)\nlocal second_run = three_draws()\nprint(first_run == second_run)\n-- Expected output: true`} />
+
+Seeding once and drawing many times is the shape that works. The sequence follows from the
+state, so setting the state back to where it was rewinds the whole stream rather than one
+value.
+
+### The seed comes straight back out
+
+<RunnableExample code={`local first_component, second_component = math.randomseed(2026, 8)\nprint(first_component)\nprint(second_component)\n-- Expected output:\n-- 2026\n-- 8`} />
+
+Given a seed, it returns that seed. The return is only interesting for the call that was not
+given one.
+
+### Capturing the seed a run chose for itself
+
+<RunnableExample code={`local first_component, second_component = math.randomseed()\nlocal first_draw = math.random(1000000)\n\nmath.randomseed(first_component, second_component)\nlocal repeated_draw = math.random(1000000)\nprint(first_draw == repeated_draw)\n-- Expected output: true`} />
+
+This is the pattern worth keeping: let the run seed itself, log the two components alongside
+whatever else the run records, and any failure it produced can be walked back into. A test
+harness that prints its seed on failure turns an intermittent test into a repeatable one.
+
+## Gotchas
+
+<Gotcha title="Seeding before every draw makes the numbers worse, not better">
+A seed does not stir the generator; it places it. Calling this inside a loop, especially from a
+clock that only ticks once a second, sets the same state over and over, so the draw that
+follows comes out the same on every pass. Seed once, where the program starts, and draw as
+many times as you like afterwards.
+</Gotcha>
+
+<Gotcha title="The seed reaches code that never mentioned it">
+There is one generator per program, so seeding it for a deterministic test also pins whatever
+a logging library, a retry helper or a sampler happens to draw. That is usually what was
+wanted; when it is not, the only real answer is a generator of your own rather than a second
+call to this one.
+</Gotcha>
+
+<Gotcha title="A repeatable sequence is repeatable to everybody">
+The point of a seed is that the sequence follows from it. Shipping a program that seeds from a
+constant, or from something as guessable as the current second, means anyone can compute every
+number it will draw. That is harmless in a card game and disqualifying in anything that hands
+a drawn value to a user as though it were unguessable.
+</Gotcha>
+
+## See also
+
+- [`math.random()`](/docs/standard-library/math/random) — the generator this sets the state of
+- [`os.time()`](/docs/standard-library/os/time) — a value that varies between runs, and the traditional thing to seed from
+- [`os.clock()`](/docs/standard-library/os/clock) — a finer-grained companion to it, for when one-second resolution is too coarse
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — turning a computed seed into a value this accepts

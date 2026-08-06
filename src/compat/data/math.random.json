@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Requires each bound to be an integer, or a float sitting exactly on one, and requires the span between the two bounds to fit in an integer; earlier versions accept any number and quietly derive a whole-number range from it.",
+    "5.4": "Draws on a generator built into Lua rather than on the one the C library supplies, and starts that generator from a seed picked at run time, so a program that never seeds it still gets a different sequence on each run. A single argument of `0` now asks for an integer with every bit drawn at random instead of describing an empty range, and the two bounds may span the whole integer range."
+  }
+}

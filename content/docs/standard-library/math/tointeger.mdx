@@ -1,9 +1,129 @@
 ---
 title: math.tointeger()
-description: Convert a value to an integer, or nil if it has no integer representation.
+description: Convert a value to an integer, or answer nil when it has no exact integer form.
 lua-compat: math.tointeger
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.tointeger
 ---
 
-{/* Not yet written. */}
+Hands back the integer a value names, when it names one exactly, and `nil` when it does not.
+The test is exactness: a float converts only if it was already sitting on a whole number, and
+one within reach of the integer range.
+
+<RunnableExample code={`print(math.tointeger(42.0))\nprint(math.tointeger(42.5))\n-- Expected output:\n-- 42\n-- nil`} />
+
+## Syntax
+
+```lua
+math.tointeger(x)
+```
+
+<Parameters>
+  <Param name="x">The value to convert. Any value at all is allowed — one that cannot be converted is answered, not refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">The integer `x` names. `nil` when it names none, which covers every value that is not a number as well as the numbers that do not fit.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `nil`; no argument is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+This is a question, not a coercion. It asks whether a value has an exact integer form and
+returns that form if it does, so the failure case is an ordinary `nil` sitting in the result
+rather than an error to be caught.
+
+Because failure is `nil`, the natural way to use it is as the condition itself — `local
+row = math.tointeger(raw_value)` followed by a test of `row`. Nothing that converts
+successfully can produce a false value, since `0` is true in Lua, so the test says exactly
+what it looks like it says.
+
+## What counts as convertible
+
+*An integer.* It is already one, and comes back unchanged.
+
+*A float whose value is exactly a whole number, and small enough to store.* `42.0` gives
+`42`. `2 ^ 62` gives the whole number it names. Past what an integer can hold there is nothing
+to hand back, so the answer is `nil` even though the float is perfectly whole.
+
+*A float with a fraction.* No. The question is not whether `42.5` is close to an integer but
+whether it is one, and this function never rounds in either direction. Use
+[`math.floor()`](/docs/standard-library/math/floor) or
+[`math.ceil()`](/docs/standard-library/math/ceil) when rounding is what was wanted.
+
+*An infinity, or a not-a-number value.* No, for the same reason: neither names a whole number.
+
+*A string that reads as a number with an exact integer value.* `"8080"` gives `8080`, and so
+do `"8080.0"` and the hexadecimal `"0x1F90"`. Surrounding spaces are tolerated; trailing
+rubbish is not, so `"8080 items"` is `nil`.
+
+*Anything else.* A boolean, a table, a function, `nil` itself — all answered with `nil`.
+
+The same criterion decides elsewhere in the library:
+[`math.ult()`](/docs/standard-library/math/ult) takes precisely the values this one converts,
+and raises on the rest rather than answering `nil`. So this is the check to run first when a
+computed value is about to be handed to it.
+
+## Examples
+
+### A division that came out whole
+
+<RunnableExample code={`local item_count = 21\nlocal page_size = 7.0\nlocal pages_needed = math.tointeger(item_count / page_size)\nprint(pages_needed)\n-- Expected output: 3`} />
+
+Division always produces a float, even when the answer has no fraction. This is how to get
+back to an integer when the division did come out even, and how to find out that it did not.
+
+### Values that arrived as text
+
+<RunnableExample code={`local config_values = { "8080", "8080.5", 30.0, 30.5, "localhost" }\nfor index = 1, #config_values do\n  print(math.tointeger(config_values[index]))\nend\n-- Expected output:\n-- 8080\n-- nil\n-- 30\n-- nil\n-- nil`} />
+
+One call sorts settings read out of a file into the ones that name a whole number and the ones
+that do not, whether they arrived as text or as numbers.
+
+### Too large to be an integer
+
+<RunnableExample code={`print(math.tointeger(2 ^ 62))\nprint(math.tointeger(2 ^ 63))\n-- Expected output:\n-- 4611686018427387904\n-- nil`} />
+
+Both of those floats are whole. The second is past the top of the integer range, so there is no
+integer for it to become — a `nil` here can mean *out of range* as readily as it means *has a
+fraction*, and the two are worth telling apart before reporting an error to a user.
+
+## Gotchas
+
+<Gotcha title="It is not a rounding function">
+`math.tointeger(2.9)` is `nil`, not `2` and not `3`. Anything that reaches for this to turn a
+measurement into an index has the wrong function: [`math.floor()`](/docs/standard-library/math/floor)
+and [`math.ceil()`](/docs/standard-library/math/ceil) round and always answer with a number,
+while this one converts and answers `nil` the moment it cannot do so exactly.
+</Gotcha>
+
+<Gotcha title="A nil answer does not mean the argument was not a number">
+The same `nil` comes back from a float with a fraction, a float too large to store, an
+infinity, a table and a misspelled word. Code that reports *not a number* on a `nil` result
+will say it about `2.5`. Where the distinction matters, ask
+[`math.type()`](/docs/standard-library/math/type) or
+[`type()`](/docs/standard-library/globals/type) first and let this one answer only the question
+it was asked.
+</Gotcha>
+
+<Gotcha title="A successful conversion changes the subtype, not the value">
+`math.tointeger(42.0) == 42.0` is true, because a whole float and the integer beside it compare
+equal — and a function wanting an integer would have accepted `42.0` in the first place, since
+it names one exactly. What the conversion changes is how the value prints, and how it behaves
+once the magnitudes grow past the point where a float can still name every whole number. When
+it looks as though nothing happened, [`math.type()`](/docs/standard-library/math/type) is what
+shows that something did.
+</Gotcha>
+
+## See also
+
+- [`math.type()`](/docs/standard-library/math/type) — asking which subtype a number already has, without converting it
+- [`math.floor()`](/docs/standard-library/math/floor) — rounding down, and where the library's integer-versus-float rule is written up
+- [`math.ceil()`](/docs/standard-library/math/ceil) — rounding the other way
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — the broader conversion, which accepts a fraction and a base
+- [`math.ult()`](/docs/standard-library/math/ult) — one of the functions that demands exactly what this one produces

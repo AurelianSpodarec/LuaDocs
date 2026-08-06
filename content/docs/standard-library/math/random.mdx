@@ -1,8 +1,164 @@
 ---
 title: math.random()
-description: ""
+description: Draw the next pseudo-random number — a fraction below one, or a whole number from a range.
+lua-compat: math.random
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.random
 ---
 
-{/* Not yet written. */}
+Draws the next number from Lua's pseudo-random generator. With no arguments it gives a
+fraction below one; with a range it gives a whole number somewhere inside that range, both
+ends included.
+
+<RunnableExample code={`local die_roll = math.random(1, 6)\nprint(die_roll >= 1 and die_roll <= 6)\n-- Expected output: true`} />
+
+Every example on this page prints something that does not depend on which numbers came out.
+A card printing a draw itself would be claiming an answer nobody can reproduce — including
+the reader running it a second time.
+
+## Syntax
+
+```lua
+math.random([m [, n]])
+```
+
+<Parameters>
+  <Param name="m">Optional. Given with `n`, the low end of the range. Given on its own, the high end of a range that starts at one.</Param>
+  <Param name="n">Optional. The high end of the range. Only meaningful when `m` is there as well.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">A float below one when the call carries no arguments; a whole number from inside the range when it carries one or two.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the range holds nothing — with two arguments, when `m` is above `n`; with one argument, when `m` names a value below one.
+- Raises when an argument is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when an argument is a number carrying a fraction, or one too large to be written as an integer.
+- Raises when more than two arguments are passed.
+
+</Errors>
+
+## Description
+
+One generator stands behind this function, shared by the whole program, and every call moves
+it on. Nothing here opens a stream of its own, so two parts of a program drawing numbers are
+taking turns from the same sequence.
+
+The *pseudo* is the whole story. Each number is computed from the generator's current state
+rather than observed from anything outside the program, so a run that starts from a known
+state produces a known sequence — that is what
+[`math.randomseed()`](/docs/standard-library/math/randomseed#seeding-and-reproducibility)
+exists to arrange, and it is also why a draw from here has no business standing in for a
+value that must be unguessable, such as a password-reset link or a session key.
+
+## The shapes of the call
+
+*No arguments.* The result is a float somewhere from zero up to but not including one. Zero
+can come out of it; one cannot.
+
+*One argument above zero.* `math.random(count)` is the two-argument call with a low end of
+one, so it draws a whole number from `1` through `count`. Choosing an element of a list is
+`list[math.random(#list)]` and needs nothing further.
+
+*Two arguments.* `math.random(low, high)` draws a whole number from `low` through `high`, and
+either end can come up. Passing them the other way round is an error, not a range read
+backwards.
+
+*A single zero.* `math.random(0)` describes no range at all. It asks instead for a whole
+number with every one of its bits drawn at random, which means anywhere in the integer range,
+negative values included.
+
+Which subtype comes back is settled by the shape of the call rather than by the arguments: the
+no-argument call gives a float, and every other shape gives an integer. That is neither half
+of the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) — this function
+mirrors nothing and rounds nothing. It reads a range and answers inside it.
+
+## Examples
+
+### The fraction the no-argument call gives
+
+<RunnableExample code={`local chance = math.random()\nprint(chance >= 0 and chance < 1)\n-- Expected output: true`} />
+
+Multiplying that fraction is the general way to reach any span, including one of fractional
+width: `low + chance * (high - low)` covers everything from `low` up to but never reaching
+`high`.
+
+### Each shape answers with its own subtype
+
+<RunnableExample code={`local chance = math.random()\nlocal die_roll = math.random(1, 6)\nprint(math.type(chance))\nprint(math.type(die_roll))\n-- Expected output:\n-- float\n-- integer`} />
+
+### Every draw lands inside the range
+
+<RunnableExample code={`local rolls_in_range = 0\nfor attempt = 1, 1000 do\n  local die_roll = math.random(1, 6)\n  if die_roll >= 1 and die_roll <= 6 then\n    rolls_in_range = rolls_in_range + 1\n  end\nend\nprint(rolls_in_range)\n-- Expected output: 1000`} />
+
+A thousand draws, and the count of those inside the range is a thousand: nothing drawn from a
+range ever lands outside it. The check is written with `>=` and `<=` because both ends belong
+to the range.
+
+### Choosing an item from a list
+
+<RunnableExample code={`local tea_varieties = { "sencha", "assam", "oolong", "rooibos" }\nlocal chosen_variety = tea_varieties[math.random(#tea_varieties)]\nlocal was_on_the_list = false\nfor index = 1, #tea_varieties do\n  if tea_varieties[index] == chosen_variety then\n    was_on_the_list = true\n  end\nend\nprint(was_on_the_list)\n-- Expected output: true`} />
+
+`#tea_varieties` is the whole argument, because the range starts at one and so does a Lua
+list. Reaching for `math.random(0, #tea_varieties)` instead draws a `0` a fifth of the time
+here, and `tea_varieties[0]` holds nothing.
+
+### Shuffling a list
+
+<RunnableExample code={`local playing_cards = { "ace", "king", "queen", "jack", "ten" }\nfor position = #playing_cards, 2, -1 do\n  local swap_with = math.random(position)\n  playing_cards[position], playing_cards[swap_with] = playing_cards[swap_with], playing_cards[position]\nend\ntable.sort(playing_cards)\nprint(table.concat(playing_cards, " "))\n-- Expected output: ace jack king queen ten`} />
+
+Swapping each position with one at or before it, walking down from the end, is the shuffle to
+write; the shorter-looking version that swaps each position with *any* position does not
+spread the arrangements evenly. Sorting afterwards is what makes the card printable: the order
+the shuffle produced is not reproducible, the set of cards is, and a shuffle that lost or
+duplicated one would show up here immediately.
+
+### Asking for every bit
+
+<RunnableExample code={`local session_label = math.random(0)\nprint(math.type(session_label))\n-- Expected output: integer`} />
+
+A single `0` is the one argument that is not a bound. The result covers the whole integer
+range, so roughly half of what it produces is negative — something to label a run with, not
+something to count with, and still not something to keep a secret behind.
+
+## Gotchas
+
+<Gotcha title="Reversing the bounds raises rather than swapping them">
+`math.random(6, 1)` is not a range from one to six written the other way round. The low end is
+above the high end, so the range holds nothing, and the call raises. Bounds computed from data
+— `math.random(first_index, last_index)` over a list that turned out to be empty — are the
+usual way to arrive here, and the answer is to check the range before drawing from it rather
+than to catch the error afterwards.
+</Gotcha>
+
+<Gotcha title="A range starting at zero is one position too long for a list">
+`math.random(#items)` picks a position in `items`. `math.random(0, #items)` picks from one
+position too many and can land on `items[0]`, which holds nothing. The one-argument form
+starts at one precisely because that is where Lua's indexing starts; dropping the low end to
+zero is usually a habit carried in from a language that indexes from there.
+</Gotcha>
+
+<Gotcha title="There is one generator, and everything shares it">
+Two libraries in one program that both draw numbers are drawing from the same sequence, and
+either one that seeds it moves the other's stream under it. Code that needs a stream nobody
+else can disturb has to carry a generator of its own rather than seeding this one and hoping.
+</Gotcha>
+
+<Gotcha title="A draw from here is not a secret">
+The sequence follows from the state it started in, so knowing that state is knowing every
+number that comes after. This is the same property
+[`math.randomseed()`](/docs/standard-library/math/randomseed) is built around, and it is
+exactly the property a token, a key or a password must not have. Reach for whatever the
+platform offers for those; this function is for simulations, sampling and games.
+</Gotcha>
+
+## See also
+
+- [`math.randomseed()`](/docs/standard-library/math/randomseed) — choosing the state the generator starts from, and how to replay a sequence
+- [`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) — how the rest of the library decides between an integer and a float
+- [`math.type()`](/docs/standard-library/math/type) — asking which of the two a drawn number is
+- [`table.sort()`](/docs/standard-library/table/sort) — the other way to reorder a list, for when the order wanted is not a random one
+- [`os.time()`](/docs/standard-library/os/time) — a value that differs between runs, and the classic thing to build a seed out of

@@ -1,8 +1,130 @@
 ---
 title: math.type()
-description: ""
+description: Report whether a number is stored as an integer or as a float, and nothing else.
+lua-compat: math.type
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.type
 ---
 
-{/* Not yet written. */}
+Reports which of the two number subtypes a value is stored as. The answer is `"integer"`,
+`"float"`, or `nil` for anything that is not a number at all. It never converts, never rounds
+and never looks at what the value would be worth as the other subtype.
+
+<RunnableExample code={`print(math.type(7))\nprint(math.type(7.0))\nprint(math.type("7"))\n-- Expected output:\n-- integer\n-- float\n-- nil`} />
+
+## Syntax
+
+```lua
+math.type(x)
+```
+
+<Parameters>
+  <Param name="x">The value to ask about. Any value is allowed; one that is not a number is answered, not refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">`"integer"` or `"float"` for a number, and `nil` for everything else.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `nil`; no argument is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+Lua's numbers come in two representations. An integer holds a whole number in a fixed width;
+a float holds a value in floating-point form, whether or not that value has a fraction. Both
+answer `"number"` to [`type()`](/docs/standard-library/globals/type), which is the right answer
+for almost every purpose and is no help at all when the difference is the thing being asked
+about. This function is the finer-grained question.
+
+What makes it awkward, and worth its own entry, is that the subtype is a fact about *storage*
+rather than about *value*. `7` and `7.0` are equal, and they reach the same slot when used as a
+table key. They differ in how they print, and they part company at the far edges of the numeric
+range, where an integer wraps around and a float loses precision instead.
+
+## The three answers
+
+*`"integer"`.* The value is stored as an integer. Whole-number literals, counts, lengths, list
+indices, and the results of integer arithmetic all arrive this way.
+
+*`"float"`.* The value is stored as a float. Any literal with a `.` or an exponent, and
+anything that came out of `/` or `^`, which convert their operands and always answer with a
+float. Which subtype the rest of the library hands back is its own rule, and it does not
+reduce to this one — [`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back)
+carries it.
+
+*`nil`.* The value is not a number. A string is not a number here even when it reads as one —
+that is the sharp edge, because so much else in Lua converts a numeric string on the reader's
+behalf and this does not. Tables, booleans, functions and `nil` itself all come back the same
+way.
+
+The one thing this deliberately does not tell you is whether a value is *worth* a whole
+number. `10.0` answers `"float"`, and code checking for whole numbers wants
+[`math.tointeger()`](/docs/standard-library/math/tointeger) instead.
+
+## Examples
+
+### The distinction `type()` cannot make
+
+<RunnableExample code={`local item_count = 12\nlocal unit_price = 12.0\nprint(type(item_count))\nprint(type(unit_price))\nprint(math.type(item_count))\nprint(math.type(unit_price))\n-- Expected output:\n-- number\n-- number\n-- integer\n-- float`} />
+
+Same value, same answer from `type()`, different answer from this one.
+
+### Arithmetic decides the subtype
+
+<RunnableExample code={`local total_items = 10\nprint(math.type(total_items))\nprint(math.type(total_items / 2))\nprint(math.type(total_items // 2))\n-- Expected output:\n-- integer\n-- float\n-- integer`} />
+
+`/` always answers with a float, whatever went into it, so a count divided evenly is still a
+float afterwards. Floor division of two integers keeps the integer; give it a float and it
+answers with a float, the way most of Lua's arithmetic behaves. Ordinary division is the most
+common way a value that started life as a count stops being one.
+
+### A whole number that is not an integer
+
+<RunnableExample code={`local function is_stored_as_integer(value)\n  return math.type(value) == "integer"\nend\n\nprint(is_stored_as_integer(10))\nprint(is_stored_as_integer(10.0))\n-- Expected output:\n-- true\n-- false`} />
+
+Both arguments are ten. Only one of them is an integer. A guard written this way rejects
+values that are perfectly usable as whole numbers, which is why a check for *wholeness* should
+go through [`math.tointeger()`](/docs/standard-library/math/tointeger) and a check for
+*storage* should come here.
+
+### Anything that is not a number
+
+<RunnableExample code={`local server_settings = { retries = 3, timeout = 1.5, host = "example.org" }\nprint(math.type(server_settings.retries))\nprint(math.type(server_settings.timeout))\nprint(math.type(server_settings.host))\nprint(math.type(server_settings))\n-- Expected output:\n-- integer\n-- float\n-- nil\n-- nil`} />
+
+A missing key would answer `nil` here too, alongside the string and the table — one more reason
+to treat a `nil` from this function as *not a number* and not as a diagnosis.
+
+## Gotchas
+
+<Gotcha title="A numeric string is not a number here">
+`math.type("7")` is `nil`, even though [`math.tointeger("7")`](/docs/standard-library/math/tointeger)
+is `7` and [`tonumber("7")`](/docs/standard-library/globals/tonumber) is `7`. This function
+looks at what the value *is*, and a string is a string. Convert first if the question was
+really about the number the text describes.
+</Gotcha>
+
+<Gotcha title="Equal values can have different subtypes">
+`7 == 7.0` is true and `math.type(7) == math.type(7.0)` is false, and both are correct. Any
+comparison written to check "are these the same kind of number" has to say which sense it
+means — equal in value, or alike in storage.
+</Gotcha>
+
+<Gotcha title="nil is an answer, but no argument is an error">
+`math.type(nil)` returns `nil`. `math.type()` raises. The two are hard to tell apart at the
+call site when the argument is a call that returned nothing at all: written as
+`math.type(find_setting())`, a `find_setting` that returns no values leaves this function with
+no argument, and it raises rather than answering. Putting the result in a local first turns
+*no value* into `nil` and the error back into an answer.
+</Gotcha>
+
+## See also
+
+- [`type()`](/docs/standard-library/globals/type) — the coarser question, which answers `"number"` for both
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — converting, rather than reporting, and the right check for wholeness
+- [`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) — which subtype the library's own functions hand back
+- [`math.maxinteger`](/docs/standard-library/math/maxinteger) — the edge where the difference between the two stops being cosmetic
+- [Numbers](/docs/language/values-and-types/number) — the numeric model the two subtypes belong to

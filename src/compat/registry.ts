@@ -52,6 +52,10 @@ import mathExp from './data/math.exp.json';
 import mathLog from './data/math.log.json';
 import mathMax from './data/math.max.json';
 import mathMin from './data/math.min.json';
+import mathRandom from './data/math.random.json';
+import mathRandomseed from './data/math.randomseed.json';
+import mathUlt from './data/math.ult.json';
+import mathType from './data/math.type.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -148,6 +152,20 @@ const raw: Record<string, unknown> = {
   // and it is deliberately not recorded here.
   'math.max': mathMax,
   'math.min': mathMin,
+  // The busiest pair in the library. `random` moved twice: once when its bounds stopped
+  // accepting any number and started demanding an exact integer, and again when the
+  // generator itself was replaced, seeded at startup, and taught to read a single `0` as a
+  // request for every bit rather than as an empty range. `randomseed` moved with it — it
+  // grew a second argument, made both optional, and started handing back the seed it used,
+  // which is what makes an unseeded run reproducible after the fact.
+  'math.random': mathRandom,
+  'math.randomseed': mathRandomseed,
+  // `ult` and `type` are pure arrivals: both came in with the integer subtype and neither
+  // has changed a line since. Their nodes carry availability and nothing else on purpose —
+  // the 5.4 manual's switch from "nil" to "fail" in their descriptions is a change of
+  // vocabulary for a value that is still `nil`, not a change of behaviour.
+  'math.ult': mathUlt,
+  'math.type': mathType,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

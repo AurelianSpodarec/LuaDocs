@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "Takes both of its arguments optionally and hands back the two components of the seed it used, so the same state can be asked for again; called with none it builds a seed at run time from whatever varies. Each argument given must be an integer, or a float sitting exactly on one. Earlier versions require one argument, take any number for it, return nothing, and leave the generator unseeded until this is called — so a program that never calls it repeats one sequence on every run."
+  }
+}
