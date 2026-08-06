@@ -1,8 +1,121 @@
 ---
 title: pcall()
-description: ""
+description: Run a call that might fail, and get a status back instead of losing control of the program.
+lua-compat: globals.pcall
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-pcall
 ---
 
-{/* Not yet written. */}
+Calls `f` with the arguments given after it, and catches any error raised while it runs. The
+first value handed back is a status: `true` followed by everything `f` returned, or `false`
+followed by the [error object](/docs/standard-library/globals/error#what-an-error-carries).
+Either way the program carries on from here.
+
+<RunnableExample code={`local function scale(factor, amount)\n  return factor * amount\nend\n\nprint(pcall(scale, 3, 4))\nlocal completed, reason = pcall(scale, 3, "twelve")\nprint(completed)\nprint(type(reason))\n-- Expected output:\n-- true\t12\n-- false\n-- string`} />
+
+## Syntax
+
+```lua
+pcall(f [, arg1, ···])
+```
+
+<Parameters>
+  <Param name="f">What to call. Anything a call can be written on works here, including a table with a `__call` metamethod — the value is not inspected first, it is simply called under protection.</Param>
+  <Param name="arg1, ···">The arguments to hand to `f`. As many as wanted, or none at all.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
+  <Return type="any">On the `true` path, every value `f` returned, in the order it returned them — as many as there were, or none. On the `false` path, exactly one value: the error object the failure carried.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. `f` has to be there; the arguments after it are optional.
+- Calling something that cannot be called does not raise here. That failure happens inside the protected call like any other, so `false` comes back rather than the mistake escaping.
+
+</Errors>
+
+## Description
+
+Protection follows the call rather than the line. Everything `f` reaches — the functions it
+calls, the functions those call, a metamethod that runs somewhere in the middle — is covered,
+and a failure at any depth stops there and returns here. The stack between is discarded on
+the way: by the time this call hands back its status, the frames that were running are gone,
+and nothing but the error object survives to describe them. Catching a failure *and* keeping
+a description of where it happened is what
+[`xpcall()`](/docs/standard-library/globals/xpcall) exists for.
+
+A protected call is not a barrier to a coroutine. Code running under one can suspend, hand a
+value to whoever resumed it, and pick up where it left off when resumed again; the protection
+is still in place across the suspension.
+
+No message handler runs for a failure caught here. Where an enclosing
+[`xpcall()`](/docs/standard-library/globals/xpcall) has installed one, a failure this call
+catches is handled here and the handler never sees it — the handler is for errors that reach
+*that* call, and this one intercepted the error first.
+
+## What is protected, and what is not
+
+The arguments are evaluated before anything is protected. `pcall(parse, read_file(name))` runs
+`read_file` first, in the ordinary way, and a failure there escapes untouched — only `parse`
+is inside. Where the argument expression is the risky part, the fix is to move it in:
+`pcall(function() return parse(read_file(name)) end)` puts both under protection, at the cost
+of one closure.
+
+What comes back on the failing path is one value and no more. A function that would have
+returned three values contributes none of them once it raises, so there is nothing to be read
+past the error object, and a caller written as
+`local completed, first, second = pcall(...)` finds `second` holding `nil` on every failure.
+
+## Examples
+
+### Keeping every result of a call that worked
+
+<RunnableExample code={`local function split_name(full_name)\n  return full_name:match("(%a+) (%a+)")\nend\n\nlocal completed, first_name, family_name = pcall(split_name, "Ada Lovelace")\nprint(completed)\nprint(first_name)\nprint(family_name)\nprint(select("#", pcall(split_name, "Ada Lovelace")))\n-- Expected output:\n-- true\n-- Ada\n-- Lovelace\n-- 3`} />
+
+Three values in total: the status, and then the two the call itself produced.
+
+### Falling back to a default when a lookup goes wrong
+
+<RunnableExample code={`local function read_theme(settings)\n  return settings.appearance.theme\nend\n\nlocal function theme_or_default(settings)\n  local completed, theme = pcall(read_theme, settings)\n  if completed then\n    return theme\n  end\n  return "dark"\nend\n\nprint(theme_or_default({ appearance = { theme = "solarized" } }))\nprint(theme_or_default({}))\n-- Expected output:\n-- solarized\n-- dark`} />
+
+The second call reads `theme` out of an `appearance` that is not there, and indexing `nil`
+raises rather than answering `nil`. Wrapping it turns that into a status the caller can act
+on.
+
+### Anything callable can go under protection
+
+<RunnableExample code={`local counter = setmetatable({ count = 0 }, {\n  __call = function(self, step)\n    self.count = self.count + step\n    return self.count\n  end,\n})\n\nprint(pcall(counter, 5))\nlocal called_a_number = pcall(42)\nprint(called_a_number)\n-- Expected output:\n-- true\t5\n-- false`} />
+
+The table is called through its `__call` metamethod and the result comes back after the
+status. The number cannot be called at all, and that turns into a caught failure rather than a
+complaint about the argument.
+
+## Gotchas
+
+<Gotcha title="The first value back is a status, not a result">
+`local total = pcall(add_up, prices)` binds `total` to `true`, not to a sum, and nothing
+complains — a boolean is a perfectly good value to have. Every use of this call needs a name
+for the status and a separate one for whatever follows it.
+
+<RunnableExample code={`local function total(prices)\n  local sum = 0\n  for index = 1, #prices do\n    sum = sum + prices[index]\n  end\n  return sum\nend\n\nlocal wrong = pcall(total, { 2, 3 })\nlocal completed, right = pcall(total, { 2, 3 })\nprint(wrong)\nprint(completed, right)\n-- Expected output:\n-- true\n-- true\t5`} />
+</Gotcha>
+
+<Gotcha title="It catches mistakes as readily as failures">
+Protection does not distinguish between a condition the code anticipated and a plain bug. A
+misspelled name that resolves to `nil` and is then called, a `nil` where a table was expected,
+a typo in a rarely taken branch — all raise, and all come back as `false` and a string,
+indistinguishable from the failure the wrapper was written for. The larger the wrapped region,
+the more of the program's real mistakes are quietly converted into a status nobody reads.
+Wrapping the one call that can fail, rather than the block it sits in, is what keeps that from
+happening.
+</Gotcha>
+
+## See also
+
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — the same protection, plus a handler that runs before the stack is discarded
+- [`error()`](/docs/standard-library/globals/error) — raising the failure this call catches
+- [`assert()`](/docs/standard-library/globals/assert) — raising when a value is `nil` or `false`
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — the other call that reports a failure as a status rather than propagating it
+- [Protected calls](/docs/language/error-handling/protected-calls) — the mechanism, in the language's own terms

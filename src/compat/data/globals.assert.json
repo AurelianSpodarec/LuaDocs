@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Raises with `message` as the error object whatever its type, so a table reaches the catcher intact. 5.1 and 5.2 require the message to be a string — or a number, which they convert to one — and refuse anything else as a bad argument before the assertion's own failure is ever reported.",
+    "5.5": "An error object of `nil` is replaced by a string before it propagates, so a `nil` handed over as the message reaches a catcher as a string rather than as `nil`."
+  }
+}

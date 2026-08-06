@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Takes arguments for `f` after the handler. 5.1 takes exactly two arguments, ignores anything written after them, and always calls `f` with none — so a call needing arguments there had to wrap `f` in a closure. Code running under the call may also suspend from here on, where 5.1 raises rather than let a yield cross a protected call.",
+    "5.3": "Requires `msgh` to be a function. Earlier versions accept any value in that position and only reveal the problem if `f` actually fails.",
+    "5.5": "An error object of `nil` is replaced by a string before it leaves the call, including a `nil` the handler itself answered with. The handler is still called with the object as it was raised."
+  }
+}

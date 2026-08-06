@@ -81,6 +81,10 @@ import globalsRawset from './data/globals.rawset.json';
 import globalsRawlen from './data/globals.rawlen.json';
 import globalsGetmetatable from './data/globals.getmetatable.json';
 import globalsSetmetatable from './data/globals.setmetatable.json';
+import globalsPcall from './data/globals.pcall.json';
+import globalsXpcall from './data/globals.xpcall.json';
+import globalsError from './data/globals.error.json';
+import globalsAssert from './data/globals.assert.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -314,6 +318,36 @@ const raw: Record<string, unknown> = {
   // that is already attached is a silent failure with nothing to catch it.
   'globals.getmetatable': globalsGetmetatable,
   'globals.setmetatable': globalsSetmetatable,
+  // The error four. Their manual passages are reworded more than any other group in this
+  // section — "error message" becomes "error object", `pcall` gains a note that a message
+  // handler does not run for what it catches — and none of that is a behaviour change, on
+  // the `math.huge` ruling. What is recorded here is read off `lbaselib.c` at the release
+  // tags as much as off the manuals, because three of the four moved without any passage
+  // saying so.
+  //
+  // `pcall` and `xpcall` both become yieldable at 5.2, when `luaB_pcall` and `luaB_xpcall`
+  // switch from `lua_pcall` to `lua_pcallk` with a continuation. 5.1's `lua_yield` refuses
+  // outright while a C call is pending, and a protected call is one. No manual states it
+  // at the Lua level in any version; it is ADR 0010 rule 3, and it is recorded because a
+  // coroutine that wraps its body in a protected call works on four of the five lines.
+  'globals.pcall': globalsPcall,
+  // `xpcall` is the one whose *signature* moved. 5.1 takes exactly two arguments and calls
+  // `f` with none; 5.2 adds the argument list and 5.3 starts insisting `msgh` really is a
+  // function, where 5.1 and 5.2 take any value and only trip over it when an error arrives.
+  'globals.xpcall': globalsXpcall,
+  // `error`'s change is invisible in every manual: 5.1 through 5.3.2 test the message with
+  // `lua_isstring`, which a number satisfies, so a number message picked up position
+  // information and reached the catcher as a string. 5.3.3 narrowed it to `LUA_TSTRING`.
+  // That is a patch-level boundary the site cannot express (CONTEXT.md tracks minor lines),
+  // so it is filed at 5.3, which is what a reader on any 5.3 build shipped since 2015 sees.
+  // The manual's own move — "if the message is a string" appearing at 5.2 — is *not* the
+  // change: 5.1's code already had the test, less strictly.
+  'globals.error': globalsError,
+  // `assert` stops formatting its message at 5.3, where `luaB_assert` starts delegating to
+  // `luaB_error` instead of calling `luaL_error` on a `luaL_optstring`. Before that the
+  // message had to be a string or a number; a table was refused as a bad argument, which is
+  // a different failure from the one the assertion was written to report.
+  'globals.assert': globalsAssert,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

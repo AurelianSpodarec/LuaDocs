@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Code running under the protected call may suspend. A `coroutine.yield()` inside `f` reaches whoever resumed the coroutine and the protection survives the suspension; 5.1 raises rather than let a yield cross a protected call.",
+    "5.5": "An error object of `nil` is replaced by a string before it propagates, so the second value on the failing path is a string where earlier versions hand back `nil`."
+  }
+}

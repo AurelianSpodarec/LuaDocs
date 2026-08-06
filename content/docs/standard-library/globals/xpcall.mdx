@@ -1,8 +1,124 @@
 ---
 title: xpcall()
-description: ""
+description: Run a call under protection with a handler that inspects the failure while the stack is still standing.
+lua-compat: globals.xpcall
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-xpcall
 ---
 
-{/* Not yet written. */}
+Calls `f` under protection, exactly as
+[`pcall()`](/docs/standard-library/globals/pcall) does, with one addition: a *message
+handler* that runs at the moment of the failure and decides what comes back in place of the
+[error object](/docs/standard-library/globals/error#what-an-error-carries).
+
+<RunnableExample code={`local settings = {}\n\nlocal completed, answer = xpcall(function()\n  return settings.appearance.theme\nend, function(reason)\n  return "could not read the theme (" .. type(reason) .. ")"\nend)\n\nprint(completed)\nprint(answer)\n-- Expected output:\n-- false\n-- could not read the theme (string)`} />
+
+## Syntax
+
+```lua
+xpcall(f, msgh [, arg1, ···])
+```
+
+<Parameters>
+  <Param name="f">What to call, under protection.</Param>
+  <Param name="msgh">The message handler. It is called with the error object when — and only when — `f` fails, and whatever it answers becomes the second value handed back.</Param>
+  <Param name="arg1, ···">The arguments to hand to `f`. They follow the handler rather than sitting straight after `f`, which is the argument order to get wrong when converting a call from `pcall()`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
+  <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered — and `nil` when it answered nothing.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with fewer than two arguments. A handler is not optional here; without one there is nothing to distinguish this call from `pcall()`.
+- <Since v="5.3" /> Raises when `msgh` is not a function.
+
+</Errors>
+
+## Description
+
+The difference between this and [`pcall()`](/docs/standard-library/globals/pcall) is *when*
+the handler gets to look. A protected call discards the stack on its way back, so by the
+time `pcall()` reports a failure the frames that produced it are gone and the error object
+is all that is left. The handler here runs first, while everything is still standing, which
+is what makes a traceback of the failing stack possible.
+
+Everything else is the same. The status comes first, the results follow it, and a failure at
+any depth under `f` stops there. Arguments given after the handler are passed on to `f`
+untouched.
+
+## What the handler sees
+
+The handler is called with one argument, the error object as it was raised — the value
+[`error()`](/docs/standard-library/globals/error) was given, or the string one of Lua's own
+failures produced. Its single return value replaces that object as the second result of this
+call, so the handler is free to summarise, annotate, wrap in a table, or hand the object
+straight back unchanged.
+
+It runs before the failure unwinds anything. That is the whole point: at that moment the
+call stack still holds every frame between this call and the failure, so
+[`debug.traceback()`](/docs/standard-library/debug/traceback) and
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo) can describe where the program
+actually was. Capturing that description is work that has to happen inside the handler —
+once the handler returns, the frames go, and nothing afterwards can recover them.
+
+The handler is itself covered by the same protection, which makes it recursive: a failure
+raised inside it is handed straight back to it, with its own error object rather than the
+original. A handler that recovers on that second showing has its answer used as normal; one
+that keeps failing sends Lua round the same loop, and Lua cuts it short and answers with
+something of its own — neither the object that was raised nor anything the handler wrote. So
+a handler is a place for defensive code: reading a field off an error object whose shape is
+not guaranteed is how one ends up raising inside one.
+
+A handler is for ordinary runtime failures. It is not called for a failure to allocate
+memory, nor for one raised while a finalizer is running.
+
+## Examples
+
+### Passing arguments through to the protected call
+
+<RunnableExample code={`local function stock_level(warehouse, item)\n  local level = warehouse[item]\n  if level == nil then\n    error({ code = "UNKNOWN_ITEM", item = item })\n  end\n  return level\nend\n\nlocal function describe(reason)\n  return reason.code .. ": " .. reason.item\nend\n\nlocal warehouse = { cocoa = 12, flour = 3 }\nprint(xpcall(stock_level, describe, warehouse, "cocoa"))\nprint(xpcall(stock_level, describe, warehouse, "saffron"))\n-- Expected output:\n-- true\t12\n-- false\tUNKNOWN_ITEM: saffron`} />
+
+The two arguments after `describe` are `stock_level`'s, not the handler's. The handler is
+handed one thing only, and only when something goes wrong.
+
+### Capturing a traceback before it disappears
+
+<RunnableExample code={`local function inner_step()\n  error("disk full")\nend\n\nlocal function run_job()\n  inner_step()\nend\n\nlocal completed, report = xpcall(run_job, function(reason)\n  return { reason = reason, trace = debug.traceback("", 2) }\nend)\n\nprint(completed)\nprint(report.reason:sub(- #"disk full"))\nprint(type(report.trace))\n-- Expected output:\n-- false\n-- disk full\n-- string`} />
+
+The handler packs both the object and a description of the stack into one table, which is
+then the second value of the call. Written with
+[`pcall()`](/docs/standard-library/globals/pcall) instead, a traceback built after the call
+came back would describe where the program is *now*; the frames that ran from `run_job()`
+down to `inner_step()` have been thrown away by then.
+
+## Gotchas
+
+<Gotcha title="A handler that keeps failing takes your answer with it">
+Whatever the handler returns is what the caller sees, so a handler that raises every time it
+runs leaves the caller with neither the original error object nor the value it was writing.
+The status is still `false`, which makes the substitution easy to miss.
+
+<RunnableExample code={`local working_completed, working_answer = xpcall(function()\n  error("the cache is cold")\nend, function(caught)\n  return "handled"\nend)\n\nlocal broken_completed, broken_answer = xpcall(function()\n  error("the cache is cold")\nend, function(caught)\n  error("the handler broke too")\nend)\n\nprint(working_completed, working_answer)\nprint(broken_completed, broken_answer == "handled")\n-- Expected output:\n-- false\thandled\n-- false\tfalse`} />
+
+The safe shape is a handler that assumes nothing about the object it is handed — check its
+type before indexing it, and build the description from what is actually there.
+</Gotcha>
+
+<Gotcha title="The handler runs on every failure, not only the interesting ones">
+Installing a handler that builds a traceback means building one for every error the call
+catches, including the ones a caller is going to ignore. Where a protected call sits in a
+loop and failing is ordinary, that is real work done for nothing, and
+[`pcall()`](/docs/standard-library/globals/pcall) is the cheaper call. Reach for a handler
+where the failure is going to be reported to a person, not where it is going to be counted.
+</Gotcha>
+
+## See also
+
+- [`pcall()`](/docs/standard-library/globals/pcall) — the same protection with no handler
+- [`error()`](/docs/standard-library/globals/error) — raising the failure, and what the object it carries can be
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — the description a handler is usually written to capture
+- [`assert()`](/docs/standard-library/globals/assert) — raising when a value is `nil` or `false`
+- [Protected calls](/docs/language/error-handling/protected-calls) — the mechanism, in the language's own terms

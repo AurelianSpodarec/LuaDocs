@@ -1,8 +1,156 @@
 ---
 title: error()
-description: ""
+description: Raise an error carrying a value of your choosing, and say which line should be blamed for it.
+lua-compat: globals.error
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-error
 ---
 
-{/* Not yet written. */}
+Raises an error carrying `message` as the *error object* — the value that reaches whatever
+catches the failure. The call never comes back: the rest of the function is skipped and
+control jumps to the innermost protected call, or out to the host when there is none.
+
+<RunnableExample code={`local function withdraw(balance, amount)\n  if amount > balance then\n    error("insufficient funds")\n  end\n  return balance - amount\nend\n\nprint(withdraw(100, 30))\nlocal completed = pcall(withdraw, 100, 300)\nprint(completed)\n-- Expected output:\n-- 70\n-- false`} />
+
+## Syntax
+
+```lua
+error(message [, level])
+```
+
+<Parameters>
+  <Param name="message">The error object: the value carried to whatever catches the failure. Almost any value will do — a string, a table describing what went wrong, an object of your own. `nil` is the one that does not survive the trip; see below.</Param>
+  <Param name="level">Which line to name when `message` is a string. `1`, the default, names the line this call sits on; `2` names the line that called the function this call sits in; `0` names nothing and leaves the message as written.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing, ever. Code written after this call in the same function does not run, so a `return` in front of it is a way of saying *and we are done here* rather than a value being handed back.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `level` is something other than a number or a string that reads as one. Leaving it out and passing `nil` both mean the default level, and neither is an error.
+- <Since v="5.3" /> Raises when `level` is a number carrying a fraction rather than an exact whole-number value, or one too large to be written as a whole number. A float with nothing after the point is accepted; `1.5` is not.
+
+</Errors>
+
+## Description
+
+Raising is not returning. A `return` hands a value to the caller, which decides what to do
+with it; raising abandons the caller too, and every caller above it, until something is
+willing to catch the failure. That something is
+[`pcall()`](/docs/standard-library/globals/pcall) or
+[`xpcall()`](/docs/standard-library/globals/xpcall) — the innermost one still running. If
+none is running, the failure reaches the host that started the program, which typically
+prints a description and stops.
+
+So this call is the tool for a condition the current function has no sensible answer to.
+Where the caller could reasonably be expected to cope — a lookup that found nothing, a parse
+that did not fit — handing back `nil` and a reason is usually kinder, and
+[`assert()`](/docs/standard-library/globals/assert) is what turns that pair into a raise at
+the point where a caller decides it has had enough.
+
+## What an error carries
+
+Every failure propagates one value, the *error object*. Lua's own failures — arithmetic on a
+string, indexing `nil`, a bad argument to a library function — always carry a string
+describing what happened. A program is under no such restriction: the value handed to this
+call is — with the one exception below — the value that arrives, whatever its type, and a
+table is the usual choice when the catcher needs to tell one failure from another rather
+than show a sentence to a person.
+
+Nothing converts that value to text on the way. A catcher receiving a table receives the
+table itself, with its fields intact and its metatable attached; turning it into something
+readable is the catcher's job, and [`tostring()`](/docs/standard-library/globals/tostring)
+with a `__tostring` metamethod is the usual way to arrange it. The one value that does not
+survive the trip is `nil`: an error object of `nil` is replaced by a string before it reaches
+anyone, so a catcher testing for `nil` is testing for something that does not arrive.
+
+Because the object is arbitrary, code that catches has to decide how much it assumes.
+`reason.code` reads a field off a table that a matching raise put there. Hand the same
+catcher a string — which is what Lua's own failures carry — and that read answers `nil`
+rather than complaining, because a string indexes into the `string` library, so the branch
+that was meant to recognise the failure quietly does not fire. Checking the type before
+reading a field is what makes a catcher survive both kinds of object.
+
+## Where the blame lands
+
+When `message` is a string, a position is glued to the front of it before the error goes
+anywhere: the name of the chunk and a line number, followed by a colon and a space. `level`
+chooses which line that is.
+
+- `1`, the default, names the line this call is written on. That is right when the mistake
+  really is here.
+- `2` names the line that called the function this call is written in. That is right for an
+  argument check: the caller passed the bad value, so the caller's line is the useful one to
+  point at. Larger numbers keep walking outwards, one caller at a time.
+- `0` adds nothing, and the message reaches the catcher exactly as written.
+
+A level that reaches nowhere useful adds nothing rather than complaining. Counting past the
+outermost caller, or landing on a function written in C, or landing on a frame that a tail
+call has already replaced, all produce a message with no position on the front — which is the
+usual explanation for a `2` that appears to have done nothing.
+
+None of this happens when `message` is anything other than a string. A table, a boolean or a
+number is carried through untouched and `level` has no effect on it at all, which is worth
+knowing before choosing a table over a sentence: the position information is the thing being
+given up.
+
+## Examples
+
+### An error object that carries more than a sentence
+
+<RunnableExample code={`local function charge(account, amount)\n  if amount > account.balance then\n    error({ code = "INSUFFICIENT", short = amount - account.balance })\n  end\n  account.balance = account.balance - amount\nend\n\nlocal account = { balance = 40 }\nlocal completed, reason = pcall(charge, account, 100)\nprint(completed)\nprint(reason.code)\nprint(reason.short)\n-- Expected output:\n-- false\n-- INSUFFICIENT\n-- 60`} />
+
+The catcher gets the table itself, so it can branch on `reason.code` and report how much was
+missing without parsing a sentence back apart.
+
+### Keeping the message exactly as written
+
+<RunnableExample code={`local function reject_order()\n  error("this order has no items", 0)\nend\n\nlocal completed, reason = pcall(reject_order)\nprint(completed)\nprint(reason)\n-- Expected output:\n-- false\n-- this order has no items`} />
+
+A level of `0` is what to reach for when the message is going to be shown to a person, or
+compared against, rather than read by whoever is debugging.
+
+### Blaming the caller instead of the check
+
+<RunnableExample code={`local function set_volume(level)\n  if type(level) ~= "number" then\n    error("volume must be a number", 2)\n  end\n  return level\nend\n\nlocal function configure_speaker()\n  local chosen = set_volume("loud")\n  return chosen\nend\n\nlocal completed, reason = pcall(configure_speaker)\nprint(completed)\nprint(reason:sub(- #"volume must be a number"))\nprint(#reason > #"volume must be a number")\n-- Expected output:\n-- false\n-- volume must be a number\n-- true`} />
+
+The message survives intact — that is the second line — and something was glued in front of
+it, which is the third. What was glued on names the line inside `configure_speaker()` where
+`set_volume()` was called, not the line inside `set_volume()` where the check lives. That is
+the point of a level of `2`: whoever reads the report wants the call that was wrong, not the
+guard that noticed.
+
+## Gotchas
+
+<Gotcha title="Position information reaches a string message only">
+`level` and the position it chooses apply when the message is a string. Hand over a table and
+nothing is prepended, nothing is converted, and the object arrives exactly as it left.
+
+<RunnableExample code={`local function raise_string() error("plain trouble") end\nlocal function raise_table() error({ reason = "plain trouble" }) end\n\nlocal text = select(2, pcall(raise_string))\nlocal object = select(2, pcall(raise_table))\nprint(text:sub(- #"plain trouble"))\nprint(#text > #"plain trouble")\nprint(object.reason)\nprint(type(object))\n-- Expected output:\n-- plain trouble\n-- true\n-- plain trouble\n-- table`} />
+
+The string grew; the table did not. Neither is wrong, but a codebase that mixes the two has
+catchers that must cope with both.
+</Gotcha>
+
+<Gotcha title="Re-raising a caught string adds a second position">
+Catching a failure, deciding not to handle it, and raising it again is an ordinary thing to
+do — and when the object is a string that already carries a position, the second raise puts
+another one in front of that. The result reads as two locations for one failure, the outer
+one being where it was re-raised rather than where anything went wrong.
+
+<RunnableExample code={`local function inner_step() error("the cache is cold") end\n\nlocal once = select(2, pcall(inner_step))\nlocal twice = select(2, pcall(function()\n  local finished, caught = pcall(inner_step)\n  if not finished then\n    error(caught)\n  end\nend))\nprint(once:sub(- #"the cache is cold"))\nprint(#twice > #once)\n-- Expected output:\n-- the cache is cold\n-- true`} />
+
+Passing `0` on the re-raise keeps the original position and adds none of its own, which is
+usually what was wanted.
+</Gotcha>
+
+## See also
+
+- [`pcall()`](/docs/standard-library/globals/pcall) — running a call that may raise, and catching it if it does
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — catching with a handler that runs while the stack still stands
+- [`assert()`](/docs/standard-library/globals/assert) — raising when a value turns out to be `nil` or `false`
+- [`warn()`](/docs/standard-library/globals/warn) — reporting something without interrupting anything
+- [Error objects](/docs/language/error-handling/error-objects) — the value a failure carries, in the language's own terms
+- [Error levels](/docs/language/error-handling/error-levels) — the position argument in more depth

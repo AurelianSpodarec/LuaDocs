@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Glues position information onto the message only when the message is really a string. 5.1 and 5.2 treat a number as one too, so `error(42)` raises there with a string carrying a chunk and a line in front of the digits, and from here on it raises with the number `42` and no position at all. `level` also has to hold an exact whole-number value now; one carrying a fraction used to be truncated towards zero and now raises.",
+    "5.5": "An error object of `nil` is replaced by a string before it propagates, so `error(nil)` reaches a catcher as a string. Earlier versions hand the `nil` straight through."
+  }
+}

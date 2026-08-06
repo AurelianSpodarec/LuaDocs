@@ -1,8 +1,124 @@
 ---
 title: assert()
-description: ""
+description: Raise an error when a value turns out to be nil or false, and hand every argument straight back when it does not.
+lua-compat: globals.assert
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-assert
 ---
 
-{/* Not yet written. */}
+Raises an error when `v` is `nil` or `false`, carrying `message` as the
+[error object](/docs/standard-library/globals/error#what-an-error-carries). When `v` is
+anything else, the call hands back *every* argument it was given — which is what lets it sit
+around a call whose result was wanted anyway.
+
+<RunnableExample code={`local function parse_port(text)\n  local port = assert(tonumber(text), "port must be a number")\n  return port\nend\n\nprint(parse_port("8080"))\nlocal completed = pcall(parse_port, "http")\nprint(completed)\n-- Expected output:\n-- 8080\n-- false`} />
+
+## Syntax
+
+```lua
+assert(v [, message])
+```
+
+<Parameters>
+  <Param name="v">The value to test. Only `nil` and `false` count as a failure; every other value passes, including `0` and the empty string.</Param>
+  <Param name="message">The error object to raise with — any value that [an error can carry](/docs/standard-library/globals/error#what-an-error-carries). Left out, a fixed string standing in for *this assertion did not hold* is used instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">Every argument the call was given, in the order they arrived — `v` first, then `message` when one was passed, then anything after it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `v` is `nil` or `false`. That is the function's whole purpose rather than a mishap, and `message` is what the failure carries.
+- Raises when called with no argument at all. There has to be something to test; `nil` is a value and fails the test, while nothing at all is a mistake in the call.
+
+</Errors>
+
+## Description
+
+Two of Lua's values are false and every other one is true, so this call is a test for
+*absence* far more often than for falsehood: a lookup that found nothing, a constructor that
+declined, a conversion that did not fit. `0` and `""` both pass, which surprises people
+arriving from languages where they do not.
+
+Handing back all its arguments is what makes the call disappear into an expression.
+`local port = assert(tonumber(text))` reads as *convert, and stop here if it will not
+convert*, and costs no extra line and no extra name. The same shape carries a whole
+convention: a function that reports failure as `nil` and a reason can be wrapped in this call
+by a caller who would rather not deal with it, and the reason becomes the message with
+nothing else written.
+
+What it does *not* have is a way to point somewhere else.
+[`error()`](/docs/standard-library/globals/error) takes a level and can blame its caller;
+this call takes no such argument, so the location a string message picks up is not something
+a caller can move: it names the line the assertion is written on. Where the useful place to
+point is a caller's line, an explicit `if … then error(…, 2) end` is the shape that can say
+so.
+
+## What the failure carries
+
+The message becomes the error object as handed over, whatever its type — a string, a table,
+an object with a metatable. Nothing inspects it and nothing converts it, so a catcher
+receives what the assertion chose to send, and everything under
+[what an error carries](/docs/standard-library/globals/error#what-an-error-carries) applies
+here too — including the one value that does not reach a catcher as itself.
+
+A string message picks up position information on the way out, the same way a plain
+[`error()`](/docs/standard-library/globals/error#where-the-blame-lands) with its default
+level does: the chunk and the line of the assertion, glued to the front. A message of any
+other type is carried through untouched and picks up no position at all, which is the trade a
+table message makes.
+
+## Examples
+
+### Letting a failure travel as it stands
+
+<RunnableExample code={`local function find_recipe(catalogue, name)\n  local found = catalogue[name]\n  if not found then\n    return nil, "no recipe named " .. name\n  end\n  return found\nend\n\nlocal catalogue = { brownies = { servings = 8 } }\nlocal recipe = assert(find_recipe(catalogue, "brownies"))\nprint(recipe.servings)\n\nlocal completed = pcall(function()\n  return assert(find_recipe(catalogue, "pavlova"))\nend)\nprint(completed)\n-- Expected output:\n-- 8\n-- false`} />
+
+`find_recipe()` reports failure as `nil` and a reason, which is the pair this call was shaped
+for: the reason lands in the message position with nothing written to put it there, and a
+caller who wants to handle the failure rather than raise on it simply leaves the wrapper off.
+
+### A message that is not a sentence
+
+<RunnableExample code={`local function open_ledger(account)\n  return assert(account.ledger, { code = "NO_LEDGER" })\nend\n\nlocal completed, reason = pcall(open_ledger, {})\nprint(completed)\nprint(reason.code)\n-- Expected output:\n-- false\n-- NO_LEDGER`} />
+
+The table arrives at the catcher intact, so the code that catches can branch on
+`reason.code` instead of matching text.
+
+### Everything it was given comes back
+
+<RunnableExample code={`local settings = { theme = "dark" }\nprint(assert(settings.theme, "no theme configured"))\nprint(select("#", assert(1, 2, 3)))\n-- Expected output:\n-- dark\tno theme configured\n-- 3`} />
+
+Both arguments came back, not just the one that was tested — which is convenient in an
+assignment to a single name and a nuisance anywhere the extra values have somewhere to go.
+
+## Gotchas
+
+<Gotcha title="The extra values travel, and they land in argument positions">
+Because the call hands back everything, feeding it straight into another function passes the
+message along as a second argument. `tonumber(assert(text, "missing"))` sends `"missing"`
+where the numeric base belongs; `table.insert(list, assert(value, "missing"))` turns a
+two-argument insert into a three-argument one. Wrapping the call in a second pair of
+parentheses keeps the first value only, and assigning to a name is clearer still.
+</Gotcha>
+
+<Gotcha title="The message is built even when the assertion holds">
+The arguments are evaluated before the call, so a message assembled by concatenation or by a
+function call is assembled on every pass as well as on every failure. In a hot loop that is
+work done for a string nobody will ever read.
+
+<RunnableExample code={`local builds = 0\n\nlocal function describe_failure(name)\n  builds = builds + 1\n  return "missing " .. name\nend\n\nlocal settings = { theme = "dark" }\nassert(settings.theme, describe_failure("theme"))\nprint(builds)\n-- Expected output:\n-- 1`} />
+
+The assertion held and the message was built anyway. Where building it is expensive, an
+`if … then error(…) end` builds it only on the branch that needs it.
+</Gotcha>
+
+## See also
+
+- [`error()`](/docs/standard-library/globals/error) — raising unconditionally, with a choice of which line to blame
+- [`pcall()`](/docs/standard-library/globals/pcall) — catching the failure this call raises
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — catching it with a handler that runs before the stack is discarded
+- [`type()`](/docs/standard-library/globals/type) — the check to make when *what kind of value* matters and not merely whether there is one
+- [Error objects](/docs/language/error-handling/error-objects) — the value a failure carries, in the language's own terms
