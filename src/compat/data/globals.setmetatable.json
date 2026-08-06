@@ -1,6 +1,6 @@
 {
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
-    "5.2": "Attaching a metatable that already holds a `__gc` field marks the table to be finalized when it is collected. Before, only full userdata could be given a finalizer, and only from C, so a `__gc` field in a table's metatable did nothing."
+    "5.2": "Attaching a metatable that already holds a `__gc` field marks the table to be finalized when it is collected. Before, a finalizer could only be given to a full userdata — a value a Lua program cannot create — so a `__gc` field in a table's metatable did nothing."
   }
 }

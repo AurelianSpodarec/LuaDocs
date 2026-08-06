@@ -60,8 +60,9 @@ interchangeable — a variable that turned out empty reads as `nil` where an omi
 would too, and here the empty variable quietly removes a metatable while the omission raises.
 
 The restriction to tables is the manual's own: a metatable can be attached to a value of
-another type, but not from here. Numbers, strings, booleans and functions each have one
-metatable for the whole type rather than one per value, and reaching those takes
+another type, but not from here. Where a table carries its own, every other type has at most one
+metatable for the whole type — one covering all numbers, one covering all strings — and
+attaching or replacing it takes
 [`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) or the C API.
 [`getmetatable()`](/docs/standard-library/globals/getmetatable#which-values-have-a-metatable-to-read)
 describes how the types differ; this call is only ever about a table.
@@ -149,8 +150,9 @@ the failure that does not announce itself.
 There is one metatable per table, so handing over a new one discards the old one whole. A
 metatable meant to add `__tostring` to a table that already had `__index` takes the `__index`
 away with it, and the loss shows up later as an ordinary missing field rather than as an error
-here. To add a field, write it into the metatable already attached; to build one metatable out
-of another, copy the fields across before attaching it.
+here. To add a field, write it into the metatable already attached — with the exception the next
+Gotcha covers; to build one metatable out of another, copy the fields across before attaching
+it.
 </Gotcha>
 
 <Gotcha title="A finalizer has to be in the metatable before it is attached">

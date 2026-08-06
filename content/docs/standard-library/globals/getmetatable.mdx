@@ -45,8 +45,12 @@ is the way to get one back.
 The answer comes in one of three shapes. A value with no metatable answers `nil`. A value
 whose metatable holds a `__metatable` field answers with what that field holds, which is the
 next section. Everything else answers with the metatable, and it is the metatable itself — the
-same table, not a copy of it, so the fields a program reads out of it are the live ones and
-writing into it changes how the value behaves from that point on.
+same table, not a copy of it, so the fields a program reads out of it are the live ones, and
+writing into it takes effect on the value from that point on. Two fields the garbage collector
+reads do not follow that rule. `__gc` decides nothing unless it was already there when the
+metatable was attached, which
+[`setmetatable()`](/docs/standard-library/globals/setmetatable#gotchas) covers; and a change to
+`__mode` is not promised to reach the table it governs before the next collection.
 
 Reading the metatable is a plain read. No metamethod runs to produce the answer, not even one
 belonging to the metatable's own metatable, and the `__metatable` field is looked for in the
@@ -114,8 +118,8 @@ out of reach.
 
 The last two lines are the ones worth reading twice. A number has nothing attached to it and a
 string does, because the string library put it there — so this is a poor test for *is this one
-of my objects*. Comparing against a particular metatable, two examples further down, is the test
-that works.
+of my objects*. Comparing the answer against a particular metatable is the test that works, and
+it has an example of its own below.
 
 ### Every string answers with the same metatable
 
@@ -153,8 +157,11 @@ metatable is attached, because a field with a value of `nil` is a field a table 
 
 <Gotcha title="The metatable that comes back is shared, and it is live">
 This call hands over the metatable rather than a copy, and one metatable usually serves many
-values. Writing into the result therefore changes every value using it, at once and from then
-on — and for a string, the one metatable it answers with serves every string in the program.
+values. Writing into the result therefore reaches every value using it, at once — and for a
+string, the one metatable it answers with serves every string in the program. The exceptions are
+the two fields the collector reads: writing `__gc` in this late is no use at all, as
+[`setmetatable()`](/docs/standard-library/globals/setmetatable#gotchas) explains, and a change to
+`__mode` may not reach the table it governs until the next collection.
 
 <RunnableExample code={`local shared_metatable = { __index = { colour = "green" } }\nlocal first_marker = setmetatable({}, shared_metatable)\nlocal second_marker = setmetatable({}, shared_metatable)\n\ngetmetatable(first_marker).__index = { colour = "red" }\nprint(first_marker.colour)\nprint(second_marker.colour)\n-- Expected output:\n-- red\n-- red`} />
 
