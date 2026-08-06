@@ -1,8 +1,131 @@
 ---
 title: _G
-description: ""
+description: A global variable holding the global environment — the table that global names are read from and written to.
+lua-compat: globals._G
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-_G
 ---
 
-{/* Not yet written. */}
+A global variable, not a function, holding the global environment: the table that global names
+resolve through. It is what makes globals reachable as ordinary table fields, so a name that
+has to be computed at run time can be looked up rather than written out.
+
+<RunnableExample code={`report_title = "quarterly"\nprint(_G.report_title)\n\n_G.report_title = "annual"\nprint(report_title)\n\nprint(_G._G == _G)\n-- Expected output:\n-- quarterly\n-- annual\n-- true`} />
+
+## Value
+
+The global environment, which is an ordinary table. A chunk that resolves its global names
+here — which is what a chunk does unless it has been given an environment of its own — reads
+and writes them as fields of it, so `print` and `_G.print` are two spellings of one value,
+`_G.print = nil` really does take `print` away, and `_G._G` is the same table again. The
+standard libraries are loaded into it too, which is why `string`, `table` and `math` are
+globals at all.
+
+It is a table like any other. It can be passed to a function, iterated, given a metatable, and
+written into with [`rawset()`](/docs/standard-library/globals/rawset); nothing about it is
+special except what is kept in it.
+
+## Description
+
+Lua keeps one distinguished table as the global environment, and this variable is initialised
+with it. Global names in a chunk are resolved through that table by default — that default is
+what "global variable" means — so writing `total = 1` and writing `_G.total = 1` do the same
+thing, and reading `total` and reading `_G.total` do the same thing.
+
+The two spellings are not interchangeable in every situation, though, and the difference is the
+whole reason the variable is worth having. A global name written in the source has to be known
+when the source is written. A field access does not: `_G[name]` takes the name as a value, so a
+program can look a global up from a string it computed, a configuration file or a command line.
+
+Reading a global that was never set answers `nil`, exactly as reading an absent field of any
+table does. There is no separate notion of a global being *declared*, so a misspelled global is
+not an error — it is a read of `nil` — and putting a metatable on this table is the usual way of
+turning that back into an error.
+
+## Changing the variable changes nothing
+
+The value stored *in* the variable is the global environment. The variable itself is not,
+and Lua does not consult it. Assigning something else to `_G` leaves every global name in the
+program resolving exactly where it did before, and going the other way round, changing where
+globals resolve does not update `_G`.
+
+That is a stronger statement than it looks. It means this variable cannot be used to switch a
+program's globals for a different table: it is a *reference* to the global environment, not the
+mechanism that installs one. Code that wants a chunk to resolve its globals somewhere else gives
+that chunk an [environment](/docs/language/environments/env) of its own instead, and the global
+environment carries on being what it was.
+
+It also means the variable can be shadowed like any other name. `local _G = {}` inside a
+function is an ordinary local, and the globals around it are untouched.
+
+## Reaching a global by name
+
+`_G[name]` is the whole technique, and it has two shapes worth separating. Reading is safe:
+a name that is not there answers `nil`, so a lookup can fall back or report a missing setting
+without any guard. Writing is the shape to be careful with, because a computed name can collide
+with something already there — `_G["print"] = 5` is a valid assignment and the program loses
+`print()`.
+
+Because of that, code that reaches into the table from data is usually better off keeping a
+table of its own, and reserving `_G` for reading. Where writing really is wanted, prefixing the
+computed names, or checking with [`rawget()`](/docs/standard-library/globals/rawget) first, keeps
+a name that arrived from outside from landing on top of a library function.
+
+## Examples
+
+### Looking up a global whose name is computed
+
+<RunnableExample code={`setting_timeout = 30\nsetting_retries = 2\n\nlocal function setting(name)\n  return _G["setting_" .. name]\nend\n\nprint(setting("timeout"))\nprint(setting("retries"))\nprint(setting("colour"))\n-- Expected output:\n-- 30\n-- 2\n-- nil`} />
+
+The names are built from strings, so the set of settings can grow without the lookup changing.
+The third call is the shape a missing name takes: an absent field, answering `nil`, not an
+error.
+
+### The variable and the environment are different things
+
+<RunnableExample code={`local global_environment = _G\n_G = "not the environment"\n\nshipping_cost = 4\nprint(global_environment.shipping_cost)\nprint(type(_G))\nprint(shipping_cost)\n\n_G = global_environment\nprint(type(_G))\n-- Expected output:\n-- 4\n-- string\n-- 4\n-- table`} />
+
+With a string in the variable, a global assignment still lands in the global environment and a
+global read still finds it. Nothing about how names resolve went through this variable, so
+overwriting it broke nothing except the convenient handle — which the last two lines put back.
+
+### Turning a misspelled global into an error
+
+<RunnableExample code={`setmetatable(_G, {\n  __index = function(environment, name)\n    error("undeclared global " .. name, 2)\n  end,\n})\n\ninvoice_total = 120\nprint(invoice_total)\n\nlocal read_worked = pcall(function() return invoice_totl end)\nprint(read_worked)\n\nsetmetatable(_G, nil)\nprint(type(invoice_total))\nprint(invoice_totl)\n-- Expected output:\n-- 120\n-- false\n-- number\n-- nil`} />
+
+Because the global environment is an ordinary table, a metatable on it catches reads that find
+nothing and turns a typo into a complaint at the point it is made. The guard is removed again at
+the end: it is a development aid, and while it is installed every optional-global check in the
+program has to go through [`rawget()`](/docs/standard-library/globals/rawget) instead.
+
+## Gotchas
+
+<Gotcha title="Assigning to it does not move the globals">
+`_G = something_else` replaces the contents of one global variable and nothing else. Every
+global name in the program keeps resolving where it did, and the only thing lost is the handle.
+Code trying to sandbox a chunk by reassigning this variable has changed nothing that matters —
+give the chunk an [environment](/docs/language/environments/env) of its own instead.
+</Gotcha>
+
+<Gotcha title="Writing a computed name can land on a library function">
+`_G[name] = value` will happily overwrite `print`, `type` or `string` when `name` came from
+outside the program. The failure appears far from the assignment, as a library function
+behaving strangely, and it is the reason data-driven writes belong in a table of the program's
+own rather than in the global environment.
+</Gotcha>
+
+<Gotcha title="Iterating it walks the standard library too">
+The standard libraries are loaded into this table, so `pairs(_G)` visits `string`, `table`,
+`math` and the rest along with anything the program set. Code that means "the globals
+I created" has to filter, and what it is filtering against differs between builds and between
+hosts.
+</Gotcha>
+
+## See also
+
+- [The global environment](/docs/language/environments/the-global-environment) — the table this variable holds, and how names reach it
+- [Environments](/docs/language/environments/env) — giving code a table of its own to resolve names through
+- [`load()`](/docs/standard-library/globals/load) — loading a chunk against an environment that is not the global one
+- [`rawget()`](/docs/standard-library/globals/rawget) — reading a field with no metatable consulted, which a guarded global environment needs
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — putting the guard on in the first place
+- [`_VERSION`](/docs/standard-library/globals/_version) — the section's other global that is a value rather than a function

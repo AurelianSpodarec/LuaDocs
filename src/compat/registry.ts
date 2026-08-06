@@ -91,6 +91,9 @@ import globalsDofile from './data/globals.dofile.json';
 import globalsSelect from './data/globals.select.json';
 import globalsPrint from './data/globals.print.json';
 import globalsWarn from './data/globals.warn.json';
+import globalsCollectgarbage from './data/globals.collectgarbage.json';
+import globalsGlobalTable from './data/globals._G.json';
+import globalsVersionString from './data/globals._VERSION.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -396,6 +399,31 @@ const raw: Record<string, unknown> = {
   // refactor between v5.4.0 and v5.4.7 — a single `warnf` reading a state integer becomes
   // three functions swapped by `lua_setwarnf` — leaves every observable answer the same.
   'globals.warn': globalsWarn,
+  // The section's version minefield. The *symbol* never moves — every line has
+  // `collectgarbage` — but its option strings arrive, leave, come back and change meaning,
+  // and `version_removed` describes a symbol rather than a string it accepts. So every one of
+  // those moves is a `changed_in`: that is the honest encoding of an option's removal, with
+  // the surviving option set described undated in the prose per the removal fork's rule.
+  // `"generational"` and `"incremental"` are the awkward pair — added at 5.2, dropped at 5.3
+  // (5.3 §8.1 says so), back at 5.4 — which no pair of bounds could express even if bounds
+  // applied to options. Deliberately *not* recorded: that these two answer with the previous
+  // mode as a string, which the 5.5 passage documents and the 5.4 passage does not, because
+  // `pushmode` is already there at v5.4.0 and a documentation change is not a `changed_in`.
+  'globals.collectgarbage': globalsCollectgarbage,
+  // Nothing to record. The passage is word-identical from 5.2 on and 5.1 differs only in
+  // where it sends the reader for environments; `_G` appears in no Incompatibilities chapter
+  // (all four searched). What moved underneath — per-function environments giving way to an
+  // `_ENV` upvalue — is observable through `setfenv` and `load`, not through this variable,
+  // whose documented behaviour (it holds the global environment, Lua never reads it back) is
+  // the same on all five.
+  'globals._G': globalsGlobalTable,
+  // The rare entry whose *value* is the version fact. Each manual states the literal string
+  // its line reports, and `lua.h` builds it from `LUA_VERSION_MAJOR` and `LUA_VERSION_MINOR`
+  // only — never `LUA_VERSION_RELEASE` — so the string is fixed within a line and changes
+  // exactly at one. Prose cannot carry it (no version is ever named there) and the constant
+  // fork has no `<Errors>` and so no `<Since>`, which leaves `changed_in` as the instrument:
+  // the entry describes the shape, the dataset pins the string per line.
+  'globals._VERSION': globalsVersionString,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

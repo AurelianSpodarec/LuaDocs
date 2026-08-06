@@ -1,8 +1,220 @@
 ---
 title: collectgarbage()
-description: ""
+description: The one handle Lua code has on the garbage collector — run a cycle, measure memory, suspend collection, or change how the collector works.
+lua-compat: globals.collectgarbage
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-collectgarbage
 ---
 
-{/* Not yet written. */}
+Drives the garbage collector. A string picks the operation — run a full cycle, report how much
+memory is in use, stop automatic collection, start it again, or change the way the collector
+works — and a call with no argument at all runs a cycle.
+
+<RunnableExample code={`local scratch = {}\nfor row_index = 1, 2000 do scratch[row_index] = { row = row_index } end\n\nlocal before_kbytes = collectgarbage("count")\nscratch = nil\ncollectgarbage("collect")\nprint(collectgarbage("count") < before_kbytes)\n-- Expected output:\n-- true`} />
+
+## Syntax
+
+```lua
+collectgarbage([opt [, arg]])
+```
+
+<Parameters>
+  <Param name="opt">Which of the collector's operations to ask for, as a string. Left out, a full collection cycle is run.</Param>
+  <Param name="arg">The number the chosen operation needs, where it needs one. `"step"` reads it as a step size. `"param"` reads it as the name of a collector parameter, and takes one more argument after it — an integer between `0` and `100000` — giving that parameter a new value.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">With `"count"`: the memory in use by Lua, in kilobytes. It carries a fractional part, so multiplying it by `1024` gives the figure in bytes.</Return>
+  <Return type="boolean">With `"step"`: whether the step finished a collection cycle in incremental mode, or a major collection in generational mode.</Return>
+  <Return type="boolean">With `"isrunning"`: whether the collector is running — that is, whether it has not been stopped.</Return>
+  <Return type="string">With `"incremental"` or `"generational"`: the mode the collector was in before the call, spelled the same way the two options are.</Return>
+  <Return type="integer">With `"param"`: the value the named parameter held before the call. Lua keeps these numbers in a compressed form, so what comes back can be near the last value set rather than equal to it.</Return>
+  <Return type="integer">With `"collect"`, `"stop"` or `"restart"`: a number carrying no documented meaning. Nothing should be read from it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `opt` is a string that names none of the options.
+- Raises when `opt` is a value that cannot be read as a string — a boolean, a table or a function is refused before any option is looked up. A number is read as its digits first, and then refused as an unrecognised option.
+- Raises when `"param"` is not followed by a string naming one of the collector's parameters.
+- <Since v="5.3" /> Raises when a numeric `arg` carries a fraction rather than an exact whole-number value. `collectgarbage("step", 1.5)` is refused; `collectgarbage("step", 2.0)` is not.
+
+</Errors>
+
+## Description
+
+Memory in Lua is managed for you. The collector finds objects the program can no longer reach
+and frees them, and a program that never calls this function still has all of that done on its
+behalf. What this call adds is the ability to *ask*: to run a cycle at a moment of your
+choosing, to read how much memory is in use, to suspend collection across a stretch where a
+pause would be felt, and to change the strategy the collector works by.
+
+Called with nothing, it runs a full cycle — the same as `collectgarbage("collect")`. That is
+the option most code reaches for, and the one most code reaches for too often: a full cycle
+walks everything the program holds, every time, and the collector's own schedule is usually
+better at picking the moment than a guess written into the source.
+
+## The options
+
+- `"collect"` — runs a full collection cycle. This is what a call with no `opt` does.
+- `"stop"` — stops the collector running of its own accord. It still runs when this function
+  asks it to, and nothing else starts it until it is restarted.
+- `"restart"` — lets the collector run of its own accord again.
+- `"count"` — answers how much memory Lua is using, in kilobytes.
+- `"isrunning"` — answers whether the collector is running rather than stopped.
+- `"step"` — does a piece of a collection instead of the whole of one. A positive `arg` asks
+  the collector to work as though that many bytes had just been allocated; a zero asks for one
+  basic step, which in incremental mode is a step of the current step size and in generational
+  mode is either a full minor collection or a scheduled incremental step.
+- `"incremental"` — puts the collector in incremental mode.
+- `"generational"` — puts the collector in generational mode.
+- `"param"` — reads, and optionally sets, one of the numbers that tune the collector. The name
+  comes as a string after the option, and a new value may come after that.
+
+## What a collection promises
+
+Less than most code assumes, and the gap is where the bugs are.
+
+An object is dead once the collector can be sure the program will not reach it again in the
+ordinary course of running. The two things guaranteed are that an object the program can still
+reach that way is never collected, and that an object it cannot reach *eventually* is. Between
+those two, the moment a particular object goes away is the collector's business, and the manual
+is explicit that it need not be the moment you expect.
+
+So `collectgarbage()` promises that a cycle ran. It does not promise that a given table has
+been freed, because the reference keeping it alive may be one you have forgotten — a closure's
+upvalue, a slot in a table you still hold, an entry in a cache set up and left behind. Nor does it
+promise that memory went back to the operating system; freeing is Lua's accounting, not the
+allocator's. Anything held in the C registry, the global environment included, is never
+collected at all.
+
+Where a program genuinely needs to know that something has gone, ask the question directly:
+put the object in a [weak table](/docs/language/garbage-collection/weak-tables) and look at
+whether the slot has emptied, or give it a
+[finalizer](/docs/language/garbage-collection/finalizers) and let it say so itself.
+
+## Measuring what Lua is using
+
+`"count"` answers with Lua's own memory in kilobytes, as a number carrying a fractional part —
+multiply it by `1024` and you have the figure in bytes. It counts what Lua has allocated, which
+is not what the process has resident and not what the allocator has asked the system for.
+
+The figure is a moving one. It changes as the program runs, and it changes when the collector
+runs, so a single reading is worth little: what is worth something is the difference between
+two readings around a piece of work you know the shape of, taken with a full cycle before each
+so the two are measured from the same floor. A count printed for a person to read is a
+different number on the next run, on another machine and on another build.
+
+## Turning the collector off around a burst
+
+`"stop"` and `"restart"` bracket a stretch where collection pauses would be felt — a frame of
+animation, a tight parse, a batch of records. Between them the program keeps allocating and
+nothing is reclaimed, so memory climbs for as long as the bracket is open; the cost of stopping
+the collector is paid in memory, and it is paid until the next restart.
+
+`"stop"` stops the collector acting *on its own*. It does not disable this function: a
+`collectgarbage("collect")` between a stop and a restart still runs a full cycle, and
+`"step"` still does its piece of one. That is what makes stopping useful rather than reckless —
+collection becomes something the program schedules instead of something it is interrupted by.
+
+`"isrunning"` reports which of the two states the collector is in, which is worth having when
+the bracket spans more code than one function.
+
+## Choosing how the collector works
+
+A fresh Lua state collects incrementally: a cycle is a mark-and-sweep pass broken into small
+steps interleaved with the program. `"generational"` switches to a scheme that assumes most
+objects die young and so traverses recently created objects most of the time, dropping into a
+full traversal when it has to. `"incremental"` switches back. Each answers with the mode that
+was in force before it was called, so a stretch of code can put the mode back the way it found
+it.
+
+`"param"` is how the numbers behind both modes are read and written — the pause, the step
+multiplier and the step size for incremental collection, and the minor, minor-major and
+major-minor multipliers for generational collection. The call always answers with the previous
+value, and leaving the new value out reads a parameter without changing it.
+
+Tuning these is measurement work, not configuration work. The manual says plainly that the
+collector's behaviour is not portable across platforms or across releases of Lua, which makes a
+good set of numbers on one machine no more than a hypothesis on another. The defaults are meant
+to suit most programs, and a program that has not measured a collection problem does not have
+one to fix.
+
+## Examples
+
+### Watching an unreachable value go
+
+<RunnableExample code={`local cache = setmetatable({}, { __mode = "v" })\ncache.report = { rows = 120 }\n\nprint(cache.report ~= nil)\ncollectgarbage("collect")\nprint(cache.report ~= nil)\n-- Expected output:\n-- true\n-- false`} />
+
+The table holds its values weakly, so the only reference to the report does not keep it alive.
+Before the cycle the slot is filled; after it, the pair has gone from the table. This is the
+readable way to ask whether something was collected — far better than reading a memory figure
+and guessing.
+
+### Closing a resource when the last reference goes
+
+<RunnableExample code={`local closed_names = {}\n\nlocal function open_connection(name)\n  return setmetatable({ name = name }, {\n    __gc = function(handle) closed_names[#closed_names + 1] = handle.name end,\n  })\nend\n\nopen_connection("reports")\ncollectgarbage("collect")\n\nprint(#closed_names)\nprint(closed_names[1])\n-- Expected output:\n-- 1\n-- reports`} />
+
+The connection is created and immediately dropped, so the next cycle finds it dead and calls
+its finalizer. Note where `__gc` is written: it is in the metatable *before* the metatable is
+attached, which is what marks the object for finalization —
+[`setmetatable()`](/docs/standard-library/globals/setmetatable) has the rule and the repair for
+getting it the wrong way round.
+
+### Measuring what a structure costs
+
+<RunnableExample code={`collectgarbage("collect")\nlocal before_kbytes = collectgarbage("count")\n\nlocal rows = {}\nfor row_index = 1, 5000 do rows[row_index] = { row_index } end\n\nlocal after_kbytes = collectgarbage("count")\nprint(after_kbytes > before_kbytes)\nprint((after_kbytes - before_kbytes) * 1024 > 5000)\n\nrows = nil\ncollectgarbage("collect")\n-- Expected output:\n-- true\n-- true`} />
+
+A cycle first, so both readings start from the same floor, then a reading either side of the
+allocation. The difference is what the five thousand rows cost, in kilobytes; multiplying by
+`1024` puts it in bytes. Neither reading is printed, because neither is the same twice.
+
+### Suspending collection across a burst
+
+<RunnableExample code={`collectgarbage("stop")\nprint(collectgarbage("isrunning"))\n\nlocal batch = {}\nfor row_index = 1, 500 do batch[row_index] = { row_index } end\n\ncollectgarbage("restart")\nprint(collectgarbage("isrunning"))\n\nbatch = nil\ncollectgarbage("collect")\n-- Expected output:\n-- false\n-- true`} />
+
+Nothing is reclaimed between the two calls, which is the point: the burst runs without the
+collector interrupting it, and pays for that in memory held until the restart. The pairing has
+to be exception-safe in real code — a `stop` whose `restart` is skipped by an error leaves the
+collector off for the rest of the program.
+
+## Gotchas
+
+<Gotcha title="A cycle that ran is not a table that went away">
+`collectgarbage()` guarantees that a collection happened, not that any particular object was
+part of it. An object still reachable from anywhere — a closure's upvalue, a slot in a live
+table, a registry entry — survives the cycle exactly as it should, and the usual reason a
+"leak" survives a forced collection is that something is still holding it. Chasing the memory
+figure will not find that reference; a weak table or a finalizer will.
+</Gotcha>
+
+<Gotcha title="The count is a live figure, not a value to compare against">
+`collectgarbage("count")` answers with what Lua is using at that instant, and it differs
+between runs, between machines and between builds. Code that tests it against a literal, and
+tests that assert an exact figure, fail for reasons that have nothing to do with the change
+that broke them. Compare two readings taken around known work instead.
+</Gotcha>
+
+<Gotcha title="Stopping the collector is a decision to spend memory">
+Between a `"stop"` and a `"restart"` nothing is reclaimed however much the program allocates,
+so the bracket has to be short and it has to close on every path out of the section — including
+the one an error takes. A stop that is never restarted turns every later allocation into
+permanent growth.
+</Gotcha>
+
+<Gotcha title="Do not call it from a finalizer">
+A finalizer runs while the collector is part-way through its own work, and asking the collector
+to do something else from inside that is not supported. Where a finalizer needs to trigger more
+cleanup, record what it wants and act on the record from ordinary code.
+</Gotcha>
+
+## See also
+
+- [Garbage collection](/docs/language/garbage-collection) — how the collector decides what is dead
+- [Incremental mode](/docs/language/garbage-collection/incremental-mode) — the pause, the step multiplier and the step size
+- [Generational mode](/docs/language/garbage-collection/generational-mode) — the multipliers behind minor and major collections
+- [Finalizers](/docs/language/garbage-collection/finalizers) — what a `__gc` metamethod may do, and when it runs
+- [Weak tables](/docs/language/garbage-collection/weak-tables) — holding a reference that does not keep an object alive
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — the call that marks a table for finalization
+- [`__gc`](/docs/language/metatables/gc) — the finalizer field itself
+- [`__mode`](/docs/language/metatables/mode) — the field that makes a table's references weak

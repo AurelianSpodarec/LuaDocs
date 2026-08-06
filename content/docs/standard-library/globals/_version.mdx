@@ -1,8 +1,120 @@
 ---
 title: _VERSION
-description: ""
+description: A global variable holding a string that names the version of Lua the code is running under.
+lua-compat: globals._VERSION
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-_VERSION
 ---
 
-{/* Not yet written. */}
+A global variable, not a function, holding a string that names the version of Lua the code is
+running under. It is what a program reads to report the language it is on, and — with more care
+than most code takes — to decide what to do about it.
+
+<RunnableExample code={`local line = _VERSION:match("^Lua (%d+%.%d+)$")\nprint(type(line))\nprint(_VERSION == "Lua " .. line)\n-- Expected output:\n-- string\n-- true`} />
+
+## Value
+
+A string, and one with a fixed shape: the word `Lua`, a space, then the number of the language
+line — a major number, a dot, and a minor number. Nothing follows the minor number, so the
+string identifies a *line* of the language rather than a build of it, and every release within
+a line reports exactly the same thing.
+
+What the number is depends on which Lua is running the code. That is the whole point of the
+variable, and it is why the value it holds is a version fact rather than a fixed one: the shape
+above is true everywhere, and the number in it is whatever the interpreter reading the program
+answers to.
+
+## Description
+
+This is an ordinary global variable holding an ordinary string. It is set once as the base
+library loads, and it is the standard library's answer to the question *which Lua is this*.
+
+The honest uses are the reporting ones: a banner, a log line, a bug report, a diagnostic that
+tells a maintainer which interpreter produced the output in front of them. For those, the string
+goes straight through and nothing needs parsing.
+
+The other common use is branching — running one piece of code on one line of the language and
+another piece elsewhere — and that is where care is needed. A comparison against a written-out
+string pins the program to exactly one line: it fails on the next release of the language, and
+it fails in the direction that is hardest to spot, because the branch quietly takes the wrong
+side rather than raising. Where a branch really is needed, parse the two numbers out and compare
+them as numbers, so that *newer than* is a question the code can ask.
+
+The string says nothing at all about the release. A behaviour that changed in a patch release,
+a build compiled with different options, an interpreter with libraries left out — none of them
+shows up here, and a program that needs to know about any of those has to find out some other
+way.
+
+## Test for the feature, not for the version
+
+Almost every branch written against this variable is really asking whether some function exists,
+and asking that directly is shorter, more accurate and does not go stale.
+
+A feature test reads the thing it cares about: `if table.unpack then …`. It is right on every
+line that has the function, including lines that did not exist when the code was written, and it
+is right on a build that omitted a library, which a version comparison never is. It also
+survives a host that fills a gap itself — a compatibility shim that defines the missing name
+makes the feature test true, which is exactly what the shim was for, while the version
+comparison carries on refusing.
+
+Reserve this variable for saying which Lua is running, and let the code that has to *do*
+something different look for what it needs.
+
+## Examples
+
+### Turning the string into a number you can compare
+
+<RunnableExample code={`local major, minor = _VERSION:match("^Lua (%d+)%.(%d+)$")\nlocal as_number = tonumber(major) * 100 + tonumber(minor)\n\nprint(type(as_number))\nprint(as_number > 500)\n-- Expected output:\n-- number\n-- true`} />
+
+Two captures and a little arithmetic give a single number that sorts the way the lines do, so a
+comparison can ask *at least this* rather than *exactly this*. That is the shape a version check
+has to take if it is going to be written at all, because it is the shape that stays correct when
+a newer line appears.
+
+### It names the line, not the release
+
+<RunnableExample code={`local dot_count = select(2, _VERSION:gsub("%.", "."))\nprint(dot_count)\nprint(_VERSION:sub(1, 3))\n-- Expected output:\n-- 1\n-- Lua`} />
+
+One dot, so two numbers, so no patch component anywhere in the string. Every release inside a
+line hands back the identical value, which means this variable can never distinguish a build
+carrying a fix from one that does not.
+
+### The check that does not go stale
+
+<RunnableExample usesEntry={false} code={`local unpack_values = table.unpack or unpack\nprint(type(unpack_values))\n\nlocal first, second = unpack_values({ 7, 8 })\nprint(first + second)\n-- Expected output:\n-- function\n-- 15`} />
+
+The name this needs has lived in two places, and the test asks for it in both without mentioning
+the language version once. It picks the right one wherever it runs, and it keeps picking the
+right one on a line nobody had when it was written — which is precisely what a comparison
+against a version string cannot do.
+
+## Gotchas
+
+<Gotcha title="Comparing it against a written-out string ties the code to one line">
+`_VERSION == "Lua …"` is true on exactly one line of the language and false on every other,
+including the ones where the guarded code would have worked perfectly. The failure is silent:
+the branch takes the other side, and the symptom turns up somewhere else entirely. Compare
+parsed numbers, or better, test for the feature.
+</Gotcha>
+
+<Gotcha title="It cannot tell you anything about the build">
+Two interpreters reporting the same string can differ in ways that matter — a patch-level fix,
+a compile-time option, a library the host chose not to load. This variable identifies the line
+and stops there, so it is no use for deciding whether a particular bug is present or whether a
+particular library is available.
+</Gotcha>
+
+<Gotcha title="It is an ordinary global, and can be written over">
+Nothing protects the name. An assignment anywhere in the program replaces it, and code that
+reads it afterwards — including code in a library that never asked for any of this — gets
+whatever was left behind. A program that means to record the version should read it once, early,
+and keep its own copy.
+</Gotcha>
+
+## See also
+
+- [`_G`](/docs/standard-library/globals/_g) — the section's other global that is a value rather than a function
+- [`string.match()`](/docs/standard-library/string/match) — pulling the two numbers out of the string
+- [`type()`](/docs/standard-library/globals/type) — asking what a value is, which is the feature test's usual shape
+- [`require()`](/docs/standard-library/globals/require) — how a compatibility shim usually arrives
+- [Strings](/docs/language/values-and-types/string) — what this value is, and what can be done with it

@@ -1,0 +1,9 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Holds the string `\"Lua 5.2\"`.",
+    "5.3": "Holds the string `\"Lua 5.3\"`.",
+    "5.4": "Holds the string `\"Lua 5.4\"`.",
+    "5.5": "Holds the string `\"Lua 5.5\"`."
+  }
+}
