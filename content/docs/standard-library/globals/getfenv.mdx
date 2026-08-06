@@ -1,8 +1,168 @@
 ---
 title: getfenv()
-description: ""
+description: Read the table a function resolves its global names through.
+lua-compat: globals.getfenv
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-getfenv
 ---
 
-{/* Not yet written. */}
+Hands back the table a function resolves its global names through — its *environment*. No global
+asks that question of an existing function now. What stands in its place is keeping hold of the
+table yourself: code that wants a chunk to read its globals somewhere particular hands that table
+over when the chunk is loaded, and the reference it kept is the answer this call would have given.
+
+<RunnableExample usesEntry={false} code={`local settings = { paper_size = "a4" }\n-- getfenv(reader) answered with the table this chunk reads its globals from\nlocal reader = assert(load("copies = 3 return paper_size", "reader", "t", settings))\nprint(reader())\nprint(settings.copies)\n-- Expected output:\n-- a4\n-- 3`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so they
+show the standing-in code doing the work and name the old call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+getfenv([f])
+```
+
+<Parameters>
+  <Param name="f">Which function to ask about: the function itself, or a number naming a stack level counted outward from the caller. Left out, it is `1`, which is the function that made this call.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The table that function resolves its global names through. For anything that is not a Lua function, and for a level of `0`, the global environment comes back instead.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is neither a function nor a number naming a stack level. A table, a boolean or a string that does not read as a number is refused.
+- Raises when `f` is a number below zero.
+- Raises when the level names no call on the stack — asking for a caller further out than the outermost one.
+- Raises when the level names a call the interpreter holds no function for. That is what a tail call leaves behind: the frame it replaced still takes up a level, and nothing is recorded at it.
+
+</Errors>
+
+## Description
+
+Global names are table fields. A Lua function reads `paper_size` by reading the `paper_size`
+field of one particular table, and writes it by writing that field. This call names the table.
+
+Two ways of naming a function reach the same answer. Passing the function itself asks about that
+function. Passing a number asks about a function on the call stack instead, counted from the
+inside out: `1` is the function that made the call, `2` is the one that called *it*, and so on
+outward. The number is the useful form when the code that wants to know is a helper — it can ask
+about whoever invoked it without that caller having to hand itself over.
+
+A level of `0` is a special answer rather than a further step outward: it names the global
+environment, the table a thread hands to the chunks it loads. Anything that is not a Lua function
+gets the same answer for a different reason — a C function has an environment of its own, but not
+one this call reports, and reaching it takes the debug library rather than this call.
+
+What comes back is the table itself, not a description of it and not a copy. Writing a field into
+it puts a global within reach of every function sharing it, and clearing one takes a global away.
+That is what makes the call worth having and also what makes it worth being careful with.
+
+## What a function environment is
+
+An *environment* is an ordinary table that a Lua function resolves its global names through. A
+global read is a read of one of its fields and a global assignment is a write to one, so which
+globals a piece of code can see is settled by that table.
+
+A function does not choose its own. It gets one when it is created, from whatever created it:
+
+- A function defined inside another function shares the environment of the enclosing one.
+- A chunk compiled from source or from a file starts with the environment of the thread that
+  compiled it, which is that thread's global environment.
+- Because sharing is by reference rather than by copy, many functions usually share one table —
+  which is why assigning a global inside one function is visible from another.
+
+Nothing about the table is special. It can be built by hand, passed around, iterated, given a
+metatable, and held by two functions at once. A table with a handful of entries is all a restricted
+set of globals amounts to: names it does not hold read as `nil`, and a metatable on it is what turns
+those misses into a lookup somewhere else.
+
+The global environment is one such table that gets a name of its own —
+[`_G`](/docs/standard-library/globals/_g) holds it — and it is where the standard libraries live,
+which is why `string` and `math` are reachable as globals at all.
+
+## Reading an environment without this call
+
+Environments themselves did not go anywhere; what went away is a global that asks a function about
+one after the fact. In their place the environment is *a variable named `_ENV`*, which every chunk
+is compiled inside the scope of, and a global name in the source is shorthand for a field of
+whatever that variable holds at that point in the text. A variable is read where it is in scope, so
+inside ordinary code the table is something you have at the point it is chosen rather than
+something to go and find later.
+
+The debug library still gets at it — a Lua function carries its environment as an upvalue, and
+upvalues can be listed and read by name from outside the function. That is a route for a debugger
+rather than one to build a program on, and it is the same answer a C function's environment already
+had while this call existed.
+
+What to write instead depends on why the table was wanted:
+
+- *To see what a piece of code can reach* — decide it rather than discover it. Hand the chunk a
+  table when you load it, and keep the reference; that table is what the chunk starts with, and it
+  is one you are already holding.
+  [`load()`](/docs/standard-library/globals/load#choosing-the-environment) is where a chunk is
+  given one.
+- *To reach the globals the rest of the program uses* — that table is
+  [`_G`](/docs/standard-library/globals/_g), available under that name from anywhere.
+- *To let one piece of code work against a table decided elsewhere* — pass the table in as an
+  argument, exactly as any other value would be passed. It is more typing than a call that went
+  and found it, and it is visible in the signature rather than hidden in the frame.
+
+What none of these gives back is a global that answers for a function somebody else wrote and
+handed you. That was the call's distinctive ability, and among the globals it has no successor.
+
+## Examples
+
+### Keeping the table you handed over
+
+<RunnableExample usesEntry={false} code={`local stock_room = { crates_on_hand = 12 }\n-- getfenv(restock) would have answered with stock_room\nlocal restock = assert(load("crates_on_hand = crates_on_hand + 4", "restock", "t", stock_room))\nrestock()\nrestock()\nprint(stock_room.crates_on_hand)\n-- Expected output: 20`} />
+
+The chunk reads and writes one global name, and both go through the table it was given. Holding
+that table is what makes the effect readable from outside — the count is a field of a table the
+caller already has.
+
+### The table a chunk gets when it is given none
+
+<RunnableExample usesEntry={false} code={`delivery_window = "tuesday"\n-- getfenv(0) answered with this same table\nlocal reader = assert(load("return delivery_window"))\nprint(reader())\nprint(_G.delivery_window)\ndelivery_window = nil\n-- Expected output:\n-- tuesday\n-- tuesday`} />
+
+A chunk loaded with no table of its own resolves globals through the global environment, and that
+table is reachable as `_G`. So the answer for anything running under the ordinary globals is one
+that never had to be asked for.
+
+### Two copies of one chunk, reading different tables
+
+<RunnableExample usesEntry={false} code={`local metric = { unit_name = "kg" }\nlocal imperial = { unit_name = "lb" }\nlocal source = "return 'weighed in ' .. unit_name"\n-- getfenv on each compiled chunk would have answered with its own table\nprint(assert(load(source, "metric", "t", metric))())\nprint(assert(load(source, "imperial", "t", imperial))())\n-- Expected output:\n-- weighed in kg\n-- weighed in lb`} />
+
+The same source compiled twice against two tables gives two functions that agree on every name
+except the ones their tables disagree about. That is what an environment does, seen from the
+outside.
+
+## Gotchas
+
+<Gotcha title="The table that comes back is live">
+It is the table, not a report about it. Writing a field into it adds a global that the function is
+able to see from its next line onward, and removing one takes a global away mid-run. Code that
+means to *inspect* what a function can reach and code that means to *change* it are one keystroke
+apart here, which is why holding a table you built yourself is easier to reason about than
+fetching one you did not.
+</Gotcha>
+
+<Gotcha title="A tail call leaves a level with nothing behind it">
+A call written as `return helper()` replaces the frame it was made from rather than adding one. The
+replaced frame is not skipped in the counting — it still takes up a level — but the interpreter no
+longer holds the function that was there, so asking for that level raises instead of answering.
+Levels further out keep the numbers they had. A level argument is therefore dependable in code
+whose call shapes you control and awkward in code whose callers you do not.
+</Gotcha>
+
+## See also
+
+- [`setfenv()`](/docs/standard-library/globals/setfenv) — the other direction, and what to write in place of it
+- [`load()`](/docs/standard-library/globals/load#choosing-the-environment) — giving a chunk a table of its own to resolve names through, which is where the decision is made now
+- [`_G`](/docs/standard-library/globals/_g) — the table the ordinary globals live in, reachable under a name
+- [`loadstring()`](/docs/standard-library/globals/loadstring) — compiling a chunk from source, which inherits the loading thread's environment
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — turning a small table of globals into one that falls back somewhere else

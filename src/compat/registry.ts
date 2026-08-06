@@ -94,6 +94,11 @@ import globalsWarn from './data/globals.warn.json';
 import globalsCollectgarbage from './data/globals.collectgarbage.json';
 import globalsGlobalTable from './data/globals._G.json';
 import globalsVersionString from './data/globals._VERSION.json';
+import globalsGetfenv from './data/globals.getfenv.json';
+import globalsSetfenv from './data/globals.setfenv.json';
+import globalsUnpack from './data/globals.unpack.json';
+import globalsLoadstring from './data/globals.loadstring.json';
+import globalsModule from './data/globals.module.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -426,6 +431,28 @@ const raw: Record<string, unknown> = {
   // fork has no `<Errors>` and so no `<Since>`, which leaves `changed_in` as the instrument:
   // the entry describes the shape, the dataset pins the string per line.
   'globals._VERSION': globalsVersionString,
+  // The section's removed family, and it leaves in two shapes rather than one. 5.2 §8.2 is the
+  // only Incompatibilities passage any of the five appears in, and it says three different
+  // things: `setfenv` and `getfenv` "were removed", `unpack` "was moved into the table library
+  // and therefore must be called as `table.unpack`", and `loadstring` and `module` are
+  // "deprecated". Under the ruling `math.log10` and `table.maxn` already ship — a version has
+  // the symbol iff that version's manual asserts its existence, and deprecation asserts it
+  // while silence does not — the first three are gone at 5.2 and the last two survive 5.2 as a
+  // `changed_in` and go at 5.3, where no manual mentions them again.
+  //
+  // The build axis agrees everywhere except one place, and it is the one T3 already recorded:
+  // 5.2's shipped makefile passes `-DLUA_COMPAT_ALL`, which switches on `LUA_COMPAT_UNPACK`,
+  // `LUA_COMPAT_LOADSTRING` and `LUA_COMPAT_MODULE` — so a stock 5.2 build has the bare
+  // `unpack` this dataset says it does not. 5.3 puts those three under `LUA_COMPAT_5_1` while
+  // its makefile passes only `-DLUA_COMPAT_5_2`, so a stock 5.3 build has none of them, and
+  // 5.4 and 5.5 have no such switch at all. `getfenv` and `setfenv` have no compatibility
+  // switch in any version: environments stopped being a per-function table, so there was
+  // nothing left for the pair to do.
+  'globals.getfenv': globalsGetfenv,
+  'globals.setfenv': globalsSetfenv,
+  'globals.unpack': globalsUnpack,
+  'globals.loadstring': globalsLoadstring,
+  'globals.module': globalsModule,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

@@ -1,8 +1,130 @@
 ---
 title: unpack()
-description: ""
+description: Hand back a run of a list's elements as separate values, under the bare global name.
+lua-compat: globals.unpack
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-unpack
 ---
 
-{/* Not yet written. */}
+Returns a run of a list's elements as separate values, one for each position, so a list can be
+handed to something that takes arguments rather than a table. This is the bare global spelling of
+[`table.unpack()`](/docs/standard-library/table/unpack): the same function under a name in the
+table library, so the fix is to put the prefix back and change nothing else.
+
+<RunnableExample usesEntry={false} code={`local shipping_dimensions = {32, 18, 9}\n-- unpack(shipping_dimensions) handed these over as three arguments\nprint(math.max(table.unpack(shipping_dimensions)))\n-- Expected output: 32`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it under
+this name, so they show the prefixed spelling doing the work and name the old call in a comment
+beside it. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+unpack(list [, i [, j]])
+```
+
+<Parameters>
+  <Param name="list">The list to read the elements from.</Param>
+  <Param name="i">The position to start at. Omitted, it is `1`.</Param>
+  <Param name="j">The last position to include. Omitted, it is `#list`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">One value for each position from `i` to `j`, in order — whatever is stored there, of whatever type. Nothing at all when the run is empty.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `list` is not a table, including when it is left out.
+- Raises when `i` or `j` is given and is neither a number nor a string that reads as one.
+- Raises when the run is longer than the number of values one call can hand back. Where that limit falls is not fixed by the language, and a run near it is better read a piece at a time.
+
+</Errors>
+
+## Description
+
+`i` and `j` mark the run and both ends are included, so a call hands back exactly `j - i + 1`
+values whenever `j` is at or after `i`. Left out they are `1` and `#list`, which is the whole list,
+so the everyday call names nothing but the list.
+
+When `i` sits past `j` the run is empty and no values come back at all. That is not one `nil` — it
+is nothing, which is why an empty run inside a call to
+[`print()`](/docs/standard-library/globals/print) prints an empty line rather than `nil`.
+
+The run is read as given and is not trimmed to fit the list. A `j` past the last element does not
+stop early: it goes on reading positions that hold nothing, and each of those arrives as `nil`. The
+number of values therefore depends on `i` and `j` alone, never on what the list turns out to hold.
+
+Only numbered positions take part, since the run is described by counting from `i` to `j`. Named
+fields stored beside the elements are passed over, so a table that is a list and a record at once
+gives up its list half and keeps the other to itself.
+
+The elements are read straight out of the table, with no metamethod given a say — a table standing
+in for another answers here with what it holds itself rather than with what it forwards to. Where
+the prefixed spelling reads them through the table's metamethods instead, that is a change of its
+own rather than anything the rename did, and
+[`table.unpack()`](/docs/standard-library/table/unpack) is where it is recorded.
+
+What comes back is a run of values rather than a list, and Lua keeps the whole run only where a run
+of values is expected: the last position of an argument list, of a table constructor, of a `return`,
+or of a multiple assignment. Anywhere else it is cut down to its first value. That rule belongs to
+[multiple results](/docs/language/expressions/multiple-results) rather than to this call, and it
+decides what almost every use of it produces.
+
+## Examples
+
+### Handing a list to something that takes arguments
+
+<RunnableExample usesEntry={false} code={`local recorded_call = {"%s scored %d", "grace", 91}\n-- unpack(recorded_call) turned the stored call back into arguments\nprint(string.format(table.unpack(recorded_call)))\n-- Expected output: grace scored 91`} />
+
+The list holds a call that was stored to be made later — a template and its two values. Unpacking
+it turns the three stored elements back into the three arguments
+[`string.format()`](/docs/standard-library/string/format) is waiting for.
+
+### Taking a named piece of a record
+
+<RunnableExample usesEntry={false} code={`local log_fields = {"2026-08-06", "warn", "queue is long"}\n-- unpack(log_fields, 2, 3) read exactly this run\nlocal level, message = table.unpack(log_fields, 2, 3)\nprint(level)\nprint(message)\n-- Expected output:\n-- warn\n-- queue is long`} />
+
+`2` and `3` name the first and last positions to read, so the date at position `1` is never looked
+at and the two values that come back land in the two variables in order.
+
+### The count comes from the run, not from the list
+
+<RunnableExample usesEntry={false} code={`local pantry = {"cocoa", "flour"}\n-- unpack(pantry, 1, 4) and unpack(pantry, 3, 2) counted the same way\nprint(select("#", table.unpack(pantry, 1, 4)))\nprint(select("#", table.unpack(pantry, 3, 2)))\n-- Expected output:\n-- 4\n-- 0`} />
+
+Four positions asked for, four values back, two of them `nil` because the list stops at `2`. Ask
+for a run that starts after it ends and nothing comes back — not a `nil`, nothing at all.
+
+### Where the run is kept whole
+
+<RunnableExample usesEntry={false} code={`local guest_names = {"ada", "grace"}\n-- unpack(guest_names) behaved the same way in both positions\nprint(table.unpack(guest_names))\nprint(table.unpack(guest_names), "plus one")\n-- Expected output:\n-- ada\tgrace\n-- ada\tplus one`} />
+
+Last in the argument list, both values arrive. With something after it, the run is cut down to its
+first value and the second guest is quietly lost.
+
+## Gotchas
+
+<Gotcha title="A list with a hole in it does not come back the way it went in">
+The default `j` is `#list`, which stops where the stored positions stop rather than where the data
+does. A list assembled from values that might be `nil` therefore gives back fewer values than went
+in — silently, and only sometimes, because how many depends on where the hole fell. Carrying the
+count separately and passing it as `j` is the fix, and
+[`table.pack()`](/docs/standard-library/table/pack) is what carries it.
+</Gotcha>
+
+<Gotcha title="It is a rename, not a different function">
+This and the prefixed spelling are one function that moved rather than two functions that behave
+alike, so putting the prefix back is what the port asks for. Rewriting a call as a loop, or
+reaching for a different function while the name is already being touched, invites a change of
+behaviour the rename by itself would not have introduced.
+</Gotcha>
+
+## See also
+
+- [`table.unpack()`](/docs/standard-library/table/unpack) — the same function under the name it answers to now
+- [`table.pack()`](/docs/standard-library/table/pack) — the near-inverse, and the count that makes the pair exact
+- [`select()`](/docs/standard-library/globals/select) — counting a run of values, or reaching past its first
+- [Multiple results](/docs/language/expressions/multiple-results) — where a run of values is kept whole and where it is cut down
+- [The length operator](/docs/language/expressions/length-operator) — what the default `j` is measured with

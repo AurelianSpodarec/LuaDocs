@@ -1,8 +1,160 @@
 ---
 title: setfenv()
-description: ""
+description: Replace the table a function resolves its global names through.
+lua-compat: globals.setfenv
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-setfenv
 ---
 
-{/* Not yet written. */}
+Replaces the table a function resolves its global names through — its *environment* — so that
+every global the function reads or writes from then on lands in a table of the caller's choosing.
+No global does this to an already-built function now. The table is chosen where the code is written
+or where it is loaded, which the section below sets out.
+
+<RunnableExample usesEntry={false} code={`local allowances = { overnight_allowed = true }\n-- setfenv(guarded, allowances) put this table under an already-built function\nlocal guarded = assert(load("return overnight_allowed", "guarded", "t", allowances))\nprint(guarded())\nprint(overnight_allowed)\n-- Expected output:\n-- true\n-- nil`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so they
+show the standing-in code doing the work and name the old call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+setfenv(f, table)
+```
+
+<Parameters>
+  <Param name="f">Which function to change: the function itself, or a number naming a stack level counted outward from the caller, where `1` is the function making this call. A `0` means the running thread instead of any one function.</Param>
+  <Param name="table">The table the function is to resolve its global names through from then on.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function">The function whose environment was set — the one passed in, or the one found at the level named. Nothing at all when `f` was `0`, because no single function was changed.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `table` is not a table, including when it is left out. This is checked before the function is even looked for, so a bad second argument is reported whatever the first one holds.
+- Raises when `f` is neither a function nor a number naming a stack level.
+- Raises when `f` is a number below zero.
+- Raises when the level names no call on the stack — asking for a caller further out than the outermost one.
+- Raises when the level names a call the interpreter holds no function for. That is what a tail call leaves behind: the frame it replaced still takes up a level, and nothing is recorded at it.
+- Raises when the function named is not a Lua function. A C function has an environment that this call declines to touch, and the debug library is what reaches it.
+
+</Errors>
+
+## Description
+
+[`getfenv()`](/docs/standard-library/globals/getfenv#what-a-function-environment-is) sets out what
+an environment is and how a function comes by one; this call is the other half of that pair, and
+everything below is what it adds.
+
+The change is made to the function value rather than to one invocation of it, and it takes effect
+at once. A function that changes its own environment — `setfenv(1, ...)` — reads its remaining
+global names out of the new table, and so does every later call to it. Nothing is saved and put
+back afterwards: the previous table is gone from that function's point of view unless the caller
+kept a reference to it first.
+
+When the change is visible to a *nested* function depends on when that function was created. A
+closure the changed function had already built was handed the old table and goes on using it, while
+one it builds after the change inherits the new one. Two closures written a few lines apart can
+therefore see different globals, which is the most surprising thing about the call.
+
+A level of `0` is not a function at all: it changes the running thread's environment, which is the
+table new chunks loaded by that thread will start with. That is the widest form of the call and
+the only one that hands nothing back.
+
+## Setting an environment without this call
+
+Environments themselves did not go anywhere. What changed is that the environment stopped being
+something a call reaches in and swaps, and became *a variable named `_ENV`*. Every chunk is
+compiled inside the scope of that variable, and a global name in the source is shorthand for a
+field of whatever `_ENV` holds at that point in the text. So there is no substitution to make, one
+call for another — the decision moves from run time to the point where the code is written or
+loaded. Three shapes cover what the call was used for:
+
+- *Give a whole chunk a table of its own.*
+  [`load()`](/docs/standard-library/globals/load#choosing-the-environment) takes the table as an
+  argument, and the chunk it hands back resolves every global name through it. This is the closest
+  thing to the old call and the one to reach for when the source is arriving from somewhere else.
+- *Give a stretch of code you are writing a table of its own.* Because `_ENV` is an ordinary name
+  following the ordinary scope rules, `local _ENV = wherever` at the top of a function or a `do`
+  block redirects every global name in the text below it, and nothing outside that scope. It is
+  lexical: it is decided by where the assignment sits in the source, not by who is running.
+- *Pass the table in as an argument.* Often the honest answer. Code that was reaching for an
+  environment in order to look names up in a table can take the table as a parameter and index it,
+  which is visible in the signature and needs no environment at all.
+
+Two of the call's abilities have no successor among the globals, and they are worth naming rather
+than working around:
+
+- *Changing a function you were handed.* A function compiled somewhere else carries its own
+  environment, and no global writes a new one under it. The debug library can set the upvalue that
+  holds it, which is a debugger's reach rather than a shape to build a program on.
+- *Changing everything at once.* The `0` form moved a whole thread onto a new table of globals in
+  one line. Each chunk now holds its own reference to its environment, so a chunk already loaded is
+  unaffected by anything done afterwards and redirecting several means redirecting each.
+
+The practical consequence is that a sandbox is built at the door rather than after the fact: the
+table is decided when the untrusted source is loaded, and code already running is left alone.
+
+## Examples
+
+### Redirecting the globals of the code you are writing
+
+<RunnableExample usesEntry={false} code={`local counters = { parcels_seen = 0 }\n\nlocal function tally(amount)\n  -- setfenv(1, counters) did this to the running function\n  local _ENV = counters\n  parcels_seen = parcels_seen + amount\n  return parcels_seen\nend\n\nprint(tally(3))\nprint(tally(4))\nprint(counters.parcels_seen)\n-- Expected output:\n-- 3\n-- 7\n-- 7`} />
+
+`parcels_seen` is written as a global and is a field of `counters`, because that is what `_ENV`
+holds where the name appears. The redirection stops at the end of the function, so the code around
+it is untouched.
+
+### A table that has to hold everything the code uses
+
+<RunnableExample usesEntry={false} code={`local bare = {}\nlocal narrow = assert(load("return string", "narrow", "t", bare))\nprint(narrow())\n\nlocal supplied = { string = string }\nlocal wide = assert(load("return string.upper('airmail')", "wide", "t", supplied))\nprint(wide())\n-- Expected output:\n-- nil\n-- AIRMAIL`} />
+
+A table with nothing in it is a set of globals with nothing in it, so the standard libraries stop
+being reachable by name. Whatever the code is allowed to use has to be put in the table, one entry
+per name.
+
+### A function handed in keeps the globals it was built with
+
+<RunnableExample usesEntry={false} code={`local recorded_notes = {}\nlocal function remember(label)\n  recorded_notes[#recorded_notes + 1] = label\nend\n\nlocal sandbox = { note = remember }\n-- setfenv could have changed remember itself; giving it away cannot\nlocal chunk = assert(load("note('picked') note('packed')", "chunk", "t", sandbox))\nchunk()\nprint(#recorded_notes)\nprint(recorded_notes[1])\nprint(rawget(_G, "note"))\n-- Expected output:\n-- 2\n-- picked\n-- nil`} />
+
+The table decides which names the chunk can reach. It does not decide anything about `remember`,
+which was compiled elsewhere, keeps its own globals, and writes into a local the chunk cannot see
+or name.
+
+### One source, two tables, two behaviours
+
+<RunnableExample usesEntry={false} code={`local metric = { unit_name = "kg" }\nlocal imperial = { unit_name = "lb" }\nlocal source = "return 'weighed in ' .. unit_name"\n-- setfenv on one compiled function, twice, gave the same pair of behaviours\nprint(assert(load(source, "metric", "t", metric))())\nprint(assert(load(source, "imperial", "t", imperial))())\n-- Expected output:\n-- weighed in kg\n-- weighed in lb`} />
+
+Where the call would have compiled once and re-pointed the result, the standing-in shape compiles
+once per table. The compile costs something and the result is two independent functions rather
+than one whose meaning depends on when it is called.
+
+## Gotchas
+
+<Gotcha title="Functions made afterwards inherit the change and functions made before do not">
+A function picks up its environment when it is created. So changing a function's environment
+leaves the closures it has already built reading the old table, while closures it builds from then
+on read the new one. Code that redirects globals halfway through a run ends up with two sets of
+functions that disagree about what a global name means, and nothing in either of them says so.
+</Gotcha>
+
+<Gotcha title="Nothing puts the old table back for you">
+The call replaces the reference and keeps no history. A function that redirected its own globals
+in order to do one thing differently has no way to undo that afterwards unless it saved the
+previous table before making the change. This is the strongest argument for deciding the table at
+the point the code is loaded: a chunk given a table when it was built cannot lose track of where
+it started, because it never started anywhere else.
+</Gotcha>
+
+## See also
+
+- [`getfenv()`](/docs/standard-library/globals/getfenv#what-a-function-environment-is) — the reading direction, and where the shared explanation of environments lives
+- [`load()`](/docs/standard-library/globals/load#choosing-the-environment) — handing a chunk its table when it is compiled, which is where the choice is made now
+- [`_G`](/docs/standard-library/globals/_g) — the table the ordinary globals live in
+- [`loadstring()`](/docs/standard-library/globals/loadstring) — compiling source that a table like this is usually being built for
+- [`module()`](/docs/standard-library/globals/module) — a call that used this one on its caller, and why that turned out badly

@@ -1,8 +1,180 @@
 ---
 title: module()
-description: ""
+description: Set a file up as a module by installing a table and redirecting the file's globals into it.
+lua-compat: globals.module
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-module
 ---
 
-{/* Not yet written. */}
+Sets the file that calls it up as a module: it finds the table the given name already stands for or
+builds one and installs it as a global, records it so that
+[`require()`](/docs/standard-library/globals/require) hands it back, then makes the table the
+environment of the calling function so that everything the rest of the file declares as a global
+lands inside it. What stands in its place is not another call but a pattern — a file that builds an
+ordinary local table and returns it.
+
+<RunnableExample usesEntry={false} code={`local shipping_path = "module-example-shipping.lua"\nlocal shipping_file = assert(io.open(shipping_path, "w"))\nshipping_file:write("local shipping = {}\\n")\nshipping_file:write("function shipping.cost(weight_kg)\\n")\nshipping_file:write("  return weight_kg * 3\\n")\nshipping_file:write("end\\n")\nshipping_file:write("return shipping\\n")\nshipping_file:close()\n\n-- module("shipping") would have built the table and named it for you\nlocal shipping = assert(loadfile(shipping_path))()\nprint(shipping.cost(4))\nprint(rawget(_G, "shipping"))\nos.remove(shipping_path)\n-- Expected output:\n-- 12\n-- nil`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so they
+show the standing-in pattern doing the work and name the old call in a comment beside it. The call
+itself is in the syntax below. Each example writes its own file into the sandbox's own filesystem
+and removes it again; nothing touches a file on your machine.
+</Note>
+
+## Syntax
+
+```lua
+module(name [, ···])
+```
+
+<Parameters>
+  <Param name="name">The module's name. A name with dots in it stands for a path through nested tables: `parcels.rates` means the field `rates` of a table held under the global `parcels`.</Param>
+  <Param name="···">Options, each a function that is called with the module table as its only argument once the module has been set up.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing to assign. The table is reached through the global name the call installs and through `package.loaded`, which is where `require()` looks for it — not through a value taken from the call.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `name` is neither a string nor a number, including when it is left out.
+- Raises when the global name it would install, or one of the components of a dotted name, is already taken by something that is not a table. A table already recorded under the name is reused rather than refused, so this bites only where the collision is with an unrelated value.
+
+</Errors>
+
+## Description
+
+The call does four things in order, and the fourth is the one that decides how the file above and
+below it has to be written.
+
+*It finds the table.* A table already recorded under the name is the module. Failing that, a global
+table of that name is the module. Failing that, a fresh table is made, installed under the global
+name, and recorded so the name resolves to it from then on. So calling twice with one name lands on
+one table rather than replacing it.
+
+*It fills in three fields*, on a table that has not been set up as a module before: `_NAME`, the
+module's own name; `_M`, a reference back to the table itself; and `_PACKAGE`, the package part of a
+dotted name — everything before the last component. A table already carrying `_NAME` is left as it
+is, which is how a second call under one name avoids resetting the first.
+
+*It installs the table where module loading looks.* `package.loaded` is the record `require()`
+consults, and that is what makes the table the value a caller receives.
+
+*It makes the table the environment of the calling function.* From the call onwards, every global
+name in the file is a field of the module table: `function cost(weight_kg)` declares a global, the
+global is a field of the table, and so the function becomes part of the module without being named
+twice. That is the trick the whole design rests on, and it is also its problem — the file has
+swapped the table its global names resolve through, so the standard library is no longer reachable
+by name from inside it.
+
+A dotted name builds the path as it goes. `parcels.rates` finds or creates a global table
+`parcels`, then finds or creates its `rates` field, and the module table is that field. So a group
+of related modules assembles a tree of global tables between them.
+
+## What the options were for
+
+An option is a function, and the call applies each one to the module table in the order the options
+were given. The library documents one such function: `package.seeall`, whose job is to undo the
+side effect of the fourth step above.
+
+It gives the module table a metatable whose `__index` is the global environment. Names the module
+table holds are found in it as before; names it does not hold fall through to the ordinary globals,
+so `print` and `string` become reachable again from the body of the file. Passing it as an option
+was, in practice, how most files that used this call were written — which is a fair summary of how
+well the environment swap worked out.
+
+The cost of that convenience is that the module table then answers to the program's global names as
+well as its own. A lookup of a field the module does not have no longer stops at `nil`: it reads
+whatever global shares that name, if one does, so a typo inside the module and a typo in code using
+the module can both find something rather than nothing.
+
+## The pattern that replaced it
+
+A module is a value, and the way to produce a value from a file is to return it. The whole of the
+replacement is three lines around whatever the module actually does:
+
+```lua
+local parcel_rates = {}
+
+-- functions and fields go here, as fields of the local table
+
+return parcel_rates
+```
+
+[`require()`](/docs/standard-library/globals/require) records the value a file returns — where
+there is one — and hands it back to whoever asked for the module, so the returned table reaches
+callers by the same route the old call arranged by hand. Four things follow, and together they are
+the reason the pattern won:
+
+- *Nothing is installed in the globals.* The table is a local until it is returned, so a module that
+  is never required leaves no trace, and two modules cannot collide over a name neither of them
+  chose.
+- *The file keeps its own globals.* Nothing has swapped the environment, so `print`, `string` and
+  the rest are reachable throughout, with no option needed to put them back.
+- *The caller names the module.* `local rates = require("parcel_rates")` binds it to whatever local
+  name suits the calling file, and a second file may bind it to another.
+- *The `local` keyword is what tells public from private.* A value declared local in the file is
+  closed over by the functions that use it and reaches nobody else; a field written onto the
+  returned table is public. The old shape drew the same line with the same keyword, but it drew it
+  somewhere surprising: a name written as an ordinary global there became part of the module rather
+  than part of the program.
+
+Where a module was reached as `parcels.rates`, the tree of global tables becomes a path on disk:
+the file sits where the searcher looks for that name, and the caller writes
+`require("parcels.rates")` exactly as before. What changes is that the nesting lives in the module
+names rather than in a set of global tables the modules built between them.
+
+## Examples
+
+### Keeping state the module's callers cannot reach
+
+<RunnableExample usesEntry={false} code={`local counter_path = "module-example-counter.lua"\nlocal counter_file = assert(io.open(counter_path, "w"))\ncounter_file:write("local dispatched = 0\\n")\ncounter_file:write("local dispatch_log = {}\\n")\ncounter_file:write("function dispatch_log.record()\\n")\ncounter_file:write("  dispatched = dispatched + 1\\n")\ncounter_file:write("  return dispatched\\n")\ncounter_file:write("end\\n")\ncounter_file:write("return dispatch_log\\n")\ncounter_file:close()\n\n-- under module("dispatch_log"), a running count had to be a field of the module\nlocal dispatch_log = assert(loadfile(counter_path))()\ndispatch_log.record()\nprint(dispatch_log.record())\nprint(rawget(_G, "dispatched"))\nos.remove(counter_path)\n-- Expected output:\n-- 2\n-- nil`} />
+
+The count is a local of the file, closed over by the one function that touches it. Callers hold the
+table and cannot reach the number through it, and the program's globals never hear about either.
+
+### The file can still see the standard library
+
+<RunnableExample usesEntry={false} code={`local labels_path = "module-example-labels.lua"\nlocal labels_file = assert(io.open(labels_path, "w"))\nlabels_file:write("local labels = {}\\n")\nlabels_file:write("function labels.describe(parcel_count)\\n")\nlabels_file:write("  return string.format('%d parcels', parcel_count)\\n")\nlabels_file:write("end\\n")\nlabels_file:write("return labels\\n")\nlabels_file:close()\n\n-- after module("labels"), reaching string.format needed an option\nlocal labels = assert(loadfile(labels_path))()\nprint(labels.describe(7))\nos.remove(labels_path)\n-- Expected output: 7 parcels`} />
+
+`string.format` is an ordinary global read, and the file resolves it where every other file does.
+Nothing had to be passed to make that so, which is the plainest measure of what the environment
+swap was costing.
+
+### What require hands back, and hands back again
+
+<RunnableExample usesEntry={false} code={`local rates_path = "module-example-rates.lua"\nlocal rates_file = assert(io.open(rates_path, "w"))\nrates_file:write("return { overnight = 12, standard = 4 }\\n")\nrates_file:close()\n\n-- module("module-example-rates") reached callers by the same record\nlocal rates = require("module-example-rates")\nprint(rates.overnight)\nprint(require("module-example-rates") == rates)\n\npackage.loaded["module-example-rates"] = nil\nos.remove(rates_path)\n-- Expected output:\n-- 12\n-- true`} />
+
+The value the file returned is what the caller gets, and the second request answers with the same
+table rather than reading the file again. The last two lines are the example tidying up after
+itself, and are not part of the pattern.
+
+## Gotchas
+
+<Gotcha title="Everything after the call is inside the module">
+The call swaps the environment of the file that made it, so from that line on a global read is a
+read of the module table. `print` is `nil` there, `string` is `nil` there, and a helper the file
+meant to keep to itself becomes a public field the moment it is declared as a global. Files using
+the call were written either with an option putting the globals back or with every library name
+copied into a local above the call — both of them ceremony that the returned-table pattern does not
+need.
+</Gotcha>
+
+<Gotcha title="The module announces itself to the whole program">
+The table is installed under a global name as a side effect of the file being run, so a module
+becomes reachable from code that never asked for it. What happens when the name is already in use
+depends on what is holding it: a table already there is adopted as the module rather than replaced,
+and anything that is not a table stops the call outright. Neither outcome is one the module author
+chose, which is what the advice against modules setting global variables is about, and why the
+replacement builds a local and hands it back rather than announcing itself.
+</Gotcha>
+
+## See also
+
+- [`require()`](/docs/standard-library/globals/require) — how a module is found, loaded once, and handed to its callers
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling a file so it can be run and its value taken, which is what the pattern relies on
+- [`setfenv()`](/docs/standard-library/globals/setfenv) — the environment swap this call performed on its caller
+- [`_G`](/docs/standard-library/globals/_g) — the table the installed global name lands in
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — the mechanism behind the fall-through option, in its own right

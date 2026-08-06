@@ -1,8 +1,146 @@
 ---
 title: loadstring()
-description: ""
+description: Compile Lua source held in a string into a function, without running any of it.
+lua-compat: globals.loadstring
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-loadstring
 ---
 
-{/* Not yet written. */}
+Compiles a chunk of Lua source held in a string and hands it back as a function, without running a
+line of it. Source that does not compile is not an error here: `nil` comes back, followed by a
+message saying what the compiler objected to.
+[`load()`](/docs/standard-library/globals/load) is where this went: where that call reads source
+text, `load(source)` is this call under another name.
+
+<RunnableExample usesEntry={false} code={`local expression = "return 12 * 4"\n-- loadstring(expression) compiled exactly this\nlocal compute = assert(load(expression))\nprint(compute())\n-- Expected output: 48`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so they
+show the standing-in call doing the work and name the old call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+loadstring(string [, chunkname])
+```
+
+<Parameters>
+  <Param name="string">The Lua source to compile.</Param>
+  <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, the source text itself is used.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
+  <Return type="string">What the compiler objected to, as text meant for a person to read. Present on the failing path only: a call that compiled something hands back the function and nothing after it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `string` is a value there is no source to be read from, including when it is left out. A table, a boolean or `nil` in that position is refused before anything is compiled.
+- Raises when `chunkname` is given and is neither a string nor a number. Leaving it out and passing `nil` both mean the default name, and neither is a mistake.
+- Source that does not compile does not raise. It arrives as the two return values instead, which is what makes a protected call around this one unnecessary.
+
+</Errors>
+
+## Description
+
+Turning source into behaviour takes two steps, and this call performs the first and stops. What
+comes back is an ordinary function value — assignable, passable, callable as often as you like, and
+inert until something calls it. [`load()`](/docs/standard-library/globals/load#what-a-chunk-is)
+sets out what a chunk is and what follows from Lua treating one as an anonymous function taking a
+variable number of arguments; all of it applies to what this call produces.
+
+The gap between compiling and running is the reason to reach for the call at all. Source arriving
+while the program is running — a pricing rule out of a config file, an expression somebody typed —
+can be checked for syntax before anything acts on it, and called at a moment of the caller's
+choosing rather than at the moment it was read.
+
+A failure to compile is reported the way a lookup that found nothing is reported, not the way a
+mistake is: `nil` first, then a message. Code that wants the failure to be loud writes
+[`assert()`](/docs/standard-library/globals/assert) around the call, and
+`assert(loadstring(source))()` was the documented shape for compiling and running in one step. It
+hands back the function when there is one and raises carrying the compiler's message when there is
+not.
+
+The name given as `chunkname` is what a later failure inside the chunk is reported against. Left
+out, the source text stands in for a name, which reads well for a one-line expression and badly for
+anything longer — a name of your own is worth the second argument as soon as the source is more
+than a line.
+
+## Writing it as a call to load
+
+The successor takes source text as its first argument, and the swap is name for name:
+`loadstring(source)` becomes `load(source)`, `loadstring(source, name)` becomes
+`load(source, name)`, and the two return values arrive the same way in both.
+
+The one thing to check before making the swap is at the other end of it. Where
+[`load()`](/docs/standard-library/globals/load) does not read source text, it reads a function
+called over and over to supply the source a piece at a time — and a string handed to it there is
+refused as a bad argument rather than compiled. So the rename is safe in the direction code
+usually travels and not in the other; `load`'s own entry carries which is which.
+
+Where the swap does apply, the two behave alike: the same kind of function comes back, a failure is
+reported through the same two values, and leaving the name out means the source text on both sides.
+`load()` also takes arguments this call's own signature does not name — which forms of chunk are
+acceptable, and a table for the chunk to resolve its global names through — and leaving those out
+is what makes the two-argument call the plain rename it looks like.
+
+## Examples
+
+### Loading and running in one step
+
+<RunnableExample usesEntry={false} code={`local audit_line = "return 'checked ' .. 4 .. ' parcels'"\n-- assert(loadstring(audit_line))() was the documented idiom\nprint(assert(load(audit_line))())\n-- Expected output: checked 4 parcels`} />
+
+The wrapper turns the two return values into one: the function, or a raise carrying the compiler's
+complaint. The trailing `()` then runs what came back, which is the only thing that runs any of the
+source.
+
+### Source that takes arguments
+
+<RunnableExample usesEntry={false} code={`local template = "local width_mm, height_mm = ... return width_mm * height_mm"\n-- loadstring(template, "area rule") produced the same function\nlocal area = assert(load(template, "area rule"))\nprint(area(6, 7))\n-- Expected output: 42`} />
+
+A chunk is compiled as a function taking a variable number of arguments, so the text can read its
+inputs from `...` and be called more than once with different ones. Naming it is what makes a later
+failure point at `area rule` rather than at the source text.
+
+### Asking whether something compiles
+
+<RunnableExample usesEntry={false} code={`-- loadstring answered the same way, with the same two values\nprint(load("return 4 +") == nil)\nprint(load("return 4 + 5") == nil)\n-- Expected output:\n-- true\n-- false`} />
+
+Because the call stops before anything runs, a syntax check is just a compile and a look at the
+first return value. It is the cheapest validation available for source that arrived from outside,
+and it says nothing at all about whether the code is safe to run — only that it parses.
+
+### Choosing between stored rules
+
+<RunnableExample usesEntry={false} code={`local rules = {\n  standard = "return 20",\n  bulk = "return 15",\n}\n-- loadstring(rules.bulk, "bulk") compiled the chosen one\nlocal chosen = assert(load(rules.bulk, "bulk"))\nprint(chosen())\n-- Expected output: 15`} />
+
+The rules live as text and become functions only when one is picked. Compiling on demand keeps the
+cost to the rule actually used, and naming each after its key is what makes a failure inside one
+identifiable.
+
+## Gotchas
+
+<Gotcha title="Nothing in the string has run when the call returns">
+A successful call has compiled the source and done nothing else. Side effects the source describes
+— a global assigned, a table filled in — have not happened, and code that compiles a chunk and
+forgets to call it sees no error and no effect. The trailing `()` in the documented idiom is
+carrying more weight than it looks.
+</Gotcha>
+
+<Gotcha title="The compiler's wording is not part of the language">
+The second return value is written for a person to read, and how it is phrased belongs to the
+compiler rather than to Lua. Code that branches on *whether* the source compiled has the first
+return value to test; code that branches on the wording of the second is reading something a later
+Lua may phrase differently.
+</Gotcha>
+
+## See also
+
+- [`load()`](/docs/standard-library/globals/load) — where this went, and what it accepts as a chunk
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — the same compilation, with the source read from a file
+- [`dofile()`](/docs/standard-library/globals/dofile) — reading a file and running it in one step, reporting failure by raising
+- [`assert()`](/docs/standard-library/globals/assert) — the wrapper in the documented idiom, turning the two return values into a raise
+- [`setfenv()`](/docs/standard-library/globals/setfenv) — the call that used to decide which globals a freshly compiled chunk could see
