@@ -94,8 +94,9 @@ than working around:
   environment, and no global writes a new one under it. The debug library can set the upvalue that
   holds it, which is a debugger's reach rather than a shape to build a program on.
 - *Changing everything at once.* The `0` form moved a whole thread onto a new table of globals in
-  one line. Each chunk now holds its own reference to its environment, so a chunk already loaded is
-  unaffected by anything done afterwards and redirecting several means redirecting each.
+  one line. Each chunk now holds its own reference to its environment, so changing where *newly
+  loaded* chunks start does not reach the ones already loaded, and redirecting several means
+  redirecting each.
 
 The practical consequence is that a sandbox is built at the door rather than after the fact: the
 table is decided when the untrusted source is loaded, and code already running is left alone.

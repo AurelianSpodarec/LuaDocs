@@ -34,7 +34,7 @@ module(name [, ···])
 </Parameters>
 
 <Returns>
-  <Return type="none">Nothing to assign. The table is reached through the global name the call installs and through `package.loaded`, which is where `require()` looks for it — not through a value taken from the call.</Return>
+  <Return type="none">The table is reached through the global name the call installs and through `package.loaded`, which is where `require()` looks for it — not through a value taken from the call.</Return>
 </Returns>
 
 <Errors>
@@ -56,8 +56,11 @@ one table rather than replacing it.
 
 *It fills in three fields*, on a table that has not been set up as a module before: `_NAME`, the
 module's own name; `_M`, a reference back to the table itself; and `_PACKAGE`, the package part of a
-dotted name — everything before the last component. A table already carrying `_NAME` is left as it
-is, which is how a second call under one name avoids resetting the first.
+dotted name. That last one is the name up to and *including* the dot before the final component, so
+`parcels.rates` gives `"parcels."` with the dot still on it, and a name with no dot in it gives an
+empty string — worth knowing before writing code that compares the field against anything. A table
+already carrying `_NAME` is left as it is, which is how a second call under one name avoids
+resetting the first.
 
 *It installs the table where module loading looks.* `package.loaded` is the record `require()`
 consults, and that is what makes the table the value a caller receives.

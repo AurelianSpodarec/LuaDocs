@@ -33,7 +33,7 @@ loadstring(string [, chunkname])
 
 <Returns>
   <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
-  <Return type="string">What the compiler objected to, as text meant for a person to read. Present on the failing path only: a call that compiled something hands back the function and nothing after it.</Return>
+  <Return type="string">What went wrong, present on the failing path only: a call that compiled something hands back the function and nothing after it. The compiler's objection to source it will not accept arrives as text meant for a person to read. Where this call reaches a chunk supplied a piece at a time rather than given as text, a failure raised inside the supplier is reported here too, and what arrives then is not necessarily a string — [`load()`](/docs/standard-library/globals/load) sets out that case.</Return>
 </Returns>
 
 <Errors>

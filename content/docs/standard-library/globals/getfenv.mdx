@@ -30,7 +30,7 @@ getfenv([f])
 </Parameters>
 
 <Returns>
-  <Return type="table">The table that function resolves its global names through. For anything that is not a Lua function, and for a level of `0`, the global environment comes back instead.</Return>
+  <Return type="table">The table that function resolves its global names through. For a C function, and for a level of `0`, the global environment comes back instead.</Return>
 </Returns>
 
 <Errors>
@@ -54,9 +54,9 @@ outward. The number is the useful form when the code that wants to know is a hel
 about whoever invoked it without that caller having to hand itself over.
 
 A level of `0` is a special answer rather than a further step outward: it names the global
-environment, the table a thread hands to the chunks it loads. Anything that is not a Lua function
-gets the same answer for a different reason — a C function has an environment of its own, but not
-one this call reports, and reaching it takes the debug library rather than this call.
+environment, the table a thread hands to the chunks it loads. A C function gets the same answer for
+a different reason — it has an environment of its own, but not one this call reports, and reaching
+that one takes the debug library rather than this call.
 
 What comes back is the table itself, not a description of it and not a copy. Writing a field into
 it puts a global within reach of every function sharing it, and clearing one takes a global away.
@@ -94,8 +94,9 @@ whatever that variable holds at that point in the text. A variable is read where
 inside ordinary code the table is something you have at the point it is chosen rather than
 something to go and find later.
 
-The debug library still gets at it — a Lua function carries its environment as an upvalue, and
-upvalues can be listed and read by name from outside the function. That is a route for a debugger
+The debug library still gets at it — a Lua function that reads a global carries its environment as
+an upvalue, and upvalues can be listed and read by name from outside the function. (A function that
+reads no global has no such upvalue, and nothing to report.) That is a route for a debugger
 rather than one to build a program on, and it is the same answer a C function's environment already
 had while this call existed.
 
