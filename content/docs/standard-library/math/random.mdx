@@ -28,12 +28,12 @@ math.random([m [, n]])
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">A float below one when the call carries no arguments; a whole number from inside the range when it carries one or two.</Return>
+  <Return type="integer or float">A float below one when the call carries no arguments. A whole number otherwise — from inside the range the arguments describe, or from across the whole integer range for the single `0` that describes none.</Return>
 </Returns>
 
 <Errors>
 
-- Raises when the range holds nothing — with two arguments, when `m` is above `n`; with one argument, when `m` names a value below one.
+- Raises when the range holds nothing — with two arguments, when `m` is above `n`; with one argument, when `m` is negative.
 - Raises when an argument is neither a number nor a string that reads as one.
 - <Since v="5.3" /> Raises when an argument is a number carrying a fraction, or one too large to be written as an integer.
 - Raises when more than two arguments are passed.
@@ -86,9 +86,13 @@ Multiplying that fraction is the general way to reach any span, including one of
 width: `low + chance * (high - low)` covers everything from `low` up to but never reaching
 `high`.
 
-### Each shape answers with its own subtype
+### Each shape answers with its own kind of number
 
-<RunnableExample code={`local chance = math.random()\nlocal die_roll = math.random(1, 6)\nprint(math.type(chance))\nprint(math.type(die_roll))\n-- Expected output:\n-- float\n-- integer`} />
+<RunnableExample code={`local chance = math.random()\nlocal die_roll = math.random(1, 6)\nprint(chance < 1)\nprint(die_roll == math.floor(die_roll))\n-- Expected output:\n-- true\n-- true`} />
+
+The no-argument call answers below one and with a fraction on it; every other shape answers
+with a whole number. [`math.type()`](/docs/standard-library/math/type) is what names the
+subtype behind that difference, where Lua tells the two apart.
 
 ### Every draw lands inside the range
 
@@ -118,7 +122,7 @@ duplicated one would show up here immediately.
 
 ### Asking for every bit
 
-<RunnableExample code={`local session_label = math.random(0)\nprint(math.type(session_label))\n-- Expected output: integer`} />
+<RunnableExample code={`local session_label = math.random(0)\nprint(session_label == math.floor(session_label))\n-- Expected output: true`} />
 
 A single `0` is the one argument that is not a bound. The result covers the whole integer
 range, so roughly half of what it produces is negative — something to label a run with, not

@@ -19,8 +19,8 @@ math.randomseed([x [, y]])
 ```
 
 <Parameters>
-  <Param name="x">Optional. The first component of the seed.</Param>
-  <Param name="y">Optional. The second component. Left out, it counts as zero.</Param>
+  <Param name="x">The seed's first component — on its own, the whole seed.</Param>
+  <Param name="y">A second component, folded in with the first. Left out, it counts as zero.</Param>
 </Parameters>
 
 <Returns>
@@ -37,13 +37,13 @@ math.randomseed([x [, y]])
 
 ## Description
 
-There is one generator in a Lua program and this sets its state. Every part of the program
-that draws a number is drawing from that one stream, so a seed set anywhere lands everywhere,
-including inside libraries that never asked for it.
-
 Called with arguments, it uses them. Called with none, it builds a seed from whatever the run
 can offer that varies — a weak attempt at unpredictability, not a strong one, and never a
 source of secrets.
+
+There is one generator in a Lua program and this sets its state. Every part of the program
+that draws a number is drawing from that one stream, so a seed set anywhere lands everywhere,
+including inside libraries that never asked for it.
 
 Either way it hands back the two components of the seed it settled on. That return is what
 makes an unpredictable run reproducible after the fact: let the run choose its own seed, write

@@ -23,7 +23,7 @@ math.tointeger(x)
 </Parameters>
 
 <Returns>
-  <Return type="integer">The integer `x` names. `nil` when it names none, which covers every value that is not a number as well as the numbers that do not fit.</Return>
+  <Return type="integer">The integer `x` names. `nil` when it names none — a number carrying a fraction, one outside the integer range, and any value that names no number at all. A string reading as a whole number does name one, and converts.</Return>
 </Returns>
 
 <Errors>
@@ -113,8 +113,12 @@ it was asked.
 
 <Gotcha title="A successful conversion changes the subtype, not the value">
 `math.tointeger(42.0) == 42.0` is true, because a whole float and the integer beside it compare
-equal — and a function wanting an integer would have accepted `42.0` in the first place, since
-it names one exactly. What the conversion changes is how the value prints, and how it behaves
+equal — and a function that demands an exact integer value, as
+[`math.ult()`](/docs/standard-library/math/ult) does, would have accepted `42.0` in the first
+place, since it names one exactly. A guard written as `math.type(value) == "integer"` would
+not, because that one asks about storage rather than about value, and this call is exactly what
+turns a `42.0` into something it accepts. What the conversion changes is how the value prints,
+and how it behaves
 once the magnitudes grow past the point where a float can still name every whole number. When
 it looks as though nothing happened, [`math.type()`](/docs/standard-library/math/type) is what
 shows that something did.

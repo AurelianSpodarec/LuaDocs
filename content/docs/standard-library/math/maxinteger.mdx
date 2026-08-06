@@ -68,10 +68,11 @@ an upper bound over integer data — but only where the bound may be a float. Wh
 has to stay an integer, because it will end up as a count or a position, this constant is the
 stand-in for "no limit" that `math.huge` cannot be.
 
-It is also the largest value `<` will call positive, and the midpoint of unsigned order:
-[`math.ult()`](/docs/standard-library/math/ult) reads the same bits with the top one counted as
-value rather than as sign, and every pattern above this constant in that reading is one `<`
-calls negative.
+It is also the largest value `<` will call positive, and the top of the lower half in unsigned
+order: [`math.ult()`](/docs/standard-library/math/ult) reads the same bits with the top one
+counted as value rather than as sign, and every pattern above this constant in that reading is
+one `<` calls negative. The pattern immediately above it —
+[`math.mininteger`](/docs/standard-library/math/mininteger)'s — is where the upper half starts.
 
 ## Examples
 
@@ -121,6 +122,6 @@ describe. Reading the value from here costs nothing and cannot go stale.
 - [`math.huge`](/docs/standard-library/math/huge) — the float bound above every integer, and the seed a running minimum wants
 - [`math.tointeger()`](/docs/standard-library/math/tointeger) — asking whether a float has an exact integer form, which a float near this bound does not
 - [`math.type()`](/docs/standard-library/math/type) — telling an integer from a float, which matters most at this end of the range
-- [`math.ult()`](/docs/standard-library/math/ult) — comparing the same bits as unsigned, where this value is the midpoint
+- [`math.ult()`](/docs/standard-library/math/ult) — comparing the same bits as unsigned, where this value tops the lower half
 - [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — the wrapping this constant marks the edge of
 - [Numbers](/docs/language/values-and-types/number) — the integer and float ranges, and how Lua converts between them

@@ -48,7 +48,8 @@ range, where an integer wraps around and a float loses precision instead.
 ## The three answers
 
 *`"integer"`.* The value is stored as an integer. Whole-number literals, counts, lengths, list
-indices, and the results of integer arithmetic all arrive this way.
+indices, and the results of arithmetic on integers — with the two exceptions named below, `/`
+and `^`, which answer with a float however whole their operands were.
 
 *`"float"`.* The value is stored as a float. Any literal with a `.` or an exponent, and
 anything that came out of `/` or `^`, which convert their operands and always answer with a
