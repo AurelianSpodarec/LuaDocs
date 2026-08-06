@@ -1,8 +1,137 @@
 ---
 title: math.pow()
-description: ""
+description: Raise one number to the power of another, as the exponentiation operator does.
+lua-compat: math.pow
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.pow
 ---
 
-{/* Not yet written. */}
+Raises a base to an exponent and hands the answer back as a float. The exponentiation
+operator computes the same value from the same two numbers, so `base ^ exponent` is what to
+write in its place — the manual's own description of this call points at the operator
+sitting beside it. The value is the same. What the operator adds is a precedence, a grouping
+rule and a route through a metatable, and those are the parts of the swap worth reading
+before making it.
+
+<RunnableExample usesEntry={false} code={`local principal = 1200\nlocal growth_factor = 1.045\nlocal years = 5\n-- math.pow(growth_factor, years) computed exactly this power\nprint(string.format("%.2f", principal * growth_factor ^ years))\n-- Expected output: 1495.42`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they show the operator doing the work and name the old call in a comment beside it. The
+call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.pow (x, y)
+```
+
+<Parameters>
+  <Param name="x">The base — the number being raised.</Param>
+  <Param name="y">The exponent — the power to raise it to. Fractions and negative values are as welcome here as whole numbers.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">`x` raised to the power `y`. A float whatever the two arguments were, since exponentiation is done in floating point and hands back a float even where both numbers had no fraction on them.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out.
+- Raises when `y` is neither a number nor a string that reads as one, including when it is left out.
+
+</Errors>
+
+## Description
+
+There is one idea here: the base multiplied by itself as many times as the exponent says,
+generalised so that the exponent need not be a whole number. A fractional exponent takes a
+root — a half is a square root, a third a cube root — and a negative exponent takes the
+reciprocal of what the positive one would have given, so `2.5 ^ -0.5` is one over the square
+root of `2.5`. That generality is why the operation is worth a name rather than a loop.
+
+The answer is a float, and stays a float even where both arguments were whole numbers and the
+answer has no fraction on it. Nothing here rounds or mirrors its arguments, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call — and does not reach the operator either.
+
+The call and the operator arrive at the same underlying exponentiation, which is why the
+value comes out the same and why there is nothing to check when swapping one for the other on
+two numbers. Reading the library's own code shows both routes reaching the C power function.
+The one shortcut a build may take is on squaring, where the operator can multiply the number
+by itself rather than call the power function at all — the faster of the two, and the same
+answer on any sensible floating-point library. What changes is everything else around the
+value.
+
+**The operator has a precedence; the call had none.** Inside a call the arguments are fenced
+off by the brackets and the comma, so nothing outside can bind to them. Written as an
+operator, `^` binds more tightly than a leading minus sign and groups from the right when
+several are chained, so `-base ^ 2` is the negation of a square rather than the square of a
+negation, and `2 ^ 3 ^ 2` is two raised to the ninth rather than eight squared. Both are in
+the examples below, and both are places where unwrapping a call into an operator changes the
+answer without changing anything visible.
+
+**The operator can be answered by a metatable.** This call reads two numbers and turns down
+anything that is not one. The operator consults a value's
+[`__pow` metamethod](/docs/language/metatables/arithmetic-metamethods) when the value is not
+a number, so an object standing in for a quantity — a vector, a decimal, a measurement
+carrying a unit — can respond to `^` where it could never have been passed here. That widens
+what goes through: an argument that used to be turned down at the call may now be accepted
+and produce something that is not a number at all.
+
+Strings that read as numbers travel either way, so `"2" ^ "3"` gives eight as a float, which
+is what the call would have answered too.
+
+## Examples
+
+### A fractional, negative exponent
+
+<RunnableExample usesEntry={false} code={`local damping_ratio = 2.5\n-- math.pow(damping_ratio, -0.5) asked for the same value\nprint(string.format("%.6f", damping_ratio ^ -0.5))\n-- Expected output: 0.632456`} />
+
+One over the square root, in a single operation. An exponent of `-0.5` is the usual way to
+write an inverse square root, and it wants neither a division nor a call to
+[`math.sqrt()`](/docs/standard-library/math/sqrt).
+
+### The operator binds tighter than a minus sign
+
+<RunnableExample usesEntry={false} code={`local temperature_delta = 3\nprint(-temperature_delta ^ 2 == -(temperature_delta ^ 2))\nprint(-temperature_delta ^ 2 == (-temperature_delta) ^ 2)\n-- Expected output:\n-- true\n-- false`} />
+
+`math.pow(-temperature_delta, 2)` squares a negative number and gives `9.0`. Written without
+brackets the operator squares first and negates afterwards, giving `-9.0`. A squared
+deviation that arrives negative is usually this, and a pair of brackets is the fix.
+
+### A chain of exponents groups from the right
+
+<RunnableExample usesEntry={false} code={`print(2 ^ 3 ^ 2 == 2 ^ (3 ^ 2))\nprint(2 ^ 3 ^ 2 == (2 ^ 3) ^ 2)\n-- Expected output:\n-- true\n-- false`} />
+
+Most binary operators in Lua group from the left; this one and concatenation group from the
+right. Nested calls made the grouping visible and cost a pair of brackets to say so. The
+operator makes it implicit and costs a pair of brackets to say otherwise.
+
+## Gotchas
+
+<Gotcha title="Unwrapping the call into the operator in place can change the answer">
+`math.pow(a, b)` is self-contained. `a ^ b` is an expression among other expressions, and it
+takes its place in the precedence table — above unary minus, and grouping rightward against
+itself. So a call sitting inside a larger expression does not reliably survive being
+unwrapped where it stands. The version of the swap that is safe to make without reading the
+surrounding line is to keep the brackets: parenthesise each argument, or parenthesise the
+whole expression where it sits inside something bigger.
+</Gotcha>
+
+<Gotcha title="The operator accepts values the call turned down">
+The call reads numbers, and a table, a boolean or a `nil` reaching it raises there and then.
+The operator looks at the value's metatable first, so a value carrying a `__pow` metamethod
+answers rather than failing, and a value carrying none fails somewhere else with a different
+message. Where the arguments were never certain to be numbers, the check that came free with
+the call is worth writing back in by hand.
+</Gotcha>
+
+## See also
+
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, the replacement, among the rest of the arithmetic
+- [Operator precedence](/docs/language/expressions/operator-precedence) — where `^` sits in the table, and which way a chain of them groups
+- [Arithmetic metamethods](/docs/language/metatables/arithmetic-metamethods) — `__pow`, which the operator consults and this call did not
+- [`math.sqrt()`](/docs/standard-library/math/sqrt) — the square root as a named call, and how it compares against an exponent of a half
+- [`math.exp()`](/docs/standard-library/math/exp) — raising *e* in particular, computed directly rather than as a power of a stored constant

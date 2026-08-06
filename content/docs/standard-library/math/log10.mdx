@@ -1,8 +1,137 @@
 ---
 title: math.log10()
-description: ""
+description: Take the base-ten logarithm of a number.
+lua-compat: math.log10
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.log10
 ---
 
-{/* Not yet written. */}
+Answers the question "ten to what power gives this number?". Passing ten as a second argument
+to [`math.log()`](/docs/standard-library/math/log) asks the same question, so
+`math.log(x, 10)` is what to write in its place — with one thing to check first, because
+where `math.log` reads a single argument the ten is dropped in silence.
+
+<RunnableExample usesEntry={false} code={`local hydrogen_ion_concentration = 0.0000032\n-- math.log10(hydrogen_ion_concentration) answered the same question\nprint(string.format("%.2f", -math.log(hydrogen_ion_concentration, 10)))\n-- Expected output: 5.49`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they show the replacement doing the work and name the old call in a comment beside it. The
+call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.log10 (x)
+```
+
+<Parameters>
+  <Param name="x">The number to take the base-ten logarithm of.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The power ten must be raised to in order to give `x`. A float whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out. Anything passed after it is ignored rather than turned down.
+
+</Errors>
+
+## Description
+
+Base ten is the base of counting in digits, so this is the logarithm that measures *orders of
+magnitude*: the whole part of the answer counts the powers of ten and the fraction says where
+inside that decade the number sits. Everything the function is used for follows from that — decibels,
+pH, a Richter figure, an axis that has to hold both `3` and `3000000` on one chart.
+
+The answer is a float, and stays one even where it lands on a whole number. Nothing here
+rounds or mirrors its argument, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call.
+
+An argument of zero or below has no logarithm, and the answer says so without raising: zero
+gives a negative infinity and a negative number gives a not-a-number value. Both are ordinary
+float values that travel onward through arithmetic looking like results, which is why a
+pipeline that can produce a zero wants its guard here rather than three steps later.
+[`math.log()`](/docs/standard-library/math/log) carries the detail of how those two values
+behave once they are loose.
+
+## The replacement, and where it is silent
+
+`math.log(x, 10)` is the base-ten logarithm written the way the rest of the library writes
+logarithms, and it is worth more than brevity: passing the base is not the same as dividing
+one logarithm by another, and
+[`math.log()`](/docs/standard-library/math/log#choosing-a-base) sets out the difference.
+
+The check is at the other end. Where `math.log` reads a single argument, a second one is not
+turned down — it is dropped, and the call answers with the natural logarithm instead. The
+result is a number, it is plausible, and it is larger than the base-ten answer by a factor of
+about `2.3`, which is the sort of error that reads as a units problem rather than as a wrong
+function. So a two-argument call to `math.log` is portable in one direction only, and
+in the other direction the base-ten logarithm has to be built by hand:
+
+```lua
+math.log(x) / math.log(10)
+```
+
+That form works wherever `math.log` does. It divides two natural logarithms and rounds twice
+on the way, so it is a hair off the direct answer for numbers whose logarithm should land on
+a whole number — which matters when the answer is about to be compared or rounded rather than
+printed.
+
+## Examples
+
+### Turning a concentration into a pH
+
+<RunnableExample usesEntry={false} code={`local hydrogen_ion_concentration = 0.000000015\n-- math.log10(hydrogen_ion_concentration) computed the inner value\nprint(string.format("%.2f", -math.log(hydrogen_ion_concentration, 10)))\n-- Expected output: 7.82`} />
+
+A pH is the negated base-ten logarithm of a concentration, which is the shape of every scale
+built to compress a range that spans many powers of ten: take the logarithm, then adjust the
+sign and the scale to taste.
+
+### Counting the digits in a number
+
+<RunnableExample usesEntry={false} code={`local file_size_bytes = 48000\n-- math.log10(file_size_bytes) gave the same starting point\nprint(math.floor(math.log(file_size_bytes, 10)) + 1)\n-- Expected output: 5`} />
+
+The whole part of a base-ten logarithm is one less than the digit count, so rounding down and
+adding one turns the logarithm into the width a number needs. This is the calculation behind
+choosing a column width or an axis label.
+
+### Building it by hand where the base argument is not read
+
+<RunnableExample usesEntry={false} code={`local file_size_bytes = 48000\n-- math.log10(file_size_bytes) was one call rather than two\nprint(string.format("%.4f", math.log(file_size_bytes) / math.log(10)))\n-- Expected output: 4.6812`} />
+
+Two natural logarithms and a division. It reaches the same value and runs anywhere `math.log`
+does, which is what makes it the fallback rather than the recommendation.
+
+## Gotchas
+
+<Gotcha title="A dropped base argument answers rather than failing">
+`math.log(x, 10)` is the right replacement and it is not universally available, and the way
+it is unavailable is the problem: the extra argument is ignored rather than reported, so the
+call hands back a natural logarithm with nothing to mark it. Each value is off by the same
+factor, so the shape of a chart or a scale survives and only the numbers on it are wrong.
+Where the code has to run in both settings, the division form above is the one that behaves
+the same in each.
+</Gotcha>
+
+<Gotcha title="The two replacements differ on a power of ten">
+A base-ten logarithm asked for directly lands on a whole number for a power of ten, and the
+division form does not: it takes two natural logarithms and rounds twice, and the answer comes
+back a hair either side of the number the mathematics promises. So code that moves from
+`math.log(x, 10)` to `math.log(x) / math.log(10)` for portability, and keeps an `==` against a
+whole number, changes behaviour on exactly the inputs it was most confident about.
+[`math.log()`](/docs/standard-library/math/log#choosing-a-base) shows the pair disagreeing.
+Round the answer, or ask the question the other way round by testing `10 ^ digits` against the
+number, which involves no logarithm at all.
+</Gotcha>
+
+## See also
+
+- [`math.log()`](/docs/standard-library/math/log) — the replacement, and how choosing a base works
+- [`math.exp()`](/docs/standard-library/math/exp) — the inverse for the natural base
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity an argument of zero answers with, negated
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, the operation a logarithm undoes
+- [Numbers](/docs/language/values-and-types/number) — why a logarithm rarely lands exactly on a whole number

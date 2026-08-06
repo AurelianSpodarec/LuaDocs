@@ -60,6 +60,14 @@ import mathPi from './data/math.pi.json';
 import mathHuge from './data/math.huge.json';
 import mathMaxinteger from './data/math.maxinteger.json';
 import mathMininteger from './data/math.mininteger.json';
+import mathPow from './data/math.pow.json';
+import mathAtan2 from './data/math.atan2.json';
+import mathCosh from './data/math.cosh.json';
+import mathSinh from './data/math.sinh.json';
+import mathTanh from './data/math.tanh.json';
+import mathLog10 from './data/math.log10.json';
+import mathFrexp from './data/math.frexp.json';
+import mathLdexp from './data/math.ldexp.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -183,6 +191,26 @@ const raw: Record<string, unknown> = {
   'math.huge': mathHuge,
   'math.maxinteger': mathMaxinteger,
   'math.mininteger': mathMininteger,
+  // The eight that leave. Availability here is read off the *manual*, on the rule
+  // `table.maxn` set: a version whose manual calls a function deprecated is a version
+  // that has it, and the removal is the first version whose manual stops mentioning it
+  // at all. So `log10` — deprecated in one Incompatibilities chapter and absent from the
+  // next — goes a version before the other seven, which are named together in a single
+  // later sentence. A stock build keeps all eight alive one line further still, behind a
+  // compatibility switch the manual never mentions; that is a property of a makefile
+  // rather than of a Lua version, and the dataset deliberately does not record it.
+  'math.pow': mathPow,
+  'math.atan2': mathAtan2,
+  'math.cosh': mathCosh,
+  'math.sinh': mathSinh,
+  'math.tanh': mathTanh,
+  'math.log10': mathLog10,
+  // The two that come back. `version_restored` exists for exactly this pair: documented,
+  // dropped from the documentation, then given entries of their own again — and given
+  // them unguarded, in the main body of the library rather than in its compatibility
+  // block. `ldexp` alone changed while it was away, in what it accepts as an exponent.
+  'math.frexp': mathFrexp,
+  'math.ldexp': mathLdexp,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

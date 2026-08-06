@@ -1,8 +1,155 @@
 ---
 title: math.frexp()
-description: ""
+description: Split a number into a fraction and a power of two.
+lua-compat: math.frexp
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.frexp
 ---
 
-{/* Not yet written. */}
+Takes a number apart into the two pieces a binary float is made of: a fraction whose size sits
+between a half and one, and the whole-number power of two that scales it back up. Multiplying
+the two together returns the number exactly.
+[`math.ldexp()`](/docs/standard-library/math/ldexp) is the way back, and where this call is
+not available the split can be worked out with halving and doubling alone.
+
+<RunnableExample usesEntry={false} code={`local mantissa = 0.8125\nlocal exponent = 6\n-- math.frexp(52) handed back exactly this pair\nprint(string.format("%.4f x 2^%d = %.1f", mantissa, exponent, mantissa * 2.0 ^ exponent))\n-- Expected output: 0.8125 x 2^6 = 52.0`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they work the split out with arithmetic and name the call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.frexp (x)
+```
+
+<Parameters>
+  <Param name="x">The number to take apart.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The fraction — a number whose size lies at or above a half and below one, carrying the sign of `x`. A zero, an infinity or a not-a-number argument comes back unchanged here instead, since none of the three has a fraction to separate out.</Return>
+  <Return type="integer">The power of two the fraction has to be scaled by to give `x` back. Where the first value is the argument itself there is no exponent to report, and the number handed over alongside it is not one to build on.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out. Anything passed after it is ignored rather than turned down.
+
+</Errors>
+
+## Description
+
+A binary float is stored as a fraction and an exponent already; this call hands over the two
+of them as separate numbers rather than as one value. The fraction is *normalised*, which
+means its size is brought into the span from a half up to but not including one — so the
+exponent is pinned down rather than being one of many that would work. The sign travels with
+the fraction, and the exponent counts doublings, so it is negative for a number below a half
+and positive for one at or above one.
+
+The split is exact in both directions. Nothing is rounded on the way out, and
+[`math.ldexp()`](/docs/standard-library/math/ldexp) puts the pieces back together without
+rounding either, so a number that has been through the pair is the same float it started as.
+That is what makes the call useful for the things it is used for: comparing magnitudes without
+overflow, writing a float out in a portable format, or normalising a set of readings by their
+largest member.
+
+Three kinds of input have no fraction to separate out, and the answer names them by handing
+the argument straight back as the first value: a zero of either sign, an infinity of either
+sign, and a not-a-number value. The pair still multiplies back to the argument in each of
+those cases — scaling any of the three by a power of two leaves it as it was — so the round
+trip stays honest without a special case in the code around it.
+
+The first value is a float and the second is a count. Nothing here rounds or mirrors the
+argument, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach the
+fraction.
+
+## Working the split out without the call
+
+Halving and doubling are exact, so the normalising can be done in a loop with nothing lost:
+
+```lua
+local fraction = value
+local exponent = 0
+while fraction >= 1 or fraction <= -1 do
+  fraction = fraction / 2
+  exponent = exponent + 1
+end
+while fraction ~= 0 and fraction > -0.5 and fraction < 0.5 do
+  fraction = fraction * 2
+  exponent = exponent - 1
+end
+```
+
+One loop brings a large number down and the other brings a small one up; a number already in
+range enters neither. The `fraction ~= 0` test is what stops a zero argument spinning forever
+in the second loop, and it happens to give the same answer the call gives — the argument back,
+with an exponent of zero.
+
+Two things this does not reproduce. It walks one power of two at a time, so a number at the
+far end of the float range takes hundreds of iterations where the call takes none. And an
+infinity satisfies the first loop's test and never leaves it, so an argument that might be one
+wants a check in front of the loop. Neither matters for ordinary numbers, and both are reasons
+to prefer the call where there is one.
+
+Reaching for a logarithm instead is the tempting shortcut and the one to avoid; the gotcha
+below sets out the two separate ways it goes wrong.
+
+## Examples
+
+### Taking a number apart
+
+<RunnableExample usesEntry={false} code={`local sample_value = 6.5\nlocal fraction = sample_value\nlocal exponent = 0\nwhile fraction >= 1 or fraction <= -1 do\n  fraction = fraction / 2\n  exponent = exponent + 1\nend\n-- math.frexp(sample_value) reached the same pair without a loop\nprint(string.format("%.4f  %d", fraction, exponent))\n-- Expected output: 0.8125  3`} />
+
+Three halvings bring `6.5` into range, and `0.8125` is what is left. The number was never
+rounded — halving a float shifts its exponent and leaves its digits untouched — so the pair
+describes the original exactly rather than approximately.
+
+### The pair rebuilds the number
+
+<RunnableExample usesEntry={false} code={`local readings = { 6.5, 0.1, -1024, 3 }\nfor index = 1, #readings do\n  local fraction = readings[index]\n  local exponent = 0\n  while fraction >= 1 or fraction <= -1 do\n    fraction = fraction / 2\n    exponent = exponent + 1\n  end\n  while fraction ~= 0 and fraction > -0.5 and fraction < 0.5 do\n    fraction = fraction * 2\n    exponent = exponent - 1\n  end\n  -- math.frexp(readings[index]) produced the same pair\n  print(fraction * 2.0 ^ exponent == readings[index])\nend\n-- Expected output:\n-- true\n-- true\n-- true\n-- true`} />
+
+A number below a half, one above one, a negative one and a number a float cannot hold exactly
+in the first place. All four come back as the same float they went in as, which is the
+property the whole call rests on.
+
+### Comparing magnitudes without doing the arithmetic
+
+<RunnableExample usesEntry={false} code={`local readings = { 0.1, 6.5, 1024 }\nfor index = 1, #readings do\n  local fraction = readings[index]\n  local exponent = 0\n  while fraction >= 1 do\n    fraction = fraction / 2\n    exponent = exponent + 1\n  end\n  while fraction ~= 0 and fraction < 0.5 do\n    fraction = fraction * 2\n    exponent = exponent - 1\n  end\n  -- math.frexp(readings[index]) gave the exponent directly\n  print(string.format("%d doublings", exponent))\nend\n-- Expected output:\n-- -3 doublings\n-- 3 doublings\n-- 11 doublings`} />
+
+The exponent alone says how big a number is to within a factor of two, and it says so as a
+small whole number. Sorting or bucketing by it costs no logarithm and cannot overflow, which
+is the usual reason to reach for this call rather than for
+[`math.log()`](/docs/standard-library/math/log).
+
+## Gotchas
+
+<Gotcha title="The fraction stops below one, not at it">
+The span is a half up to one with the upper end left out, so `1` never appears as a fraction
+and `0.5` does. A power of two is where this surprises people: `1024` splits as `0.5` and
+eleven doublings rather than as `1` and ten, and a check written as "is the fraction one" for
+a power of two is looking for a value the call does not produce.
+</Gotcha>
+
+<Gotcha title="A logarithm is the wrong way to recover the exponent">
+`math.floor(math.log(value, 2)) + 1` looks like the same answer and is not reliably it, for
+two separate reasons. Where `math.log` reads a single argument the base is dropped in silence
+and a natural logarithm gets floored instead, which is wrong by a factor before the rounding
+even starts. And where the base is read, a base-two logarithm of a power of two lands on a
+whole number in the mathematics without being guaranteed to in a float, so the floor can drop
+a step and take the exponent with it — on exactly the inputs where the answer looks most
+obviously right. Halving and doubling in a loop needs neither caveat, and the call needs
+neither and is quick besides.
+</Gotcha>
+
+## See also
+
+- [`math.ldexp()`](/docs/standard-library/math/ldexp) — the way back, and the exact scaling this split relies on
+- [`math.modf()`](/docs/standard-library/math/modf) — the other way of splitting a number in two, into a whole part and a fraction
+- [`math.log()`](/docs/standard-library/math/log) — the logarithm this call is often mistaken for, and why the two disagree on a power of two
+- [`math.abs()`](/docs/standard-library/math/abs) — taking the sign off before splitting, where only the magnitude matters
+- [Numbers](/docs/language/values-and-types/number) — the fraction-and-exponent shape a float already has

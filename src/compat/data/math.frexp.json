@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1", "version_removed": "5.4", "version_restored": "5.5" } },
+  "changed_in": {
+    "5.3": "Deprecated, and no longer documented as part of the library. It is still here and still splits a number the same way."
+  }
+}

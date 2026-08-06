@@ -1,8 +1,141 @@
 ---
 title: math.ldexp()
-description: ""
+description: Scale a number by a power of two, exactly and in one step.
+lua-compat: math.ldexp
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.ldexp
 ---
 
-{/* Not yet written. */}
+Multiplies a number by two raised to a whole-number power, and does it by adjusting the
+number's exponent rather than by working the power out first. It is the way back from the
+pair [`math.frexp()`](/docs/standard-library/math/frexp) hands out, and the operation behind
+anything measured in octaves, stops or binary orders of magnitude. Where the call is not
+available, `m * 2.0 ^ e` computes the same value for any argument that is not near the ends
+of the float range.
+
+<RunnableExample usesEntry={false} code={`local sample_level = 0.6\nlocal octaves_up = 3\n-- math.ldexp(sample_level, octaves_up) is this, in one step\nprint(string.format("%.4f", sample_level * 2.0 ^ octaves_up))\n-- Expected output: 4.8000`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they scale by an explicit power of two and name the call in a comment beside it. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.ldexp (m, e)
+```
+
+<Parameters>
+  <Param name="m">The number to scale. Any number, not only a mantissa in the range [`math.frexp()`](/docs/standard-library/math/frexp) produces.</Param>
+  <Param name="e">The exponent — how many times to double the number, or, when negative, how many times to halve it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">`m` multiplied by two raised to the power `e`. A float whatever the two arguments were.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `m` is neither a number nor a string that reads as one, including when it is left out.
+- Raises when `e` is neither a number nor a string that reads as one, including when it is left out.
+- <Since v="5.3" /> Raises when `e` carries a fraction rather than an exact whole-number value. A float with nothing after the point is accepted; `3.5` is not.
+
+</Errors>
+
+## Description
+
+Scaling by a power of two is the multiplication a binary float can do without rounding. The
+exponent field moves and the significant digits stay where they were, so the result carries
+the digits the input carried — no more and no fewer — for as long as the result stays inside
+the range where a float holds its full precision. That is what separates this from
+multiplying by `10`, or by `1.5`: those introduce a rounding step, and this does not.
+
+Two consequences follow, and they are the reason the operation is worth a name. Scaling up and
+back down again returns the original number bit for bit, so a value can be moved into a
+convenient range for a calculation and moved back afterwards with nothing lost. And the
+operation is cheap in a way a general power is not, because there is no power to compute.
+
+The answer is a float, and stays one where both arguments were whole numbers and the answer
+has no fraction on it. Nothing here rounds or mirrors its arguments, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call.
+
+The exponent is a count of doublings, so `0` leaves the number alone, a positive value doubles
+it that many times and a negative one halves it. There is no restriction on the number being
+scaled: it need not be a mantissa, need not be positive, and need not be inside any particular
+range.
+
+## Writing it out where the call is unavailable
+
+`m * 2.0 ^ e` is the stand-in, and for ordinary arguments it is exact for the same reason the
+call is: `2.0 ^ e` is itself a power of two with no rounding in it, and multiplying by one
+shifts the exponent without touching the digits.
+
+It parts company at the ends of the range, and it parts company in the direction that loses
+information. `2.0 ^ e` has to be a representable float in its own right before the
+multiplication happens, so an exponent past about `1024` gives an infinity and one below about
+`-1074` gives a zero — and then the multiplication has nothing useful left to work with. The
+call has no such intermediate: it adjusts the exponent of the number it was handed, so it can
+scale a very small number up by a very large power and land somewhere perfectly ordinary. The
+third example shows the difference and the way around it, which is to split the exponent into
+two smaller ones and scale twice.
+
+For anything inside a few hundred powers of two — which is most uses — the two are the same
+value.
+
+## Examples
+
+### Gain in octaves
+
+<RunnableExample usesEntry={false} code={`local sample_level = 0.6\nlocal gains = { -3, 0, 4 }\nfor index = 1, #gains do\n  -- math.ldexp(sample_level, gains[index]) gave each of these\n  print(string.format("%d octaves: %.6f", gains[index], sample_level * 2.0 ^ gains[index]))\nend\n-- Expected output:\n-- -3 octaves: 0.075000\n-- 0 octaves: 0.600000\n-- 4 octaves: 9.600000`} />
+
+Halving three times, leaving alone, and doubling four times. An exponent of zero is a valid
+request rather than a special case to skip, which is what lets a gain table hold a neutral
+entry without the code around it noticing.
+
+### Scaling there and back changes nothing
+
+<RunnableExample usesEntry={false} code={`local measured_value = 0.1\nlocal scaled = measured_value * 2.0 ^ 5\n-- math.ldexp(measured_value, 5) and math.ldexp(scaled, -5) make the same round trip\nprint(scaled / 2.0 ^ 5 == measured_value)\nprint(measured_value * 2.0 ^ 20 / 2.0 ^ 20 == measured_value)\n-- Expected output:\n-- true\n-- true`} />
+
+Exactly equal, not nearly. `0.1` is a number a float cannot hold exactly in the first place,
+and the round trip still returns the same float it started with, because scaling by a power of
+two never touched the digits that were there.
+
+### Where the stand-in runs out and the call would not
+
+<RunnableExample usesEntry={false} code={`local tiny_value = 1e-300\n-- math.ldexp(tiny_value, 1100) had a perfectly ordinary answer\nprint(tiny_value * 2.0 ^ 1100 == math.huge)\nprint(tiny_value * 2.0 ^ 550 * 2.0 ^ 550 < math.huge)\n-- Expected output:\n-- true\n-- true`} />
+
+The first line asks for `2.0 ^ 1100` as a value, does not get one, and multiplies a tiny
+number by an infinity. The second splits the same scaling into two halves, neither of which
+overflows on its own, and arrives at the finite answer the whole operation always had. The
+call needs neither trick, because it never builds the power at all.
+
+## Gotchas
+
+<Gotcha title="A computed exponent is worth rounding at the call site">
+The exponent is a count, and a count that arrived through a division or a logarithm is a float
+with a fraction on it more often than not. Passing one is not reliably accepted, and where it
+is accepted it is truncated towards zero rather than rounded — so a value that should have
+been `7` and arrived as `6.999999999999999` scales by `2 ^ 6`, halving the answer in silence.
+Wrap a computed exponent in
+[`math.floor()`](/docs/standard-library/math/floor) and add the rounding you meant, rather
+than leaving it to be discarded.
+</Gotcha>
+
+<Gotcha title="The stand-in overflows on an exponent the call handles">
+`m * 2.0 ^ e` builds the power as a value first, so the exponent is limited by what a float can
+hold rather than by what the answer needs. Scaling a very small number up by a very large power
+is the case that breaks: the answer is ordinary and the intermediate is not. Splitting the
+exponent in two, as the third example does, costs one extra multiplication and removes the
+limit.
+</Gotcha>
+
+## See also
+
+- [`math.frexp()`](/docs/standard-library/math/frexp) — the split this call puts back together
+- [`math.floor()`](/docs/standard-library/math/floor) — turning a computed exponent into a whole number before passing it
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, which the stand-in is built from
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity an over-large intermediate power becomes
+- [Numbers](/docs/language/values-and-types/number) — why scaling by a power of two costs no rounding where other multiplications do

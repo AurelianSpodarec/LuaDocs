@@ -1,8 +1,142 @@
 ---
 title: math.sinh()
-description: ""
+description: The hyperbolic sine — half the difference between a rising and a falling exponential.
+lua-compat: math.sinh
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.sinh
 ---
 
-{/* Not yet written. */}
+The hyperbolic sine: half the difference between *e* raised to the argument and *e* raised to
+its negation. Nothing in the library replaced it, so the way to write it now is the
+definition itself — `(math.exp(x) - math.exp(-x)) / 2` — and that subtraction is the one
+place a hand-built version parts company with the call it stands in for, near an argument of
+zero.
+
+<RunnableExample usesEntry={false} code={`local cable_constant = 40\nlocal horizontal_offset = 25\nlocal scaled_offset = horizontal_offset / cable_constant\n-- math.sinh(scaled_offset) produced this value in one call\nlocal hyperbolic_sine = (math.exp(scaled_offset) - math.exp(-scaled_offset)) / 2\nprint(string.format("%.4f", cable_constant * hyperbolic_sine))\n-- Expected output: 26.6597`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they build the value out of [`math.exp()`](/docs/standard-library/math/exp) and name the
+old call in a comment beside it. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.sinh (x)
+```
+
+<Parameters>
+  <Param name="x">The argument, in the same units the exponential takes — a plain number, not an angle.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The hyperbolic sine of `x`. A float whatever `x` was, carrying the sign of the argument and climbing away from zero in both directions.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out.
+
+</Errors>
+
+## Description
+
+The name borrows from trigonometry and the behaviour does not. The circular sine oscillates
+between `-1` and `1`; this climbs away from zero in both directions and keeps climbing. Its
+best-known appearance is the length of a hanging cable measured out from the lowest point,
+which is why the lead example measures one, and it is the odd partner of
+[`math.cosh()`](/docs/standard-library/math/cosh) wherever the two turn up together.
+
+Two properties come straight out of the definition. It is *odd*: negating the argument
+negates the answer, because negating the argument swaps the two exponentials and so flips the
+sign of the difference between them. And it passes through zero at zero, where both
+exponentials are `1` and the difference between them is nothing at all.
+
+The answer is a float, and stays one at an argument of zero where it lands exactly on `0`.
+Nothing here rounds or mirrors its argument, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call.
+
+Writing the function out by hand carries the general costs set out on
+[`math.cosh()`](/docs/standard-library/math/cosh#rebuilding-a-hyperbolic-function-by-hand) —
+in short, an intermediate exponential that overflows before the answer would have, and no
+error to say so. The special case below belongs to this function alone.
+
+## Where the subtraction costs precision
+
+`math.exp(x)` and `math.exp(-x)` approach each other as the argument approaches zero. Their
+difference is what this function is built from, and subtracting two nearly equal floats
+cancels the digits they agree on: what survives is what lay underneath, including the
+rounding each exponential already carried, so the answer holds fewer significant digits than
+either input did. The smaller the argument, the worse the trade.
+
+The behaviour is not dramatic and is easy to overlook, because the answer stays the right
+size and only its trailing digits are wrong. At an argument around a thousandth, the loss is
+somewhere out past the tenth significant digit and nothing above it notices. At an argument
+around a hundred-trillionth, the relative error has reached the fourth digit — visible in the
+second example below, where a ratio that should be `1` comes back as `0.9992`.
+
+The rescue is to stop subtracting. For a small argument the hyperbolic sine is very close to
+the argument itself, so a series is both faster and more accurate there:
+
+```lua
+local hyperbolic_sine = sample_offset + sample_offset * sample_offset * sample_offset / 6
+```
+
+Two terms of that are already better than the subtraction across the range where the
+subtraction hurts, and switching between the two on a threshold — somewhere around a
+thousandth — gives a hand-built version that behaves throughout. Where the argument is never
+small, the plain definition is fine and this section can be ignored.
+
+## Examples
+
+### The length of a hanging cable
+
+<RunnableExample usesEntry={false} code={`local cable_constant = 40\nlocal spans = { 10, 25, 40 }\nfor index = 1, #spans do\n  local scaled_offset = spans[index] / cable_constant\n  -- math.sinh(scaled_offset) is what this expression stands in for\n  local hyperbolic_sine = (math.exp(scaled_offset) - math.exp(-scaled_offset)) / 2\n  print(string.format("%d m out: %.4f m of cable", spans[index], cable_constant * hyperbolic_sine))\nend\n-- Expected output:\n-- 10 m out: 10.1045 m of cable\n-- 25 m out: 26.6597 m of cable\n-- 40 m out: 47.0080 m of cable`} />
+
+Ten metres out takes a little over ten metres of cable and forty metres out takes nearly
+forty-seven, which is the arc length of the same curve whose height
+[`math.cosh()`](/docs/standard-library/math/cosh) describes.
+
+### A small argument, and what the subtraction leaves
+
+<RunnableExample usesEntry={false} code={`local samples = { 0.001, 0.00000000000001 }\nfor index = 1, #samples do\n  local sample_offset = samples[index]\n  -- math.sinh(sample_offset) reached this value without any subtraction\n  local rebuilt = (math.exp(sample_offset) - math.exp(-sample_offset)) / 2\n  print(string.format("%.10f", rebuilt / sample_offset))\nend\n-- Expected output:\n-- 1.0000001667\n-- 0.9992007222`} />
+
+Divided by its own argument, a hyperbolic sine should approach `1` as the argument shrinks.
+The first line does. The second is heading the wrong way — the subtraction has eaten three
+digits by the time the argument is that small, and the answer is drifting away from the value
+it should be converging on.
+
+### The symmetry through zero
+
+<RunnableExample usesEntry={false} code={`local scaled_offset = 1.25\nlocal upward = (math.exp(scaled_offset) - math.exp(-scaled_offset)) / 2\nlocal downward = (math.exp(-scaled_offset) - math.exp(scaled_offset)) / 2\n-- math.sinh(scaled_offset) and math.sinh(-scaled_offset) related the same way\nprint(upward == -downward)\n-- Expected output: true`} />
+
+Exactly opposite rather than approximately so: the two calculations are the same pair of
+floats subtracted in opposite orders, and floating-point subtraction is symmetric that way
+even when it is inaccurate.
+
+## Gotchas
+
+<Gotcha title="A small argument is where the hand-built version is least accurate">
+The cancellation is harmless while the two exponentials differ and ruinous once they nearly
+agree, and they nearly agree exactly where the argument is nearly zero — the region a
+smoothing or damping calculation spends most of its time in. The answer stays the right size,
+so nothing looks wrong; what has gone is the tail of the digits, and it goes silently. Where
+the argument can be small, switch to the series above below a threshold.
+</Gotcha>
+
+<Gotcha title="This is not a sine of an angle">
+The argument is a plain number, not an angle, and the answer is not confined to any range.
+Feeding radians in here in the expectation of something between `-1` and `1` gives a number
+that grows without limit instead. The shared spelling comes from the algebra rather than from
+the two being interchangeable.
+</Gotcha>
+
+## See also
+
+- [`math.cosh()`](/docs/standard-library/math/cosh) — the even partner, and where the general costs of rebuilding these by hand are written out
+- [`math.tanh()`](/docs/standard-library/math/tanh) — this divided by the cosine, and the one that saturates
+- [`math.exp()`](/docs/standard-library/math/exp) — the function both terms are built from
+- [`math.sin()`](/docs/standard-library/math/sin) — the circular sine, which shares the name and nothing else
+- [Numbers](/docs/language/values-and-types/number) — why subtracting two nearly equal floats loses digits

@@ -1,8 +1,132 @@
 ---
 title: math.atan2()
-description: ""
+description: Recover an angle from a rise and a run, keeping the sign of both.
+lua-compat: math.atan2
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.atan2
 ---
 
-{/* Not yet written. */}
+Turns a rise and a run into the angle of the direction they point in, anywhere in the full
+circle, with the sign of each argument deciding the quadrant. `math.atan(y, x)` does exactly
+this — same two arguments, same order, same answer — so
+[`math.atan()`](/docs/standard-library/math/atan) is what to write in its place, with the
+name as the whole of the edit. The one thing to establish before making it is that the
+`math.atan` being written to reads both of its arguments, because where it reads one the
+second is dropped without a word.
+
+<RunnableExample usesEntry={false} code={`local east_offset = -6\nlocal north_offset = 8\n-- math.atan2(north_offset, east_offset) took these two arguments in this order\nprint(string.format("%.1f degrees", math.deg(math.atan(north_offset, east_offset))))\n-- Expected output: 126.9 degrees`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they show the replacement doing the work and name the old call in a comment beside it. The
+call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.atan2 (y, x)
+```
+
+<Parameters>
+  <Param name="y">The rise — the vertical component of the direction, and the numerator of the slope.</Param>
+  <Param name="x">The run — the horizontal component, and the denominator of the slope.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The angle in radians whose tangent is `y` divided by `x`, placed in the quadrant the two signs point to. A float whatever the arguments were.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `y` is neither a number nor a string that reads as one, including when it is left out.
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out. Both arguments are required here.
+
+</Errors>
+
+## Description
+
+The result is an angle in radians, so [`math.deg()`](/docs/standard-library/math/deg) is what
+makes it readable to anyone thinking in degrees. What separates this from taking the arc
+tangent of a ratio is that the ratio is never formed: the two components arrive as they were
+measured, and their signs are still there to be read. A rise of `3` over a run of `4` and a
+rise of `-3` over a run of `-4` divide to the same slope and describe opposite directions,
+and this call tells them apart where the division cannot.
+
+The full behaviour of the two-argument form — how the quadrant is chosen, what the span of
+the answer is, and why a run of zero is answered rather than guarded against — is written out
+on [`math.atan()`](/docs/standard-library/math/atan#the-second-argument-and-the-quadrant),
+which is the entry that still has it. Everything said there applies here unchanged.
+
+## Moving code across
+
+Forward, there is nothing to think about: change `math.atan2` to `math.atan` and leave the
+arguments alone. The replacement takes the rise first and the run second, exactly as this
+call does.
+
+Backwards is where care is needed, and it is worth knowing about even if the move is only
+ever forwards, because it decides whether a piece of code can be run on an older Lua at all.
+Where `math.atan` accepts a single argument, a second one is not turned down — it is
+*ignored*, and the call answers as though only the rise had been passed. So a two-argument
+call carried into that setting produces an angle rather than an error: the arc tangent of the
+rise on its own, which is a perfectly plausible number and the answer to a question nobody
+asked. Nothing at the call site distinguishes the two, and the failure shows up as a heading
+wrong by a quadrant rather than as anything that looks like a bug.
+
+That asymmetry is the reason this entry stays useful after the call itself is gone. Code that
+reads `math.atan(rise, run)` needs a Lua whose `math.atan` reads both arguments; code that
+reads `math.atan2(rise, run)` needs one that still has this function. There is no single
+spelling that covers the whole range, and the sign that the wrong one was chosen is a wrong
+number rather than a raised error.
+
+## Examples
+
+### The direction from one point to another
+
+<RunnableExample usesEntry={false} code={`local east_offset = -6\nlocal north_offset = -8\n-- math.atan2(north_offset, east_offset) answered the same way\nprint(string.format("%.1f", math.deg(math.atan(north_offset, east_offset))))\nprint(string.format("%.1f", math.deg(math.atan(north_offset / east_offset))))\n-- Expected output:\n-- -126.9\n-- 53.1`} />
+
+The same two numbers, handed over as a pair and as a ratio. The pair points down and to the
+left and gets an angle that says so; the ratio has had both minus signs cancelled out of it
+before the call and describes the opposite direction with a straight face.
+
+### Where the two forms agree
+
+<RunnableExample usesEntry={false} code={`local rise = 3\nlocal run = 4\n-- math.atan2(rise, run) and math.atan(rise / run) agreed here too\nprint(math.atan(rise, run) == math.atan(rise / run))\n-- Expected output: true`} />
+
+With both components positive there is no sign for the division to lose, and the two routes
+land on the same float. That is what makes the difference so easy to miss: a test suite whose
+data happens to point up and to the right passes either way.
+
+### A run of zero
+
+<RunnableExample usesEntry={false} code={`local vertical_only = { { 5, 0 }, { -5, 0 } }\nfor index = 1, #vertical_only do\n  local rise = vertical_only[index][1]\n  local run = vertical_only[index][2]\n  -- math.atan2(rise, run) needed no guard here either\n  print(string.format("%.1f", math.deg(math.atan(rise, run))))\nend\n-- Expected output:\n-- 90.0\n-- -90.0`} />
+
+Straight up and straight down. Forming the ratio first would divide by zero; handed the two
+components, the function has a definite answer for each and neither call needs guarding.
+
+## Gotchas
+
+<Gotcha title="The rise comes first, not the run">
+`math.atan2(y, x)` takes the numerator first, so a call written from the habit of naming a
+horizontal offset before a vertical one is reflected about the diagonal. It fails quietly:
+the angles are plausible and wrong by exactly the amount that looks like a sign convention
+problem somewhere else. The replacement inherits the order along with everything else, so a
+swap does not fix it and does not introduce it.
+</Gotcha>
+
+<Gotcha title="The replacement is silent where it is not available">
+Renaming this call to `math.atan` is exact where `math.atan` reads two arguments and quietly
+wrong where it reads one, because the extra argument is dropped rather than reported. Neither
+outcome raises, so the way to tell them apart is to check the answer: the arc tangent of
+a lone rise stays within a quarter turn of zero, while a genuine two-argument answer can
+reach anywhere in the circle. A direction that is never observed outside the first quadrant
+is a direction that has not been tested.
+</Gotcha>
+
+## See also
+
+- [`math.atan()`](/docs/standard-library/math/atan) — the replacement, and where the quadrant behaviour is written out
+- [`math.tan()`](/docs/standard-library/math/tan) — the function this one undoes
+- [`math.asin()`](/docs/standard-library/math/asin) — the inverse to reach for when a sloping length is what was measured
+- [`math.acos()`](/docs/standard-library/math/acos) — the inverse to reach for when an unsigned separation between directions is wanted
+- [`math.deg()`](/docs/standard-library/math/deg) — turning the radians this returns into degrees

@@ -1,8 +1,148 @@
 ---
 title: math.tanh()
-description: ""
+description: The hyperbolic tangent — a smooth curve that flattens out between minus one and one.
+lua-compat: math.tanh
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.tanh
 ---
 
-{/* Not yet written. */}
+The hyperbolic tangent: the hyperbolic sine divided by the hyperbolic cosine, which works out
+as a smooth curve through zero that flattens towards `-1` in one direction and `1` in the
+other. Nothing in the library replaced it, so it has to be written out — and of the three
+hyperbolic functions this is the one where the obvious way of writing it is the wrong one.
+`1 - 2 / (math.exp(2 * x) + 1)` is the form to use.
+
+<RunnableExample usesEntry={false} code={`local activation_input = 0.625\n-- math.tanh(activation_input) produced this value in one call\nlocal hyperbolic_tangent = 1 - 2 / (math.exp(2 * activation_input) + 1)\nprint(string.format("%.6f", hyperbolic_tangent))\n-- Expected output: 0.554600`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they build the value out of [`math.exp()`](/docs/standard-library/math/exp) and name the
+old call in a comment beside it. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.tanh (x)
+```
+
+<Parameters>
+  <Param name="x">The argument, in the same units the exponential takes — a plain number, not an angle.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The hyperbolic tangent of `x`. A float whatever `x` was, lying between `-1` and `1`, and settling on one of those two values once the argument is far enough from zero that the remaining gap stops being representable.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out.
+
+</Errors>
+
+## Description
+
+This is the *squashing* function: it takes a number of any size and returns one between `-1`
+and `1`, steeply near zero and ever more gently further out. That shape is what makes it a
+standard activation in a neural network, a soft clipper in audio, and the usual way to turn an
+unbounded score into a bounded one without a hard cut-off at the ends.
+
+It is *odd* — negating the argument negates the answer — and it passes through zero at zero
+with a slope of one, which is why it looks like the identity function for small arguments and
+diverges from it as the argument grows. It approaches its two limits without reaching them in
+the mathematics; in floating point it arrives, because the difference stops being
+representable somewhere past an argument of about `20`.
+
+The answer is a float, and stays one at an argument of zero where it lands exactly on `0`.
+Nothing here rounds or mirrors its argument, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call.
+
+Writing the function out by hand carries the general costs set out on
+[`math.cosh()`](/docs/standard-library/math/cosh#rebuilding-a-hyperbolic-function-by-hand).
+The special case below belongs to this function alone, and it is the sharpest of the three.
+
+## Why the ratio form fails and the rearrangement does not
+
+The definition reads as a ratio of the other two hyperbolic functions:
+
+```lua
+local hyperbolic_tangent = (math.exp(x) - math.exp(-x)) / (math.exp(x) + math.exp(-x))
+```
+
+That is correct arithmetic and a poor calculation. Past an argument of about `709` the
+`math.exp(x)` appearing in both halves overflows to an infinity, and the expression becomes an
+infinity divided by an infinity — which is a not-a-number value. So the form fails precisely
+where the answer is at its most predictable: the true hyperbolic tangent of a large argument
+is `1` to every digit a float carries, and the ratio hands back the one value that compares
+equal to nothing, itself included.
+
+Dividing the top and bottom through by `math.exp(x)` removes the large intermediate
+altogether and leaves a form with the same value and none of the overflow:
+
+```lua
+local hyperbolic_tangent = 1 - 2 / (math.exp(2 * x) + 1)
+```
+
+Here the exponential appears once, in a denominator. When it overflows, the division by it
+gives zero rather than a not-a-number value, and the expression settles on exactly `1` —
+which is what the function it replaces would have given. A large negative argument sends the
+exponential to zero instead, the fraction becomes `2`, and the answer settles on `-1`. Both
+ends behave, with no threshold to pick and no guard to write.
+
+The rearrangement costs nothing where the plain ratio also works, so there is no reason to
+keep the ratio around for the middle of the range.
+
+## Examples
+
+### Squashing a range of scores
+
+<RunnableExample usesEntry={false} code={`local inputs = { -4, -0.5, 0.5, 4 }\nfor index = 1, #inputs do\n  -- math.tanh(inputs[index]) gave each of these in one call\n  local squashed = 1 - 2 / (math.exp(2 * inputs[index]) + 1)\n  print(string.format("%.1f -> %.6f", inputs[index], squashed))\nend\n-- Expected output:\n-- -4.0 -> -0.999329\n-- -0.5 -> -0.462117\n-- 0.5 -> 0.462117\n-- 4.0 -> 0.999329`} />
+
+Four inputs spanning an order of magnitude come out inside a range of two. Note how little of
+that range the outer pair use: by an argument of four the curve has spent almost all of its
+travel, which is the property that makes it a soft limiter and also the property that makes
+it saturate.
+
+### The ratio form falls over where the rearrangement does not
+
+<RunnableExample usesEntry={false} code={`local large_input = 710\nlocal as_a_ratio = (math.exp(large_input) - math.exp(-large_input)) / (math.exp(large_input) + math.exp(-large_input))\nlocal rearranged = 1 - 2 / (math.exp(2 * large_input) + 1)\n-- math.tanh(large_input) answered 1 here, as the second line does\nprint(as_a_ratio ~= as_a_ratio)\nprint(rearranged == 1)\n-- Expected output:\n-- true\n-- true`} />
+
+The first line prints `true` because a not-a-number value is the one value that differs from
+itself — the standard way of testing for one. The second prints `true` because the
+rearrangement reached the answer the function would have given. Same mathematics, two
+different fates.
+
+### The symmetry through zero
+
+<RunnableExample usesEntry={false} code={`local activation_input = 1.25\nlocal upward = 1 - 2 / (math.exp(2 * activation_input) + 1)\nlocal downward = 1 - 2 / (math.exp(-2 * activation_input) + 1)\n-- math.tanh(activation_input) and math.tanh(-activation_input) related the same way\nprint(string.format("%.6f", upward))\nprint(string.format("%.6f", downward))\n-- Expected output:\n-- 0.848284\n-- -0.848284`} />
+
+Opposite arguments give opposite answers, and the rearranged form keeps that symmetry even
+though it no longer looks symmetric.
+
+## Gotchas
+
+<Gotcha title="The definition written out literally produces a not-a-number value on a large argument">
+The ratio of two exponentials is the form the name suggests and the form to avoid: both halves
+overflow together on a large enough argument, and an infinity over an infinity is a
+not-a-number value. It then spreads without a trace of where it began — every arithmetic
+operation it touches produces another one, and every comparison against it is false except
+`~=`, so a guard written as "is the answer inside its limits" stays quiet. The rearranged form
+has no such argument.
+</Gotcha>
+
+<Gotcha title="The curve reaches its limits in floating point">
+In the mathematics the answer approaches `1` without arriving. In a float it arrives, because
+past an argument somewhere around `20` the gap between the true answer and `1` is too small to
+represent. Code that expects a value strictly inside the limits — dividing by `1 - answer`,
+say, or taking the inverse function — meets a zero or an infinity rather than a large finite
+number. That is a property of the function itself rather than of any way of writing it.
+</Gotcha>
+
+## See also
+
+- [`math.cosh()`](/docs/standard-library/math/cosh) — the denominator of the definition, and where the general costs of rebuilding these by hand are written out
+- [`math.sinh()`](/docs/standard-library/math/sinh) — the numerator, and the one that loses precision near zero
+- [`math.exp()`](/docs/standard-library/math/exp) — the function the rearranged form calls once
+- [`math.tan()`](/docs/standard-library/math/tan) — the circular tangent, which shares the name and nothing else
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity the overflowing intermediate becomes

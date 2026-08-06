@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1", "version_removed": "5.4", "version_restored": "5.5" } },
+  "changed_in": {
+    "5.3": "Deprecated, and no longer documented as part of the library, though still present and still scaling by the same power of two. The exponent must now carry an exact whole-number value; one with a fraction on it used to be truncated towards zero and now raises."
+  }
+}

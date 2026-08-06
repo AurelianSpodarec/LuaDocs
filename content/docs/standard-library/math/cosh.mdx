@@ -1,8 +1,156 @@
 ---
 title: math.cosh()
-description: ""
+description: The hyperbolic cosine — the average of a rising and a falling exponential.
+lua-compat: math.cosh
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-math.cosh
 ---
 
-{/* Not yet written. */}
+The hyperbolic cosine: the average of *e* raised to the argument and *e* raised to its
+negation. Nothing in the library replaced it, so the way to write it now is the definition
+itself — `(math.exp(x) + math.exp(-x)) / 2` — and the section below is the one place on the
+site that sets out what a hand-built hyperbolic function does and does not inherit from the
+original.
+
+<RunnableExample usesEntry={false} code={`local cable_constant = 40\nlocal horizontal_offset = 25\nlocal scaled_offset = horizontal_offset / cable_constant\n-- math.cosh(scaled_offset) produced this value in one call\nlocal hyperbolic_cosine = (math.exp(scaled_offset) + math.exp(-scaled_offset)) / 2\nprint(string.format("%.4f", cable_constant * (hyperbolic_cosine - 1)))\n-- Expected output: 8.0701`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not provide it,
+so they build the value out of [`math.exp()`](/docs/standard-library/math/exp) and name the
+old call in a comment beside it. The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+math.cosh (x)
+```
+
+<Parameters>
+  <Param name="x">The argument, in the same units the exponential takes — a plain number, not an angle.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The hyperbolic cosine of `x`. A float whatever `x` was. The curve is at its lowest at an argument of zero, where the answer is `1`, and climbs away from there in both directions.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one, including when it is left out.
+
+</Errors>
+
+## Description
+
+Despite the name this has nothing to do with angles. The circular cosine traces a circle; this
+traces a hyperbola, and where the circular cosine repeats every turn and stays inside a fixed
+range, this one climbs away from its lowest point without limit in both directions. The shape
+is the one a chain or a cable takes when it hangs under its own
+weight — the *catenary* — which is why the lead example measures a sag, and it turns up
+wherever a symmetric growth in both directions is being described.
+
+Two properties fall straight out of the definition and are worth having in mind. It is
+*even*: negating the argument leaves the answer alone, because negating it only swaps the two
+exponentials being averaged. And its smallest value is `1`, at an argument of zero, where the
+two exponentials are both `1`. From there it climbs in both directions, roughly halving the
+larger exponential once the argument is far enough from zero for the smaller one to stop
+mattering.
+
+The answer is a float, and stays one at an argument of zero where it lands exactly on `1`.
+Nothing here rounds or mirrors its argument, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+this call.
+
+## Rebuilding a hyperbolic function by hand
+
+The three hyperbolic functions are each an arrangement of two exponentials, and none of them
+was replaced by anything in the library. The way back is to write the definition out:
+
+```lua
+local hyperbolic_cosine  = (math.exp(x) + math.exp(-x)) / 2
+local hyperbolic_sine    = (math.exp(x) - math.exp(-x)) / 2
+local hyperbolic_tangent = (math.exp(x) - math.exp(-x)) / (math.exp(x) + math.exp(-x))
+```
+
+Each of those is the right value in the mathematics and an arrangement of floating-point
+operations in practice, and the two are not the same thing. A hand-built version inherits the
+limits of [`math.exp()`](/docs/standard-library/math/exp) and adds arithmetic of its own, so
+it can go wrong in two ways that a single library call does not:
+
+- **It can overflow earlier than the function it replaces.** `math.exp` runs out of float
+  somewhere past an argument of `709`, and the hyperbolic cosine and sine are about *half*
+  the exponential — so their own answers are still comfortably inside the float range at
+  arguments where the intermediate `math.exp(x)` has already become an infinity. The division
+  by two comes after the overflow, and there is nothing left to divide.
+- **It can lose precision where the two terms nearly cancel.** Each exponential is rounded to
+  a float before anything is done with it, and that rounding is negligible beside the value it
+  sits in. Subtract two such values that nearly agree and the digits they share disappear,
+  leaving an answer made largely of the rounding that was already there — a small absolute
+  error against a now much smaller result. The subtraction is not at fault; it exposes error
+  that the two exponentials carried in. This is the sine's problem rather than the cosine's,
+  because the cosine *adds* its two terms, and adding two positive numbers cancels nothing.
+
+Both are quiet. Neither raises, and neither leaves a mark on a result that is otherwise the
+right shape. Where an argument stays modest — say inside a few tens — the definitions above
+are indistinguishable from the calls they replace, and that covers most of what these
+functions are used for. Where an argument can run large or shrink towards zero, the entries
+for [`math.sinh()`](/docs/standard-library/math/sinh) and
+[`math.tanh()`](/docs/standard-library/math/tanh) carry the specific rearrangement each of
+them wants.
+
+For this function the first limit applies and the second does not. Adding two positive
+exponentials is as accurate as the exponentials themselves, so a hand-built hyperbolic cosine
+is faithful from zero right up to the point where `math.exp` gives out — and then it hands
+back an infinity a step or two before the real answer would have needed one.
+
+## Examples
+
+### The sag of a hanging cable
+
+<RunnableExample usesEntry={false} code={`local cable_constant = 40\nlocal spans = { 10, 25, 40 }\nfor index = 1, #spans do\n  local scaled_offset = spans[index] / cable_constant\n  -- math.cosh(scaled_offset) is what this expression stands in for\n  local hyperbolic_cosine = (math.exp(scaled_offset) + math.exp(-scaled_offset)) / 2\n  print(string.format("%d m out: %.4f m of sag", spans[index], cable_constant * (hyperbolic_cosine - 1)))\nend\n-- Expected output:\n-- 10 m out: 1.2565 m of sag\n-- 25 m out: 8.0701 m of sag\n-- 40 m out: 21.7232 m of sag`} />
+
+The sag grows faster than the distance does, which is the whole character of the curve: near
+the middle it is almost flat, and it steepens without limit towards the anchors.
+
+### The value at zero, and the symmetry around it
+
+<RunnableExample usesEntry={false} code={`local scaled_offset = 1.25\nlocal rising = (math.exp(scaled_offset) + math.exp(-scaled_offset)) / 2\nlocal falling = (math.exp(-scaled_offset) + math.exp(scaled_offset)) / 2\n-- math.cosh(scaled_offset) and math.cosh(-scaled_offset) agreed the same way\nprint((math.exp(0) + math.exp(-0)) / 2 == 1)\nprint(rising == falling)\n-- Expected output:\n-- true\n-- true`} />
+
+The minimum is exactly `1` rather than approximately `1`, and the two sides of it are the
+same value rather than nearly the same. Both come from the definition being a sum of two terms
+that simply trade places when the argument's sign flips.
+
+### Where the hand-built version gives out
+
+<RunnableExample usesEntry={false} code={`local far_out = 710\nlocal averaged = (math.exp(far_out) + math.exp(-far_out)) / 2\n-- math.cosh(far_out) still had a finite answer here\nprint(averaged == math.huge)\nprint(math.exp(far_out - math.log(2)) < math.huge)\n-- Expected output:\n-- true\n-- true`} />
+
+The first line overflows: `math.exp(710)` is already an infinity, and halving an infinity
+leaves one. The second line computes the same quantity as *e* raised to the argument less the
+logarithm of two — subtracting before the exponential rather than dividing after it — and
+comes back finite. That is the rearrangement to reach for when the argument can run large.
+
+## Gotchas
+
+<Gotcha title="The hand-built version overflows before the function did">
+Halving comes after the exponential, so the intermediate value is twice the answer and reaches
+the top of the float range first. The symptom is an infinity where a large but finite number
+was expected, at an argument the real function would have handled. Nothing raises and nothing
+is marked, and the infinity spreads: multiplied by zero it becomes a not-a-number value,
+divided into something it becomes a plain, plausible zero. Scaling before the exponential
+rather than after it — the third example — moves the edge back out.
+</Gotcha>
+
+<Gotcha title="This is not a cosine of an angle">
+The argument is a plain number, not an angle, and feeding this function radians in the
+expectation of something bounded between `-1` and `1` gives a number that grows without limit
+instead. The shared spelling is a historical accident of the algebra rather than a hint that
+the two are interchangeable.
+</Gotcha>
+
+## See also
+
+- [`math.sinh()`](/docs/standard-library/math/sinh) — the odd partner, and the one whose hand-built form loses precision near zero
+- [`math.tanh()`](/docs/standard-library/math/tanh) — the ratio of the two, and the one that saturates
+- [`math.exp()`](/docs/standard-library/math/exp) — the function both terms are built from, and where its own limits lie
+- [`math.cos()`](/docs/standard-library/math/cos) — the circular cosine, which shares the name and nothing else
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity an overflowing intermediate reaches
