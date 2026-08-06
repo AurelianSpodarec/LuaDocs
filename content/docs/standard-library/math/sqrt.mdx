@@ -27,7 +27,7 @@ math.sqrt(x)
 
 <Errors>
 
-- Raises when `x` is neither a number nor a string that reads as one.
+- Raises when `x` is missing, or is neither a number nor a string that reads as one.
 
 </Errors>
 
@@ -36,10 +36,17 @@ math.sqrt(x)
 The result is the non-negative root: `math.sqrt(9)` is three, never minus three, even
 though both squared give nine. Where the negative root is wanted it is the result negated.
 
-Raising to the power of a half computes the same value: `x ^ 0.5` and `math.sqrt(x)` are
-two spellings of one operation. The named call is the clearer of the two in most code, and
-the operator is the one to reach for when the exponent is a variable that happens to be a
-half rather than a half written out.
+Raising to the power of a half computes the same value, and `x ^ 0.5` is the usual other way
+to write it. The two are not guaranteed to land on the *same float*, though. The operator
+goes through the C library's general power function and this call goes through its
+square-root function; the two are computed separately and rounded separately, and on some
+builds — including the one this entry runs its own examples on — they differ in the last
+place or two. `math.sqrt(550) == 550 ^ 0.5` is `false` there, and `true` elsewhere.
+
+So they are two ways to reach the same number rather than two spellings of one operation.
+Prefer the named call where the value is a square root, because it says so; reach for the
+operator when the exponent is a variable that happens to be a half rather than a half
+written out. Comparing one against the other wants a tolerance, not `==`.
 
 This function is the exception to the library's subtype rule. It neither mirrors its
 argument nor rounds anything, so it never hands back an integer — the root of a perfect
@@ -103,4 +110,4 @@ that goes through only when the root really did come out whole.
 - [`math.floor()`](/docs/standard-library/math/floor) — the subtype rule this function is the exception to
 - [`math.tointeger()`](/docs/standard-library/math/tointeger) — turning a root that came out whole into an integer
 - [`math.abs()`](/docs/standard-library/math/abs) — the other way to get a value's size without its sign
-- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, which computes the same value when the exponent is a half
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, the other way to reach a square root, and why it need not give the identical float

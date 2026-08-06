@@ -8,7 +8,8 @@ source: https://www.lua.org/manual/5.5/manual.html#pdf-math.fmod
 
 Divides one number by another and hands back what is left over, having thrown away the
 fraction of the quotient rather than rounded it down. That one difference is why it is not
-the `%` operator, and why the two part company as soon as the operands have opposite signs.
+the `%` operator, and why the two part company on operands of opposite signs that leave
+something over.
 
 <RunnableExample code={`local leftover_slices = math.fmod(17, 5)\nprint(leftover_slices)\n-- Expected output: 2`} />
 
@@ -30,7 +31,7 @@ math.fmod(x, y)
 <Errors>
 
 - <Since v="5.3" /> Raises when both arguments are integers and `y` is zero.
-- Raises when either argument is neither a number nor a string that reads as one, and when the call is given fewer than two arguments.
+- Raises when either argument is missing, or is neither a number nor a string that reads as one.
 
 </Errors>
 
@@ -89,13 +90,15 @@ Whichever is wanted, it has to be chosen: `-90` reads as "ninety short of the ma
 
 ## Gotchas
 
-<Gotcha title="It is not the modulo operator, and swapping them changes the answer">
-They agree on every pair of operands that share a sign, so a substitution made while reading
-data of one sign survives every test built from that data. Mix the signs and they part:
+<Gotcha title="It is not the modulo operator, and swapping them can change the answer">
+They agree on every pair of operands that share a sign — and on every pair that divides
+exactly, whatever the signs — so a substitution made while reading data of one sign survives
+every test built from that data, and so does one tested only on divisions that come out
+even. Mix the signs over a division that leaves something over and they part:
 `math.fmod(-7, 3)` is `-1` and `-7 % 3` is `2` — the same remainder counted from opposite
-ends. Anything that then uses the result as a position, an index or a bucket number lands
-somewhere different, or out of range altogether, and only for the half of the input that
-crosses zero.
+ends, while `math.fmod(-6, 3)` and `-6 % 3` are both `0`. Anything that then uses the result
+as a position, an index or a bucket number lands somewhere different, or out of range
+altogether, and only for the part of the input that both crosses zero and divides unevenly.
 </Gotcha>
 
 <Gotcha title="A zero divisor does not always stop anything">
