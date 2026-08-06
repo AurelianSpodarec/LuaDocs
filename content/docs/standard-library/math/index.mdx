@@ -1,8 +1,142 @@
 ---
 title: math
-description: ""
+description: Lua's numeric toolkit — rounding, roots and logarithms, trigonometry, pseudo-random numbers, and the limits worth having a name for.
+lua-compat: math.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.8
 ---
 
-{/* Not yet written. */}
+Rounding a number to a whole one, square roots and logarithms, trigonometry, the largest or
+smallest of a set of values, pseudo-random draws, and a handful of numeric limits worth
+having a name for: this is the library that carries them. Its functions and its constants
+both live in the table `math`.
+
+Angles here are in radians. The trigonometric functions read their argument as radians and
+the inverse ones answer in radians, and converting to and from degrees is what
+[`math.rad()`](/docs/standard-library/math/rad) and
+[`math.deg()`](/docs/standard-library/math/deg) are for.
+
+Lua's `number` type has two ways of holding a value inside it — as an *integer* and as a
+*float* — and which of the two a call here hands back is rarely that function's own choice.
+A few patterns run through the library, and most of these functions fall into one of them
+rather than deciding for themselves. Whether the distinction exists at all varies by Lua line
+rather than by function: where Lua keeps none, every number is a float and there is nothing
+for those patterns to separate.
+[`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) sets them out in
+one place, and the entries that follow one link there rather than restating it.
+
+<RunnableExample code={`local room_width_metres = 4.2\nlocal room_length_metres = 3.6\nlocal floor_area = room_width_metres * room_length_metres\nlocal packs_needed = math.ceil(floor_area / 2.5)\nprint(floor_area)\nprint(packs_needed)\nprint(math.max(packs_needed, 8))\n-- Expected output:\n-- 15.12\n-- 7\n-- 8`} />
+
+The area is unmistakably a float. The two numbers under it are whole ones, and whether Lua is
+holding *those* as integers or as floats is not something the printed form tells you — which
+is the question the paragraph above points at, and the first thing about this library worth
+reading.
+
+<Note>
+The functions that answer with a float whatever went in — the roots, the logarithms, the
+trigonometry — compute in floating-point arithmetic, where a value that ought to come out
+exact usually lands a hair away from it. That is why `math.sin()` of a half-turn is a very
+small number rather than zero, and why comparing one of these results with `==` tends to
+disappoint.
+[`math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact) works
+through where the error comes from, and comparing against a tolerance instead is the usual
+answer.
+</Note>
+
+Which symbols this table holds has moved about a good deal, including one pair that left and
+later came back. Each entry's own version support says where its line falls, and the sidebar
+dims what your selected version does not have.
+
+## Rounding and remainders
+
+Getting from a number with a fraction on it to a whole one, and recovering what a division
+leaves behind.
+
+- [`math.floor()`](/docs/standard-library/math/floor) — a number rounded down to the nearest whole number
+- [`math.ceil()`](/docs/standard-library/math/ceil) — a number rounded up to the nearest whole number instead
+- [`math.fmod()`](/docs/standard-library/math/fmod) — the remainder of a division whose quotient is rounded toward zero
+
+## Comparing and measuring
+
+How far a number sits from zero, which of several values wins, and one comparison that reads
+a sign bit as part of the value — which needs integers to be a kind of number of their own.
+
+- [`math.abs()`](/docs/standard-library/math/abs) — a number's distance from zero, with its sign dropped
+- [`math.max()`](/docs/standard-library/math/max) — the largest of the values handed to it
+- [`math.min()`](/docs/standard-library/math/min) — the smallest of the values handed to it
+- [`math.ult()`](/docs/standard-library/math/ult) — two integers compared as unsigned, so the sign bit counts as value rather than as sign
+
+## Powers, roots and logarithms
+
+Growth in one direction and back again, with the square root standing beside them.
+
+- [`math.sqrt()`](/docs/standard-library/math/sqrt) — the square root of a number
+- [`math.exp()`](/docs/standard-library/math/exp) — e, the base of natural logarithms, raised to a power
+- [`math.log()`](/docs/standard-library/math/log) — the logarithm of a number, natural or in a base you name
+
+## Angles and trigonometry
+
+The three ratios, the three inverses that recover an angle from a ratio, and the pair that
+converts between the two units an angle is written in.
+
+- [`math.sin()`](/docs/standard-library/math/sin) — the sine of an angle measured in radians
+- [`math.cos()`](/docs/standard-library/math/cos) — the cosine of an angle measured in radians
+- [`math.tan()`](/docs/standard-library/math/tan) — the tangent of an angle measured in radians
+- [`math.asin()`](/docs/standard-library/math/asin) — the angle, in radians, whose sine you already have
+- [`math.acos()`](/docs/standard-library/math/acos) — the angle, in radians, whose cosine you already have
+- [`math.atan()`](/docs/standard-library/math/atan) — the angle a slope describes, or the one a rise and a run describe together
+- [`math.rad()`](/docs/standard-library/math/rad) — an angle converted from degrees to radians
+- [`math.deg()`](/docs/standard-library/math/deg) — an angle converted from radians to degrees
+
+## Splitting a number, and asking what kind it is
+
+What a number is made of — a whole part and a fraction, or a fraction and a power of two —
+and which of the two ways of holding a number it is being held by. That last question can
+only be asked where Lua tells the two apart, so the two entries that ask it come and go with
+the distinction itself.
+
+- [`math.modf()`](/docs/standard-library/math/modf) — a number split into its whole part and its fraction
+- [`math.frexp()`](/docs/standard-library/math/frexp) — a number split into a fraction and a power of two, on the lines that have it
+- [`math.ldexp()`](/docs/standard-library/math/ldexp) — a number scaled by a power of two in one exact step, which is the way back from the pair above, on the lines that have it
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — the integer a value names exactly, or `nil` when it names none
+- [`math.type()`](/docs/standard-library/math/type) — whether a number is held as an integer or as a float, and `nil` for anything that is not a number
+
+## Random numbers
+
+One function draws the next number from the generator; the other decides which sequence it is
+drawing from, which is what makes a run repeatable.
+
+- [`math.random()`](/docs/standard-library/math/random) — the next pseudo-random number: a fraction below one, or a whole number from a range
+- [`math.randomseed()`](/docs/standard-library/math/randomseed) — the state that generator draws from, set so a sequence can be asked for again
+
+## Constants
+
+Four values rather than four calls — read as fields, never called. Two of them name the ends
+of the integer range, and so are here wherever an integer is a kind of number of its own.
+
+- [`math.pi`](/docs/standard-library/math/pi) — the closest float there is to the ratio of a circle's circumference to its diameter
+- [`math.huge`](/docs/standard-library/math/huge) — a float above every finite number, and where a float computation lands when it overflows
+- [`math.maxinteger`](/docs/standard-library/math/maxinteger) — the largest value an integer can hold, and the edge counting wraps around at
+- [`math.mininteger`](/docs/standard-library/math/mininteger) — the smallest value an integer can hold, one step further from zero than the largest
+
+## Functions best written another way
+
+Six the library has carried at one time or another and newer Lua no longer does. They are
+listed because reading old code means meeting them; each entry says what to write in its
+place, and how exact the swap is.
+
+- [`math.pow()`](/docs/standard-library/math/pow) — one number raised to the power of another, which the `^` operator does
+- [`math.log10()`](/docs/standard-library/math/log10) — a base-ten logarithm, which `math.log()` gives when you name the base — with one thing to check first
+- [`math.atan2()`](/docs/standard-library/math/atan2) — an angle from a rise and a run, which `math.atan()` takes both of once it is reading both
+- [`math.cosh()`](/docs/standard-library/math/cosh) — the hyperbolic cosine, and how to write one out of `math.exp()`
+- [`math.sinh()`](/docs/standard-library/math/sinh) — the hyperbolic sine, written the same way but with one step that costs precision
+- [`math.tanh()`](/docs/standard-library/math/tanh) — the hyperbolic tangent, where dividing the two above is the form to avoid
+
+## See also
+
+- [`number`](/docs/language/values-and-types/number) — the value type these functions work on, and the two ways it holds one
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — the arithmetic Lua writes with symbols rather than with calls, `^` and `%` included
+- [Relational operators](/docs/language/expressions/relational-operators) — comparing two numbers without a function
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — turning a string into a number before any of this reaches it
+- [`string.format()`](/docs/standard-library/string/format) — writing a number out to a chosen number of places
+- [Numeric `for`](/docs/language/statements/numeric-for) — counting through a range, where the step and the limit do the arithmetic

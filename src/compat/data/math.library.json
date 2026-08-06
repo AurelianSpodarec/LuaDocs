@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Adds `math.maxinteger`, `math.mininteger`, `math.tointeger`, `math.type` and `math.ult`, and drops the deprecated `math.log10`.",
+    "5.4": "Drops the deprecated `math.atan2`, `math.cosh`, `math.sinh`, `math.tanh`, `math.pow`, `math.frexp` and `math.ldexp`.",
+    "5.5": "Documents `math.frexp` and `math.ldexp` again, and the library carries them once more."
+  }
+}

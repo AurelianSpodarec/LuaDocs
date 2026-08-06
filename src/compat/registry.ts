@@ -68,6 +68,7 @@ import mathTanh from './data/math.tanh.json';
 import mathLog10 from './data/math.log10.json';
 import mathFrexp from './data/math.frexp.json';
 import mathLdexp from './data/math.ldexp.json';
+import mathLibrary from './data/math.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -125,6 +126,12 @@ const raw: Record<string, unknown> = {
   'table.remove': tableRemove,
   'table.sort': tableSort,
   'table.unpack': tableUnpack,
+  // The `math` section's own node, on the rule `string.library` set and `table.library`
+  // followed: the library's existence and its *membership*, never the union of its
+  // members' behaviour. So the integer subtype arriving — which changes what a dozen of
+  // these functions hand back — is absent here and present on each entry where it shows,
+  // and what this node records is only which symbols the table holds.
+  'math.library': mathLibrary,
   'math.tointeger': mathTointeger,
   // The `math` library's version facts are overwhelmingly *language* facts — the integer
   // subtype arriving at 5.3 changes what these five hand back without changing what any

@@ -17,7 +17,7 @@ A slice is done when its plan's final GATE passes and the work is on `main`.
 | 1.6 | Sidebar IA — order, grouping, labels | [2026-08-04-sidebar-ia.md](2026-08-04-sidebar-ia.md) | Done |
 | 2 | Page anatomy — piloted on `string` | [2026-08-05-page-anatomy-string.md](2026-08-05-page-anatomy-string.md) | Done |
 | 2.5 | `string` section — the remaining sixteen entries | [2026-08-05-string-section.md](2026-08-05-string-section.md) | Done |
-| 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Next — start from [the handoff](2026-08-05-standard-library-handoff.md) |
+| 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Done — see below |
 | 2.7 | The bespoke UI — replacing Fumadocs's chrome | — | Not started |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
@@ -264,3 +264,149 @@ Two things the section surfaced that are **not** content problems and are owed e
   route already loads the map that would fix it. Slice 3 or the version-filter work.
 - **`math.tointeger` is an unwritten stub no slice claims.** It was reverted during the
   anatomy pilot rather than authored, and `math`'s own slice should pick it up.
+  *(Discharged — authored in slice 2.6.)*
+
+## `table` and `math` are finished (2026-08-06)
+
+Both sections are complete: `table` is twelve entries plus its overview, `math` is
+thirty-five plus its overview. Forty-nine entries in ten authoring batches, each batch
+reviewed adversarially and each needing exactly one fix round — sixteen Criticals in all,
+and on the order of a hundred recorded corrections against the manuals. The detail lives in
+the batch reports under `.superpowers/sdd/2026-08-05-table-and-math/`; what follows is what
+outlives them.
+
+### Removal: which axis decides that a symbol is gone
+
+`math` has eight symbols that leave, and three plausible axes give three different answers —
+whether a manual gives the symbol its own *entry*, whether the manual *mentions* it at all,
+or whether a build from the shipped makefile *has* it. They are not close: a stock 5.3
+provides `math.pow` behind a compatibility switch its manual never names.
+
+The ruling, which every removal after this one inherits: **a version has the symbol if and
+only if that version's manual says something that asserts its existence. Deprecation asserts
+existence; silence does not. `version_removed` is the first version whose manual stops
+mentioning the symbol at all.** So `math.log10` leaves at 5.3, and the other seven at 5.4 —
+one line later than the entry count suggests, because 5.3's Incompatibilities chapter names
+all seven in a single sentence, and any ruling that splits that sentence is incoherent on its
+face.
+
+`table` reached the same answer on `table.maxn` and never had to defend it: there, only the
+manual axis supported it. `math` is where two axes agreed and the rule had to be stated
+generally rather than decided per symbol. Its accepted cost is unchanged from `maxn`: a stock
+build keeps these symbols alive one line further than the dataset says, and the dataset
+deliberately does not record what is a property of a makefile rather than of a Lua version.
+
+The failure asymmetry is what decided it. Read the other way, the site tells a reader on 5.3
+that a function they can call does not exist — the same trap that produced a Critical in the
+`table.unpack` batch.
+
+### `version_restored`, for the two that came back
+
+`math.frexp` and `math.ldexp` are documented in 5.1 and 5.2, absent from 5.3 and 5.4, and
+documented again in 5.5. A pair of bounds is one half-open interval, so both encodings it
+allowed said something false about two of the five lines. `src/compat/schema.ts` gained one
+optional field, `version_restored`, plus four cross-field ordering checks — `.strict()`
+catches a misspelled *key*, and this field's characteristic mistake is a bad *value*, which
+parses cleanly and then renders as "available in all five".
+
+An interval list was the alternative and was refused: it gives an ordinary entry two spellings
+of one fact, and every existing dataset would have had to move or the two spellings would
+drift. It cannot express a symbol that leaves twice, and nothing in 5.1–5.5 does.
+
+Nothing downstream needed changing, which is the part worth carrying forward: `resolve.ts`
+derives availability by walking the version list through `isAvailable` rather than by reading
+the bound fields, so a third bound was free on every surface that displays one. The surfaces
+that *were* reading the bounds second-hand were wrong before this and are fixed — a removed
+entry used to be described as "introduced in 5.1" on a version that had dropped it, and a
+removed sidebar row used to carry a `5.1+` badge asserting the availability its own dimming
+denied. `+` now means exactly one thing: this version and every one after it.
+
+### The constant fork: a heading, not a component
+
+Settled as `## Value` carrying prose, with no `## Syntax`, no `<Parameters>`, no `<Returns>`
+and no `<Errors>`. No `<Value>` component: what the section carries is one or two paragraphs
+whose useful content differs completely between the four constants, not a list of rows the way
+`<Returns>` is, and a component taking arbitrary children plus a type is an H2 with extra
+syntax. `entry-anatomy.test.ts` asserts the shape, including the *absence* of `## Syntax` —
+the section a function-shaped copy leaks in first.
+
+ADR 0009's numeric disclosure was considered for the Value section and deliberately not added.
+`maxinteger` and `mininteger` are unavailable on the two lines where the word `integer` would
+be anachronistic, so a reader there already meets the availability callout, a dimmed sidebar
+row and suppressed examples — strictly more than a footnote would give them. `pi` and `huge`
+are floats, and a float is anachronistic nowhere. The gap ADR 0009 covers is closed for
+constants by availability rather than by a type field. The case that would reopen it, a
+constant that is an integer *and* present on 5.1, does not exist in the standard library.
+
+### The overview fork, now proven on three sections
+
+`string` invented it, `table` made it a fork, `math` is where it stopped being a copy job. The
+shape is settled: summary before the example, common-patterns example, task-grouped index in
+H2s, `## See also`. Three rules the two later sections added:
+
+- **Groups are authored by task and their membership is a judgement**, not the directory order
+  and not the sidebar's. `math`'s eight groups run three to eight entries; the right rail is
+  H2-only, so a `###` sub-index renders as one navigable word and is not available.
+- **Symbols that left the library get their own final group**, glossed by what to write
+  instead, and are never mixed into a task group — but *only* the ones that stayed gone.
+  `math` is the case that proves it: a legacy group holding `frexp` and `ldexp` would be
+  simply false for a reader on the newest line, so those two sit with the float-inspection
+  functions, where they are true at both ends of the range.
+- **A version qualification in a gloss is spent where the absence changes the advice**, not
+  wherever an entry is missing from some line. `math` spends two, on the pair whose
+  availability a reader cannot infer from anything else on the page. The rest of what varies
+  in `math` varies with the integer subtype, which the summary and the group lead-ins explain
+  once.
+
+### What kept going wrong, and the one check that catches it
+
+Across all ten batches the version reasoning held. What failed, over and over, was an
+**unqualified prose generalisation in an entry whose specifics were already correct** — a
+summary, a Gotcha or a `<Return>` body stating flatly what the Description forty lines away
+had qualified properly, and often refuted by the entry's own example six lines above. In four
+consecutive batches the Criticals moved no compat dataset at all.
+
+Neither an end-to-end re-read nor an adversarial review catches this class reliably. One thing
+does: a **mechanical sweep for absolutist words** — `every`, `always`, `never`, `all`, `any`,
+`cannot`, `none`, `no`, `only`, `exactly`, `identical` — followed by reading each hit against
+that entry's own Description and its own examples. It is a different operation from reading
+for sense, which is why it finds what reading for sense does not. It has found defects an
+adversarial review had already looked at and missed, in five separate batches.
+
+**The sweep must include `<Return>`, `<Param>` and `<Errors>` attribute bodies, not only
+prose paragraphs.** Two Criticals in one batch sat in `<Return>` bodies that the prose-only
+sweep never read — which is where they would be, since a `<Return>` body is one sentence
+trying to cover every case at once and is the least re-read line on the page. Any section
+after this one should run the sweep as the last step before committing, and treat it as part
+of authoring rather than as review.
+
+### Debts this slice logged and did not solve
+
+- **No version-conditional form exists for Syntax, Parameters or Returns.** `<Since v="…" />`
+  is licensed on an `<Errors>` bullet and has no counterpart anywhere else, and two entries
+  ship wrong because of it: `math.randomseed` renders a Return-values list for two returns it
+  does not have on three of the five lines, and the constant fork has nowhere to put a
+  `<Since>` at all, because a constant has no `<Errors>`. Both forks ran into the same gap
+  from opposite directions. This wants a human and a decision, not a workaround.
+- **An overview's index still makes no per-entry version claim** while the sidebar beside it
+  dims what the selected version lacks — the same debt `string` logged, now on three pages.
+  The editorial rules above narrow it and do not remove it. The fix is component work and the
+  route already loads the map (`compatByUrl`): render each index bullet through it and mark a
+  link the selected version lacks the *same way the sidebar marks it*, same treatment and same
+  vocabulary. It must be derived; hand-written badges go stale. Doing it would collapse the
+  third rule above into "group by task, put what left the library last", which is a smaller
+  thing to ask of every overview after this one.
+- **No mechanism gates an example on another entry's availability.** `RunnableExample` gained
+  a per-example `usesEntry` prop this slice — auto-run had been keyed on the entry rather than
+  on the example, so on a removed entry every card showing the *replacement* sat silent for
+  exactly the readers it was written for. The prop fixes that and can still only ask about
+  *this* entry. A card that depends on a symbol from another entry, or on a `changed_in`,
+  needs the example-variant delta form, which nothing has built yet.
+- **A printed long transcendental decimal is an assertion about the runtime's libm, not about
+  Lua.** It bit three times in `math` — two runtimes disagreeing in the sixth significant
+  figure, and 26 mismatches in one probe that a second runtime showed none of. Nothing records
+  this outside one paragraph on `sqrt.mdx`; it belongs in the authoring context.
+- **Two expected outputs assume 64-bit integers.** Standard Lua, but a `LUA_32BITS` build
+  prints differently and nothing on the site says so. Site-wide; `math` is where it first bites.
+- **`string/format.mdx` phrases a claim by error-message text**, which the rules forbid — found
+  in passing, outside this slice's files, and left for whoever edits that entry next.
