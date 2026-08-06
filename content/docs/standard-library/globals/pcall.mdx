@@ -50,7 +50,8 @@ A protected call is not a barrier to a coroutine. Code running under one can sus
 value to whoever resumed it, and pick up where it left off when resumed again; the protection
 is still in place across the suspension.
 
-No message handler runs for a failure caught here. Where an enclosing
+No [message handler](/docs/standard-library/globals/xpcall#what-the-handler-sees) runs for a
+failure caught here. Where an enclosing
 [`xpcall()`](/docs/standard-library/globals/xpcall) has installed one, a failure this call
 catches is handled here and the handler never sees it — the handler is for errors that reach
 *that* call, and this one intercepted the error first.

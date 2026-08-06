@@ -51,10 +51,11 @@ nothing else written.
 
 What it does *not* have is a way to point somewhere else.
 [`error()`](/docs/standard-library/globals/error) takes a level and can blame its caller;
-this call takes no such argument, so the location a string message picks up is not something
-a caller can move: it names the line the assertion is written on. Where the useful place to
-point is a caller's line, an explicit `if … then error(…, 2) end` is the shape that can say
-so.
+this call takes no such argument, so the location a string message picks up is not something a
+caller can move — it is chosen exactly the way a plain
+[`error()`](/docs/standard-library/globals/error#where-the-blame-lands) with its default level
+chooses one, and misses in the same places. Where the useful place to point is a caller's
+line, an explicit `if … then error(…, 2) end` is the shape that can say so.
 
 ## What the failure carries
 

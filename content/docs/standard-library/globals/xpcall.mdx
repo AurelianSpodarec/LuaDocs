@@ -27,7 +27,7 @@ xpcall(f, msgh [, arg1, ···])
 
 <Returns>
   <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
-  <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered — and `nil` when it answered nothing.</Return>
+  <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered. A handler that answers nothing, or answers `nil`, does not leave `nil` here — [`nil` is the one thing an error cannot carry](/docs/standard-library/globals/error#what-an-error-carries).</Return>
 </Returns>
 
 <Errors>

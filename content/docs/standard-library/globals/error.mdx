@@ -63,8 +63,13 @@ Nothing converts that value to text on the way. A catcher receiving a table rece
 table itself, with its fields intact and its metatable attached; turning it into something
 readable is the catcher's job, and [`tostring()`](/docs/standard-library/globals/tostring)
 with a `__tostring` metamethod is the usual way to arrange it. The one value that does not
-survive the trip is `nil`: an error object of `nil` is replaced by a string before it reaches
-anyone, so a catcher testing for `nil` is testing for something that does not arrive.
+survive the trip is `nil`: an error object of `nil` is replaced by a string on its way out, so
+a [`pcall()`](/docs/standard-library/globals/pcall) testing its second result for `nil` is
+testing for something that does not arrive. That substitution happens last of all, after any
+message handler has run — an
+[`xpcall()`](/docs/standard-library/globals/xpcall#what-the-handler-sees) handler is still
+handed the `nil` as it was raised, and a `nil` the handler itself answers with is replaced in
+its turn.
 
 Because the object is arbitrary, code that catches has to decide how much it assumes.
 `reason.code` reads a field off a table that a matching raise put there. Hand the same
@@ -86,10 +91,20 @@ chooses which line that is.
   point at. Larger numbers keep walking outwards, one caller at a time.
 - `0` adds nothing, and the message reaches the catcher exactly as written.
 
-A level that reaches nowhere useful adds nothing rather than complaining. Counting past the
-outermost caller, or landing on a function written in C, or landing on a frame that a tail
-call has already replaced, all produce a message with no position on the front — which is the
-usual explanation for a `2` that appears to have done nothing.
+A level that reaches nowhere at all adds nothing rather than complaining. Counting past the
+outermost caller, or landing on a function written in C, both produce a message with no
+position on the front — which is the usual explanation for a `2` that appears to have done
+nothing.
+
+The other way to miscount is quieter, because it produces a position rather than withholding
+one. A *tail call* — `return helper(value)`, with nothing left to do once `helper` answers —
+reuses its caller's frame instead of stacking a new one on top, so the frame the caller would
+have occupied is not there to be counted. A level counted through one therefore lands a caller
+further out than intended and names *that* line: a position that looks perfectly ordinary and
+points at the wrong call. It goes silent only when the frame it lands on is itself C or off
+the end of the stack, which is what makes the wrong position the more common outcome of the
+two. Writing the call site as `local result = helper(value)` and returning `result` on the
+next line keeps the frame, and keeps the count honest.
 
 None of this happens when `message` is anything other than a string. A table, a boolean or a
 number is carried through untouched and `level` has no effect on it at all, which is worth
