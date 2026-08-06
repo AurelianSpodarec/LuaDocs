@@ -61,8 +61,18 @@ The angles with tidy sines on paper — half a turn, a quarter turn, a third of 
 built out of pi, and pi is not a number a float can hold. `math.pi` is the nearest float to
 it, close but not equal, so the sine of `math.pi` is the sine of something a hair away from
 half a turn: a very small number rather than zero. The same goes for
-[`math.cos()`](/docs/standard-library/math/cos) at a quarter turn, and for every other
-"exact" value in the table a trigonometry lesson hands out.
+[`math.cos()`](/docs/standard-library/math/cos) at a quarter turn.
+
+Not every one of these comparisons comes out false, and that is the part worth reading
+slowly. `math.sin(math.pi / 2) == 1` holds. So does `math.cos(math.pi) == -1`, and so do the
+three inverses at the ends of their ranges. Meanwhile `math.sin(math.pi) == 0`,
+`math.sin(math.rad(30)) == 0.5` and `math.tan(math.pi / 4) == 1` are all false. Which side a
+given comparison falls on is decided by where one particular rounding happens to land — not
+by the value being tidier, and not by anything the library promises.
+
+That is an argument against `==` here rather than an exception to it. A comparison that
+passes for a reason nobody chose will keep passing until an argument, a build or a version
+moves the last bit, and nothing will mark the day it stops.
 
 Nothing has gone wrong and there is no setting that fixes it. What it means in practice is
 that a result of one of these functions must not be compared with `==` against a value
@@ -106,11 +116,12 @@ down.
 </Gotcha>
 
 <Gotcha title="Comparing a sine against a value from the textbook fails">
-`math.sin(math.pi) == 0` is `false`, and so is every other equality written against a value
-that is exact only in the mathematics. The result is off by a fraction too small to see and
-far too large for `==` to overlook. Compare the difference against a tolerance chosen for the
-problem, and treat any code branching on a sine being exactly some number as a bug waiting
-for the right input.
+`math.sin(math.pi) == 0` is `false`: the result is off by a fraction too small to see and far
+too large for `==` to overlook. A few of these comparisons do come out `true` —
+`math.sin(math.pi / 2) == 1` is one — but which ones is an accident of rounding rather than
+anything to build on, so a test that passes today says nothing about the next value or the
+next build. Compare the difference against a tolerance chosen for the problem, and treat any
+code branching on a sine being exactly some number as a bug waiting for the right input.
 </Gotcha>
 
 ## See also

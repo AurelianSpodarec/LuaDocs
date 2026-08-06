@@ -30,7 +30,7 @@ math.atan(y [, x])
 <Errors>
 
 - Raises when `y` is neither a number nor a string that reads as one.
-- <Since v="5.3" /> Raises when `x` is given and is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `x` is neither a number nor a string that reads as one. An explicit `nil` counts as leaving the argument out rather than as a bad one, and the call behaves as though only `y` had been passed.
 
 </Errors>
 
@@ -53,6 +53,13 @@ next section.
 The two-argument form computes what [`math.atan2()`](/docs/standard-library/math/atan2)
 computes, argument for argument and in the same order, so code arriving from that function
 moves across by changing the name alone.
+
+Moving in the other direction is where care is needed. Where `math.atan` takes a single
+argument, a second one is not rejected — it is *ignored*, and the call answers as though only
+the first had been passed. So a two-argument call carried backwards produces an angle rather
+than an error, and a plausible angle at that: the arc tangent of the rise on its own, which is
+the right answer to a question nobody asked. Nothing at the call site distinguishes the two,
+which is why the quadrant behaviour below is worth confirming rather than assuming.
 
 The result is always a float, whatever went in. This function neither mirrors its arguments
 nor rounds anything, so the library's

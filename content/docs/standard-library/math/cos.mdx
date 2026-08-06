@@ -53,7 +53,7 @@ The result is always a float, whatever went in. This function neither mirrors it
 nor rounds anything, so the library's
 [subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
 
-The tidy values are not exact here either, for the reason
+The tidy values are no safer to compare against here, for the reason
 [set out on `math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact):
 a quarter turn is `math.pi / 2`, `math.pi` is not exactly pi, and the cosine there comes out
 as a very small number rather than as zero. Going the other way — an angle back out of a

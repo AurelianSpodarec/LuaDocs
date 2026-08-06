@@ -58,9 +58,9 @@ It hands back a not-a-number value and says nothing — the same silence
 [`math.acos()`](/docs/standard-library/math/acos) keeps for the same reason.
 
 That value then travels. It is not equal to itself, so `angle == angle` is `false` and any
-equality check written against it fails in a way that reads as a logic bug; every arithmetic
-operation it reaches produces another one, so a single out-of-range ratio can empty an entire
-calculation with nothing appearing to go wrong at the point of failure. Comparing a value
+equality check written against it fails in a way that reads as a logic bug; and it spreads
+through almost every arithmetic operation it reaches, so a single out-of-range ratio can empty
+an entire calculation with nothing appearing to go wrong at the point of failure. Comparing a value
 against itself is the cheap test for having got one — `angle ~= angle` is true only for a
 not-a-number value.
 
@@ -101,7 +101,8 @@ came from was never in the sine to begin with.
 
 <Gotcha title="An argument out of range does not raise">
 `math.asin(1.5)` hands back a not-a-number value rather than stopping, and that value spreads
-through everything it touches while comparing equal to nothing at all, itself included. The
+through almost everything it touches while comparing equal to nothing at all, itself
+included. The
 failure therefore surfaces a long way from the call that caused it, wearing the shape of a
 logic bug. Check the ratio before the call rather than the answer after it.
 </Gotcha>

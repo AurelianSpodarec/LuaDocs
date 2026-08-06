@@ -52,8 +52,9 @@ tangent as pointing down-and-left.
 The result is always a float, whatever went in. This function neither mirrors its argument
 nor rounds anything, so the library's
 [subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
-The tidy values are inexact for the reason
-[set out on `math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact).
+The tidy values are no safer to compare against here, for the reason
+[set out on `math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact) —
+`math.tan(math.pi / 4) == 1` is one of the comparisons that comes out false.
 
 ## Where the tangent has no value
 
@@ -69,9 +70,9 @@ number — around ten to the sixteenth. Its digits are noise. They record how fa
 float happens to sit from the real quarter turn, so they differ between one Lua build and
 another, and no calculation should depend on them.
 
-The practical consequence is that guarding this call is pointless: there is no argument for
-which it misbehaves in a way a check could catch, only a band of arguments whose answers are
-too large to be meaningful. Where a slope is being turned back into an angle, going the other
+The practical consequence is that guarding against the pole is pointless: no finite angle
+makes this function misbehave in a way a check could catch, only a band of them produce
+answers too large to be meaningful. Where a slope is being turned back into an angle, going the other
 way with [`math.atan()`](/docs/standard-library/math/atan) avoids the region entirely — every
 slope has an angle, even though not every angle has a slope.
 

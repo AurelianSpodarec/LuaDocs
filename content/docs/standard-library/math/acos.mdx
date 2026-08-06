@@ -80,14 +80,17 @@ the answer the clamped call gives; the unclamped one gives a not-a-number value 
 travels. Clamping into range is not papering over a bug here: the overshoot is a property of
 the arithmetic, not of the data.
 
-### Arc cosine and arc sine add up to a quarter turn
+### Arc cosine and arc sine very nearly add up to a quarter turn
 
 <RunnableExample code={`local slope_ratio = 0.4\nprint(string.format("%.6f", math.acos(slope_ratio) + math.asin(slope_ratio)))\nprint(string.format("%.6f", math.pi / 2))\n-- Expected output:\n-- 1.570796\n-- 1.570796`} />
 
-The two answer the same question from different sides, and their answers are complements of
-each other. That is worth knowing when a value arrives as one and the code wants the other,
-and it is a reminder that neither carries information the other lacks: knowing one is knowing
-the other, so swapping between them cannot rescue an answer that needed a sign.
+The two answer the same question from different sides, and their answers add to a quarter
+turn — to the precision a float carries, which is not the same as exactly. The sum lands on
+`math.pi / 2` for some ratios and a fraction away from it for others, `0.5` among them, so
+this is a relationship to compute with and never one to test with `==`. What it is reliably
+good for is the other thing: neither function carries information the other lacks, so knowing
+one is knowing the other, and swapping between them cannot rescue an answer that needed a
+sign.
 
 ## Gotchas
 
