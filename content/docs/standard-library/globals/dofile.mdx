@@ -59,8 +59,10 @@ the rest of the program then sees. Restricting either is what
 Nothing is remembered between calls. Each call opens the file again, compiles it again and runs
 it again, so a file run twice has its side effects twice.
 [`require()`](/docs/standard-library/globals/require) is the call that loads a module once and
-hands the same result back on every call afterwards; this one is for running a file, not for
-importing one.
+hands the same result back afterwards — unless the module handed back `false`, which
+[the record does not count as loaded](/docs/standard-library/globals/require#what-gets-remembered)
+and which is therefore run again by every call that names it. This one is for running a file, not
+for importing one.
 
 A file run this way can also suspend. Where the call is inside a coroutine and the file reaches
 a [`coroutine.yield()`](/docs/standard-library/coroutine/yield), the value goes to whoever
@@ -117,7 +119,8 @@ give it an environment, or to answer with a default instead of raising.
 Two calls naming the same file run it twice. A file that appends to a list appends twice; a
 file that opens a connection opens two. Anything meant to happen once wants
 [`require()`](/docs/standard-library/globals/require), which remembers what it has already
-loaded and hands the same value back.
+loaded and hands the same value back — as long as what the module handed back was not
+[`false`](/docs/standard-library/globals/require#what-gets-remembered).
 
 <RunnableExample code={`local counter_path = "dofile-example-counter.lua"\nlocal written = io.open(counter_path, "w")\nwritten:write("times_run = (times_run or 0) + 1 return times_run")\nwritten:close()\n\nprint(dofile(counter_path))\nprint(dofile(counter_path))\nprint(dofile(counter_path))\nos.remove(counter_path)\n-- Expected output:\n-- 1\n-- 2\n-- 3`} />
 </Gotcha>

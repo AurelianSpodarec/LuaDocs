@@ -134,7 +134,9 @@ Nothing here is remembered. Two calls naming the same file open it twice, compil
 hand back two unrelated functions — so a file edited between the two compiles differently the
 second time, and a file loaded in a loop is recompiled on every pass.
 [`require()`](/docs/standard-library/globals/require) is the call that loads a module once and
-hands the same result back afterwards; this one deliberately does not.
+hands the same result back afterwards — unless the module handed back `false`, which
+[the record does not count as loaded](/docs/standard-library/globals/require#what-gets-remembered);
+this one deliberately remembers nothing at all.
 
 <RunnableExample code={`local recipe_path = "loadfile-example-recipe.lua"\nlocal first_written = io.open(recipe_path, "w")\nfirst_written:write("return 'the first version'")\nfirst_written:close()\nlocal first_chunk = assert(loadfile(recipe_path))\n\nlocal second_written = io.open(recipe_path, "w")\nsecond_written:write("return 'the second version'")\nsecond_written:close()\nlocal second_chunk = assert(loadfile(recipe_path))\n\nprint(first_chunk())\nprint(second_chunk())\nos.remove(recipe_path)\n-- Expected output:\n-- the first version\n-- the second version`} />
 
