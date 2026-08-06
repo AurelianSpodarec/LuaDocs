@@ -2,13 +2,19 @@ import { LUA_VERSIONS, type CompatNode, type LuaVersion } from './schema';
 
 const idx = (v: LuaVersion) => LUA_VERSIONS.indexOf(v);
 
+/**
+ * The one function that reads the bounds. Everything else here — and every surface
+ * above it — asks this, per version, which is why the gap `version_restored` opens
+ * needed no second branch anywhere downstream.
+ */
 export function isAvailable(node: CompatNode, v: LuaVersion): boolean {
-  const added = node.support.lua.version_added;
+  const { version_added: added, version_removed: removed, version_restored: restored } =
+    node.support.lua;
   if (added === false) return false;
-  const removed = node.support.lua.version_removed;
   if (idx(v) < idx(added)) return false;
-  if (removed && idx(v) >= idx(removed)) return false;
-  return true;
+  if (!removed || idx(v) < idx(removed)) return true;
+  // Inside or past the gap: only a reopening puts the entry back.
+  return restored ? idx(v) >= idx(restored) : false;
 }
 
 export function changeNoteFor(node: CompatNode, v: LuaVersion): string | null {
@@ -98,10 +104,16 @@ export function supportRow(node: CompatNode) {
  * The detailed matrix renders only when this is true. On an entry available
  * everywhere and changed nowhere it would be five identical rows restating the strip
  * at the top of the page — `page-structure.md`, prototype finding #2.
+ *
+ * Read off availability rather than off the bounds — "added after 5.1, or removed" is
+ * exactly "some version does not have it", so this answers identically for every node
+ * either spelling can describe, including one with a gap in the middle. The point is
+ * that it is no longer a second reading of the fields `isAvailable` owns: this was the
+ * last place outside it that knew what the pair meant, and the matrix is the only
+ * surface that spells a gap out row by row.
  */
 export function varies(node: CompatNode): boolean {
-  if (node.support.lua.version_added !== LUA_VERSIONS[0]) return true;
-  if (node.support.lua.version_removed) return true;
+  if (LUA_VERSIONS.some((version) => !isAvailable(node, version))) return true;
 
   return Object.keys(node.changed_in ?? {}).length > 0;
 }

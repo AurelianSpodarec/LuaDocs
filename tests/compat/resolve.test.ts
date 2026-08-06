@@ -27,6 +27,19 @@ const removedAndChangedNode: CompatNode = {
   changed_in: { '5.3': 'Removed here, but also has a change note.' },
 };
 
+/**
+ * The `math.frexp` / `math.ldexp` shape: documented in 5.1 and 5.2, absent from 5.3 and
+ * 5.4, documented again in 5.5.
+ *
+ * Both encodings the two bounds allowed were false about two of the five versions —
+ * `version_removed: '5.3'` denies 5.5, and omitting it claims 5.3 and 5.4 — so neither
+ * entry could be authored honestly. This is the node that could not exist. It is written
+ * out here rather than registered as a dataset: M6 writes those two entries.
+ */
+const restoredNode: CompatNode = {
+  support: { lua: { version_added: '5.1', version_removed: '5.3', version_restored: '5.5' } },
+};
+
 describe('isAvailable', () => {
   it('false before version_added', () => expect(isAvailable(node, '5.1')).toBe(false));
   it('true from version_added onward', () => expect(isAvailable(node, '5.3')).toBe(true));
@@ -47,6 +60,19 @@ describe('isAvailable', () => {
 
   it('stays false for versions after version_removed', () => {
     expect(isAvailable(removedNode, '5.5')).toBe(false);
+  });
+
+  it('reopens at version_restored, and only there', () => {
+    // The whole point of the field: 5.3 and 5.4 stay false while 5.5 comes back true.
+    // Every surface on the page asks this function, per version, so this one row of
+    // booleans is what the strip, the matrix, the badge and both callouts render from.
+    expect(LUA_VERSIONS.map((v) => isAvailable(restoredNode, v))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      true,
+    ]);
   });
 });
 
@@ -71,6 +97,16 @@ describe('supportRow', () => {
     expect(supportRow(neverAddedNode)).toEqual(
       LUA_VERSIONS.map((version) => ({ version, state: 'no' })),
     );
+  });
+
+  it('marks the gap "no" and the version it came back in "yes"', () => {
+    expect(supportRow(restoredNode)).toEqual([
+      { version: '5.1', state: 'yes' },
+      { version: '5.2', state: 'yes' },
+      { version: '5.3', state: 'no' },
+      { version: '5.4', state: 'no' },
+      { version: '5.5', state: 'yes' },
+    ]);
   });
 
   it('"no" beats "changed" when a removed version also has a changed_in entry', () => {
@@ -109,6 +145,23 @@ describe('unavailableIn', () => {
   it('has a shape for a symbol in no documented version', () => {
     expect(unavailableIn(neverAddedNode, '5.3')).toEqual({ kind: 'never' });
   });
+
+  it('reads a version inside the gap as restored, not as removed', () => {
+    for (const version of ['5.3', '5.4'] as const) {
+      expect(unavailableIn(restoredNode, version), version).toEqual({
+        kind: 'restored',
+        addedIn: '5.1',
+        removedIn: '5.3',
+        lastAvailable: '5.2',
+        restoredIn: '5.5',
+      });
+    }
+  });
+
+  it('is null on both sides of the gap', () => {
+    expect(unavailableIn(restoredNode, '5.2')).toBeNull();
+    expect(unavailableIn(restoredNode, '5.5')).toBeNull();
+  });
 });
 
 describe('availabilityRanges', () => {
@@ -122,6 +175,13 @@ describe('availabilityRanges', () => {
 
   it('is empty for a symbol no documented version has', () => {
     expect(availabilityRanges(neverAddedNode)).toEqual([]);
+  });
+
+  it('gives an entry that came back both of its runs', () => {
+    expect(availabilityRanges(restoredNode)).toEqual([
+      { from: '5.1', to: '5.2' },
+      { from: '5.5', to: '5.5' },
+    ]);
   });
 });
 
@@ -152,5 +212,13 @@ describe('varies', () => {
 
   it('is true for a symbol in no documented version', () => {
     expect(varies({ support: { lua: { version_added: false } } })).toBe(true);
+  });
+
+  it('is true for an entry that left and came back', () => {
+    // The matrix is the only surface that spells the hole out row by row, and it renders
+    // on nothing but this. `varies` is the last thing here that read the bound fields;
+    // it now walks availability like everything else, so a future shape that opens a gap
+    // some other way still shows the matrix without this function learning about it.
+    expect(varies(restoredNode)).toBe(true);
   });
 });

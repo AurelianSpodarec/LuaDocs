@@ -28,6 +28,15 @@ describe('the availability badge', () => {
     expect(availabilityBadge(spans)).toBe('5.1–5.3');
   });
 
+  it('gives an entry that came back both runs, not one span over the hole', () => {
+    // The `math.frexp` / `math.ldexp` shape. One span — "5.1+" — would claim the two
+    // versions that dropped it; "5.1–5.2" alone would deny the one that has it back.
+    const cameBack: CompatNode = {
+      support: { lua: { version_added: '5.1', version_removed: '5.3', version_restored: '5.5' } },
+    };
+    expect(availabilityBadge(cameBack)).toBe('5.1–5.2, 5.5+');
+  });
+
   it('has nothing to say about a symbol no documented version has', () => {
     expect(availabilityBadge({ support: { lua: { version_added: false } } })).toBeNull();
   });

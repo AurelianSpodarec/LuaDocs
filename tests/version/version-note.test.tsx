@@ -9,6 +9,10 @@ import type { CompatNode, LuaVersion } from '@/compat/schema';
 const notYetAdded: CompatNode = { support: { lua: { version_added: '5.2' } } };
 const removed: CompatNode = { support: { lua: { version_added: '5.1', version_removed: '5.2' } } };
 const never: CompatNode = { support: { lua: { version_added: false } } };
+/** `math.frexp` and `math.ldexp` — in 5.1 and 5.2, gone from 5.3 and 5.4, back in 5.5. */
+const cameBack: CompatNode = {
+  support: { lua: { version_added: '5.1', version_removed: '5.3', version_restored: '5.5' } },
+};
 
 /** Renders the callout with `version` selected, driving the real switcher. */
 function renderAt(node: CompatNode, version: LuaVersion) {
@@ -57,6 +61,21 @@ describe('the unavailable callout', () => {
     );
   });
 
+  it('tells a reader inside the gap that the entry comes back, and when', () => {
+    // The branch that had no dataset able to reach it until `version_restored` existed.
+    // It is driven here through the real switcher and a real node, which is the whole
+    // proof that the schema and the renderer now meet.
+    renderAt(cameBack, '5.4');
+    expect(note()).toHaveTextContent(
+      'Not in Lua 5.4. Introduced in Lua 5.1, removed in Lua 5.3, and back in Lua 5.5.',
+    );
+  });
+
+  it('renders nothing on either side of the gap', () => {
+    renderAt(cameBack, '5.5');
+    expect(note()).toBeNull();
+  });
+
   it('claims nothing about a symbol no documented version has', () => {
     renderAt(never, '5.5');
     expect(note()).toHaveTextContent('Not in Lua 5.5. Not part of any documented Lua version.');
@@ -67,11 +86,10 @@ describe('the unavailable callout', () => {
 });
 
 describe('the sentence each shape of absence gets', () => {
-  it('distinguishes all four, including the one no dataset can reach yet', () => {
-    // `math.frexp` and `math.ldexp` are documented in 5.1 and 5.2, absent from 5.3 and
-    // 5.4, and documented again in 5.5. `src/compat/schema.ts` cannot say that — one
-    // `version_removed` cannot be reopened — so no `CompatNode` produces `restored`, and
-    // the branch is pinned here on the shape instead of through a node that cannot exist.
+  it('distinguishes all four', () => {
+    // Kept as a direct test of the four shapes even though every one of them is now
+    // reachable from a node: these are the exact strings, and the callout tests above
+    // assert substrings of them.
     expect(unavailableText({ kind: 'never' })).toBe('Not part of any documented Lua version.');
 
     expect(unavailableText({ kind: 'not-yet', addedIn: '5.2' })).toContain(
