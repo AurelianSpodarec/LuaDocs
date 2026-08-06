@@ -1,8 +1,154 @@
 ---
 title: tonumber()
-description: ""
+description: Read a number out of a string or a number, optionally in a base other than ten.
+lua-compat: globals.tonumber
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-tonumber
 ---
 
-{/* Not yet written. */}
+Reads a number out of whatever it is handed, and answers `nil` when there is no number to
+read. That failure is an ordinary value sitting in the result rather than an error to catch,
+which is what makes this the usual way to find out whether a piece of text is a number at all.
+
+<RunnableExample code={`print(tonumber("42"))\nprint(tonumber("3.5"))\nprint(tonumber("twelve"))\n-- Expected output:\n-- 42\n-- 3.5\n-- nil`} />
+
+## Syntax
+
+```lua
+tonumber(e [, base])
+```
+
+<Parameters>
+  <Param name="e">The value to read. Without `base`, a number is handed straight back and a string is read as a Lua numeral; with `base`, this has to be a string.</Param>
+  <Param name="base">Which base to read `e`'s digits in — a whole number from 2 to 36. Left out, or given as `nil`, the string is read as an ordinary Lua numeral instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">The number `e` names, and `nil` when it names none. For a string, the subtype follows the numeral: a fractional part or an exponent reads as a float, and digits with neither read as an integer, given a value the integer range can hold. A number handed in with no `base` comes back exactly as it was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `nil`; nothing at all is a mistake and is refused.
+- Raises when `base` is outside 2 to 36.
+- Raises when `base` is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `base` is given and `e` is not a string.
+- <Since v="5.3" /> Raises when `base` carries a fraction rather than an exact whole-number value. A float with nothing after the point is accepted; `16.5` is not.
+
+</Errors>
+
+## Description
+
+There are two functions here wearing one name, and `base` is the switch between them.
+
+Called with one argument, this is Lua's own string-to-number conversion made explicit. A value
+that is already a number comes back as it stands, unrounded and unconverted. A string is read
+as a numeral written the way Lua writes one: an optional sign, decimal digits with an optional
+fractional part and an optional exponent marked `e` or `E`, or hexadecimal notation such as
+`0xff`. Whitespace at either end is tolerated and ignored. Everything else — a boolean, a
+table, a function, and a string with anything left over after the numeral — answers `nil`.
+
+That last clause is stricter than most parsers a reader will have met. The numeral has to
+account for the whole string: `"42 items"` is not forty-two with a note attached, it is a
+failure, because `items` is not part of any numeral. Nothing partial comes back, and nothing
+is silently truncated.
+
+No metamethod takes part. A table with a `__tostring` that produces `"5"` is still answered
+`nil`, because the conversion looks at the value rather than at how the value likes to be
+written — the opposite of
+[`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change), which
+consults the metatable first and is the entry that explains that whole mechanism.
+
+## Reading a numeral in another base
+
+Called with two arguments, this stops being Lua's numeral syntax and becomes a plain digit
+scan. `e` has to be a string; its characters are read as digits in the base given, with the
+letters standing for values from ten upward — `A` for 10, `B` for 11, on to `Z` for 35 — in
+either case. Whitespace at either end is tolerated here as well, and the digits still have to
+account for the rest of the string.
+
+What this form does *not* accept is what made the one-argument form Lua-shaped: a radix point,
+exponent notation, and the `0x` that marks hexadecimal. Base 16 wants `"ff"`, not `"0xff"` —
+`x` is worth 33, so at base 16 it is not a digit at all, the string stops accounting for
+itself, and `nil` comes back. The valid bases run from 2 to 36 inclusive, and one outside that
+range raises rather than answering.
+
+<Note>
+This form reads *whole numbers* only, so it is the wrong tool for a value that might have a
+fraction. It is the right tool for text that is already a digit string in a known base —
+colour components, permission bits, an identifier from a wire format — where the alternative
+is arithmetic in a loop.
+</Note>
+
+## Examples
+
+### Deciding whether text is a number
+
+<RunnableExample code={`local answers = { "12", " 7 ", "-2.5", "0xff", "3 apples", "" }\nfor index = 1, #answers do\n  print(tostring(tonumber(answers[index])))\nend\n-- Expected output:\n-- 12\n-- 7\n-- -2.5\n-- 255\n-- nil\n-- nil`} />
+
+The first four are numerals, surrounding spaces and hexadecimal notation included. The last
+two are not: one has a word after the digits and the other has nothing at all, and both answer
+`nil` rather than raising.
+
+### Falling back when a setting is not numeric
+
+<RunnableExample code={`local raw_settings = { port = "8080", retries = 3, host = "example.org" }\nlocal wanted = { "port", "retries", "host" }\nfor index = 1, #wanted do\n  local numeric = tonumber(raw_settings[wanted[index]])\n  print(wanted[index] .. ": " .. tostring(numeric or "not a number"))\nend\n-- Expected output:\n-- port: 8080\n-- retries: 3\n-- host: not a number`} />
+
+A setting read from a file arrives as text whether or not it was written as one, and a setting
+built in code arrives as a number already. Both go through unchanged here, and the one that
+was never numeric falls to the `or`.
+
+### Digits in another base
+
+<RunnableExample code={`print(tonumber("ff", 16))\nprint(tonumber("1010", 2))\nprint(tonumber("777", 8))\nprint(tonumber("zz", 36))\n-- Expected output:\n-- 255\n-- 10\n-- 511\n-- 1295`} />
+
+Case makes no difference above base 10, so `"ff"` and `"FF"` both read as 255.
+
+### Splitting a hexadecimal colour
+
+<RunnableExample code={`local colour = "7f3fbf"\nlocal red = tonumber(colour:sub(1, 2), 16)\nlocal green = tonumber(colour:sub(3, 4), 16)\nlocal blue = tonumber(colour:sub(5, 6), 16)\nprint(red .. " " .. green .. " " .. blue)\n-- Expected output: 127 63 191`} />
+
+Each pair of characters is a digit string in base 16 on its own, which is exactly what the
+two-argument form wants — and exactly what the one-argument form would refuse, since `7f` is
+not a Lua numeral.
+
+## Gotchas
+
+<Gotcha title="The numeral has to be the whole string">
+`tonumber("42 items")` is `nil`, not 42. So is `tonumber("12px")` and `tonumber("1 000")`. Text
+arriving from a user, a file or a header usually needs trimming or matching first —
+[`string.match()`](/docs/standard-library/string/match) with a pattern is the usual partner —
+and what is handed over here should be the numeral alone. Leading and trailing whitespace is
+the one exception, and it is forgiven silently.
+</Gotcha>
+
+<Gotcha title="An extra return value lands in base">
+A call whose argument is itself a multi-value expression passes every one of those values
+along, and the second one becomes `base`.
+[`string.gsub()`](/docs/standard-library/string/gsub) returns a count as its second value, so
+stripping spaces before converting reads the digits in a base nobody chose. Wrapping the inner
+call in a second pair of parentheses keeps its first value only.
+
+<RunnableExample code={`local spaced = "1 0 1"\nprint(tonumber(string.gsub(spaced, "%s", "")))\nprint(tonumber((string.gsub(spaced, "%s", ""))))\n-- Expected output:\n-- 5\n-- 101`} />
+
+Two spaces were replaced, so the count `2` arrived as the base and `"101"` was read as binary.
+</Gotcha>
+
+<Gotcha title="Above base 10, letters are digits">
+`e` is a digit worth 14 in any base above 14, so an exponent marker stops being one:
+`tonumber("1e2", 16)` is 482 — the hexadecimal numeral `1e2` — and not 100. `b`, `d` and `f`
+are digits too once the base is high enough to reach them, which catches strings that read
+like units or suffixes. In the two-argument form there is no exponent notation to fall back
+on.
+
+<RunnableExample code={`print(tonumber("1e2", 16))\nprint(tonumber("ff", 16))\n-- Expected output:\n-- 482\n-- 255`} />
+</Gotcha>
+
+## See also
+
+- [`tostring()`](/docs/standard-library/globals/tostring) — the conversion in the other direction
+- [`type()`](/docs/standard-library/globals/type) — asking what a value is, rather than what number it names
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — converting a value to an exact whole number, or answering `nil`
+- [`math.type()`](/docs/standard-library/math/type) — which subtype the result came back as
+- [`string.format()`](/docs/standard-library/string/format) — writing a number out, with the control this function's counterpart lacks
+- [Numbers](/docs/language/values-and-types/number) — the numeral syntax the one-argument form follows

@@ -1,8 +1,144 @@
 ---
 title: tostring()
-description: ""
+description: Turn any value into text, letting the value's metatable choose how.
+lua-compat: globals.tostring
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-tostring
 ---
 
-{/* Not yet written. */}
+Turns any value into a string. Numbers, booleans and `nil` get the spelling the language uses
+for them, a string is handed straight back, and everything else gets a name and an identity —
+unless its metatable says otherwise, which is the part worth knowing about.
+
+<RunnableExample code={`print(tostring(42))\nprint(tostring(true))\nprint(tostring(nil))\nprint(tostring("already a string"))\n-- Expected output:\n-- 42\n-- true\n-- nil\n-- already a string`} />
+
+## Syntax
+
+```lua
+tostring(v)
+```
+
+<Parameters>
+  <Param name="v">The value to write out. Any value at all is allowed, `nil` included — a value is answered, not refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">`v` written as text.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `"nil"`; nothing at all is a mistake and is refused.
+- Raises when the value's metatable holds a `__tostring` field that cannot be called.
+- <Since v="5.3" /> Raises when a `__tostring` metamethod answers with something that is neither a string nor a number.
+
+</Errors>
+
+## Description
+
+For the four kinds of value Lua can spell out on its own, the result is what you would expect
+and what you would have written by hand: `nil` becomes `"nil"`, the two booleans become
+`"true"` and `"false"`, a number becomes the text the language would print it as, and a string
+comes back unchanged rather than quoted or escaped.
+
+Everything else — a table, a function, a coroutine, a file — has no text form of its own, so
+unless its metatable supplies one, what comes back is the type name followed by something
+standing for *which one*: an identity, not a description. Two tables that are both in play get
+different text; one table gets the same text twice running. That identity separates one value
+from another and does no more than that — it differs between runs of the same program, and
+carries nothing a program should read back out of it.
+
+The one thing this function is not is a formatter.
+[`string.format()`](/docs/standard-library/string/format) is where you go to decide how many
+decimal places a number keeps, how it is padded, or what base it is written in; this one takes
+the spelling the language already has and hands it over.
+
+## What a metatable can change
+
+A value's metatable is where this function's answer can be taken over. Two fields are
+involved, and they are consulted in order.
+
+*`__tostring`* is the hook. When the value's metatable holds one, it is called with the value
+as its only argument, and its answer is what this call produces. That covers the common case:
+a record, a vector, a date, anything with a natural written form gains one by defining a
+single function, and `print()` and an interactive prompt reach it as well, without being told.
+
+*`__name`* is the narrower one, and it does less than its name suggests. It is looked at only
+for values that would otherwise get the type-and-identity spelling, only when the metatable has
+no `__tostring` at all, and only when it holds a string. When all three hold, that string may
+stand in where the type name would have gone, so a value reads as `Vector: …` rather than
+`table: …`. It replaces a word in a spelling that is not promised in the first place, which is
+why it is a debugging convenience and not a text format.
+
+Neither field affects [`type()`](/docs/standard-library/globals/type), which reports what the
+value *is* and is deaf to metatables, or
+[`tonumber()`](/docs/standard-library/globals/tonumber), which consults no metamethod at all.
+
+## The format is not a promise
+
+The reference manual commits to a readable result and to nothing more specific than that: no
+field widths, no decimal places, no promised spelling for a number, and no promised shape for
+the type-and-identity form. Code that reads the result back — parsing an identity out of it,
+matching against `"table: "`, comparing two values by comparing their text — is written
+against something the language has deliberately left open.
+
+Two habits follow. For numbers, reach for
+[`string.format()`](/docs/standard-library/string/format), which promises exactly what it is
+given. For values of your own, define `__tostring`, which makes the spelling yours and
+therefore stable by construction.
+
+## Examples
+
+### Giving a value a written form of its own
+
+<RunnableExample code={`local receipt = setmetatable(\n  { item = "cocoa", price = 4.5 },\n  { __tostring = function(entry) return entry.item .. " at " .. entry.price end }\n)\n\nprint(tostring(receipt))\nprint(receipt.item)\n-- Expected output:\n-- cocoa at 4.5\n-- cocoa`} />
+
+The metamethod receives the value itself, so it can read the fields it wants. Nothing about
+the table changes — the second line proves the fields are still where they were.
+
+### Writing out values that might be anything
+
+<RunnableExample code={`local readings = { 21.5, "n/a", nil, false }\nfor index = 1, 4 do\n  print("reading " .. index .. ": " .. tostring(readings[index]))\nend\n-- Expected output:\n-- reading 1: 21.5\n-- reading 2: n/a\n-- reading 3: nil\n-- reading 4: false`} />
+
+This is the function's everyday use: a slot that might hold a number, a string, `false` or
+nothing at all becomes text in one step, with no branch on the type and nothing to raise.
+
+### The text of a table is an identity, not a description
+
+<RunnableExample code={`local first_basket = {}\nlocal second_basket = {}\nprint(tostring(first_basket) == tostring(first_basket))\nprint(tostring(first_basket) == tostring(second_basket))\n-- Expected output:\n-- true\n-- false`} />
+
+Two empty tables hold the same contents and get different text, because the text answers
+*which table* rather than *what is in it*. A comparison written this way tests identity, which
+`==` already does more clearly and more cheaply.
+
+## Gotchas
+
+<Gotcha title="Concatenation does not call __tostring">
+`..` and this function are separate mechanisms. Joining a table onto a string raises, however
+carefully its `__tostring` was written, because concatenation looks for `__concat`, which the
+table below does not have. The fix is to make the call explicit.
+
+<RunnableExample code={`local shopping = setmetatable({}, { __tostring = function() return "shopping list" end })\nlocal concatenated = pcall(function() return "the " .. shopping end)\nprint(concatenated)\nprint("the " .. tostring(shopping))\n-- Expected output:\n-- false\n-- the shopping list`} />
+</Gotcha>
+
+<Gotcha title="A second argument is accepted and ignored">
+`tostring(price, "%.2f")` runs, raises nothing, and formats nothing — the extra argument is
+looked at by nobody, and the result is the same as `tostring(price)`. The call that was meant
+is `string.format("%.2f", price)`, and the two are easy to confuse precisely because this one
+declines to complain.
+</Gotcha>
+
+<Gotcha title="The result is text for a reader, not data for a program">
+Values that are equal can be written differently and values that are written identically can
+be distinct, so the text is a poor key, a poor comparison and a poor thing to store. Where two
+values need to be compared, compare the values; where text needs a guaranteed shape, produce
+it with `string.format()` or a `__tostring` of your own.
+</Gotcha>
+
+## See also
+
+- [`type()`](/docs/standard-library/globals/type) — naming what a value is, which no metatable can change
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — the conversion in the other direction
+- [`string.format()`](/docs/standard-library/string/format) — control over how a value is written, which this function does not offer
+- [`print()`](/docs/standard-library/globals/print) — writing values out, which reaches the same spellings
+- [How metatables really work](/docs/guides/how-metatables-work) — where `__tostring` and `__name` sit among the rest

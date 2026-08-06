@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Rejects a `0x` prefix when `base` is 16, and reads an explicit `base` of 10 as a digit scan like every other base; 5.1 answers 255 for `tonumber(\"0xff\", 16)`, and reads `tonumber(\"3.5\", 10)` as an ordinary Lua numeral and answers 3.5.",
+    "5.3": "Requires `e` to be a string when `base` is given, and requires `base` to hold an exact whole number; 5.1 and 5.2 read a number `e` as its own digits, and truncate a `base` that carries a fraction."
+  }
+}

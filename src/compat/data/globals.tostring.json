@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Raises when a `__tostring` metamethod answers with something that is neither a string nor a number; earlier versions hand that answer back as the result of the call. A string in the metatable's `__name` field may also stand in for the type name now, on a value that has no `__tostring` of its own."
+  }
+}

@@ -69,6 +69,9 @@ import mathLog10 from './data/math.log10.json';
 import mathFrexp from './data/math.frexp.json';
 import mathLdexp from './data/math.ldexp.json';
 import mathLibrary from './data/math.library.json';
+import globalsType from './data/globals.type.json';
+import globalsTostring from './data/globals.tostring.json';
+import globalsTonumber from './data/globals.tonumber.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -218,6 +221,33 @@ const raw: Record<string, unknown> = {
   // block. `ldexp` alone changed while it was away, in what it accepts as an exponent.
   'math.frexp': mathFrexp,
   'math.ldexp': mathLdexp,
+  // The `globals` section. These symbols carry no library prefix in the manual — the
+  // anchors are `pdf-type`, `pdf-tostring`, `pdf-tonumber` — but a bare `type` here would
+  // collide with `math.type` and `io.type`, which are different functions with entries of
+  // their own. So the key is the *section* name rather than a library name, matching both
+  // the directory the entries live in and the URL a reader sees. `globals.library` is
+  // reserved for the section overview, on the shape `string.library` set.
+  //
+  // Only `tostring` and `tonumber` have anything to record. `type` answers the same eight
+  // strings in every version, refuses a missing argument in every version, and consults no
+  // metatable in any of them, so its node is availability and nothing else — which is what
+  // keeps the matrix off a page where nothing varies.
+  'globals.type': globalsType,
+  // `tostring` changed once, and the manual documents neither half of it: the check that a
+  // `__tostring` result is usable as text arrives at 5.3, and `__name` starts standing in
+  // for the type name at 5.3 as well, though no manual mentions `__name` beside `tostring`
+  // until 5.4. Both are read off `lauxlib.c` and confirmed against a 5.3 build, on ADR 0010
+  // rule 3. The `.0` a float that looks like an integer gains at 5.3 is deliberately absent:
+  // that is a fact about how Lua spells numbers, disclosed once site-wide, and recording it
+  // here would put it on every entry that ever prints one.
+  'globals.tostring': globalsTostring,
+  // `tonumber` moved twice, and both moves are in what it accepts rather than in what it
+  // answers. `fail` is not one of them — the newest manuals say `fail` where the older ones
+  // said `nil`, and the value is still `nil`, which is the ruling `math.ult` and `math.type`
+  // already settled. Nor is the integer subtype: what comes back is a float before 5.3 and
+  // may be an integer after, and ADR 0009 gives that one site-wide disclosure driven by the
+  // `<Return type>` field.
+  'globals.tonumber': globalsTonumber,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

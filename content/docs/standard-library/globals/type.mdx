@@ -1,8 +1,129 @@
 ---
 title: type()
-description: ""
+description: Name the basic type of a value, as one of eight strings.
+lua-compat: globals.type
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-type
 ---
 
-{/* Not yet written. */}
+Names the basic type of whatever it is handed, and gives that name back as a string. The set
+of names is small and closed — eight of them — so this is a question with an answer for every
+value, rather than a test that can come up empty.
+
+<RunnableExample code={`print(type("cocoa"))\nprint(type(42))\nprint(type({}))\nprint(type(nil))\n-- Expected output:\n-- string\n-- number\n-- table\n-- nil`} />
+
+## Syntax
+
+```lua
+type(v)
+```
+
+<Parameters>
+  <Param name="v">The value to name. Any value at all is allowed, `nil` included — a value is answered, not refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The name of `v`'s basic type, drawn from the eight listed below.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `"nil"`; nothing at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+The result is a string, and that holds for the absent value too: `type(nil)` is the
+three-character string `"nil"`, not the value `nil`. The distinction is the single most common
+way this function is misread, because both spellings look identical in source and only one of
+them ever comes out of here.
+
+What comes back is the *basic* type, and it stops there. A configuration table and a queue are
+both `"table"`; a coroutine wrapper and a plain callback are both `"function"`. Lua's own
+libraries ask narrower questions where a narrower answer is useful —
+[`math.type()`](/docs/standard-library/math/type) separates the two number subtypes and
+[`io.type()`](/docs/standard-library/io/type) reports whether a value is a file handle and
+whether it is still open — and
+neither of those is this function under another name. Anything finer than the eight names
+below is a distinction a program draws for itself, usually with a field of its own.
+
+A metatable does not enter into it. Attaching one changes how a value behaves under
+arithmetic, indexing, comparison and printing, and leaves this answer exactly where it was, so
+a table dressed up as a vector still answers `"table"`.
+[`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change) is the
+counterpart where a metatable does get a say, and it is worth reading alongside this one for
+the contrast.
+
+## The eight names
+
+| Result | What answers with it |
+|---|---|
+| `"nil"` | `nil` itself — an unassigned variable, or a table field that was never set |
+| `"number"` | every number, whichever subtype it is stored as |
+| `"string"` | every string, whether or not its text reads as a number |
+| `"boolean"` | `true` and `false`, and nothing else |
+| `"table"` | every table, with or without a metatable |
+| `"function"` | functions written in Lua, and functions the host supplies |
+| `"thread"` | coroutines |
+| `"userdata"` | values the host holds on Lua's behalf, such as an open file |
+
+## Examples
+
+### Branching on what a value turned out to be
+
+<RunnableExample code={`local function describe_size(measurement)\n  if type(measurement) == "number" then\n    return measurement .. " cm"\n  elseif type(measurement) == "string" then\n    return measurement\n  else\n    return "unknown"\n  end\nend\n\nprint(describe_size(30))\nprint(describe_size("one metre"))\nprint(describe_size(true))\n-- Expected output:\n-- 30 cm\n-- one metre\n-- unknown`} />
+
+Each branch compares against a string literal, which is what makes the chain readable: the
+names are data, not keywords, and they can be collected in a table and looked up when there
+are more than three of them.
+
+### Reporting the shape of a settings table
+
+<RunnableExample code={`local settings = { host = "example.org", retries = 3, verbose = true }\nprint(type(settings.host))\nprint(type(settings.retries))\nprint(type(settings.verbose))\nprint(type(settings.timeout))\n-- Expected output:\n-- string\n-- number\n-- boolean\n-- nil`} />
+
+The last line is the useful one. A key nobody set reads as `nil`, so it is answered rather
+than refused — which is what lets a validation loop walk a list of expected keys and report
+the missing ones alongside the mistyped ones.
+
+### The kinds you meet less often
+
+<RunnableExample code={`local pending_download = coroutine.create(function() return "done" end)\nprint(type(pending_download))\nprint(type(string.format))\nprint(type(math))\nprint(type(io.stdout))\n-- Expected output:\n-- thread\n-- function\n-- table\n-- userdata`} />
+
+A coroutine is a `"thread"` even though nothing runs in parallel; a library such as `math` is
+an ordinary table of functions; and an open file is `"userdata"`, meaning a value Lua holds
+but does not itself understand.
+
+## Gotchas
+
+<Gotcha title="The answer for nil is a string, so comparing it to nil fails">
+`type(nil)` is `"nil"`, in quotes. A check written `if type(setting) == nil then` compares a
+string against a value of a different type and is false however the argument was set, so the
+branch simply never runs. The comparison wanted is `== "nil"` — or, more often, no call to
+this function at all, since `if setting == nil then` asks the same question directly.
+</Gotcha>
+
+<Gotcha title="nil is an answer; no argument is an error">
+`type(nil)` returns `"nil"`. `type()` raises. The two are hard to tell apart at the call site
+when the argument is itself a call: written as `type(find_setting())`, a `find_setting` that
+returns nothing at all leaves this function with no argument, and it raises instead of
+answering. Assigning the result to a local first turns *no value* into `nil`, and the error
+back into an answer.
+</Gotcha>
+
+<Gotcha title="One name covers both kinds of number">
+Integers and floats both answer `"number"`, which is the right answer nearly everywhere and no
+help at all when the difference matters — as it does for a value used as a table key, printed
+to a user, or pushed to the edge of the numeric range.
+[`math.type()`](/docs/standard-library/math/type) is the finer question, and
+[`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) explains which
+subtype the library hands back.
+</Gotcha>
+
+## See also
+
+- [`math.type()`](/docs/standard-library/math/type) — which of the two number subtypes a number is stored as
+- [`io.type()`](/docs/standard-library/io/type) — whether a value is a file, and whether that file is still open
+- [`tostring()`](/docs/standard-library/globals/tostring) — turning a value into text, where a metatable does get a say
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — reading a number out of a string, rather than naming what the string is
+- [How metatables really work](/docs/guides/how-metatables-work) — what a metatable can and cannot change about a value
