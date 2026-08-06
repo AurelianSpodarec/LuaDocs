@@ -1,8 +1,98 @@
 ---
 title: math.ceil()
-description: ""
+description: Round a number up to the nearest whole number.
+lua-compat: math.ceil
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.ceil
 ---
 
-{/* Not yet written. */}
+Rounds a number up to the nearest whole number — the smallest whole number that is not
+below it. A number that is already whole keeps its value and is not pushed up to the next
+one, which is the half of this that surprises people.
+
+<RunnableExample code={`local boxes_needed = math.ceil(47 / 10)\nprint(boxes_needed)\n-- Expected output: 5`} />
+
+## Syntax
+
+```lua
+math.ceil(x)
+```
+
+<Parameters>
+  <Param name="x">The number to round up.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">The smallest whole number that is not below `x`. An integer whenever that value fits in one, and a float when it does not.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+Rounding up means rounding toward plus infinity, not away from zero. On a positive number
+the two agree, but on a negative one rounding up moves *toward* zero: `-3.7` rounds up to
+`-3`, not to `-4`. So this function and [`math.floor()`](/docs/standard-library/math/floor)
+are mirror images across zero rather than a rounding-away and a rounding-towards pair.
+
+An argument that is already whole is its own ceiling. That is what makes this the right
+tool for "how many whole containers does this need" — a quantity that fills its containers
+exactly needs no extra one, and rounding up says so, where adding one to a rounded-down
+value would not.
+
+Which subtype comes back is the library's rounding rule rather than this function's own,
+and it is [written out on `math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back):
+an integer whenever the rounded value fits in one, and a float when it does not.
+
+## Examples
+
+### How many batches a queue takes
+
+<RunnableExample code={`local pending_jobs = 130\nlocal jobs_per_batch = 25\nprint(math.ceil(pending_jobs / jobs_per_batch))\n-- Expected output: 6`} />
+
+Five batches carry 125 jobs and the remaining five need a batch of their own, even though
+that batch runs a fifth full.
+
+### A quantity that divides exactly needs no extra batch
+
+<RunnableExample code={`local pending_jobs = 125\nlocal jobs_per_batch = 25\nprint(math.ceil(pending_jobs / jobs_per_batch))\nprint(math.floor(pending_jobs / jobs_per_batch) + 1)\n-- Expected output:\n-- 5\n-- 6`} />
+
+The second line is the mistake this function exists to avoid. Rounding down and adding one
+is right for every quantity except the ones that divide exactly, and those are precisely
+the quantities a test is likeliest to use.
+
+### Rounding up moves a negative number toward zero
+
+<RunnableExample code={`local account_balance = -12.4\nprint(math.ceil(account_balance))\n-- Expected output: -12`} />
+
+`-12` is the smallest whole number that is not below `-12.4`. Reading "round up" as "make
+it bigger in size" gives `-13` and is wrong by a whole unit on every negative value.
+
+## Gotchas
+
+<Gotcha title="Rounding up leaves a whole number alone">
+`math.ceil(5)` is `5`, not `6`. Written out that is obvious, and it is still the most
+common way this function is misused: `math.floor(x) + 1` is reached for as a stand-in for
+rounding up, agrees with it everywhere except on whole numbers, and is therefore wrong
+exactly where a hand-checked example is likeliest to sit. Where the intent really is "the
+next one up, always", that is `math.floor(x) + 1` — but then it is not rounding.
+</Gotcha>
+
+<Gotcha title="A float that only looks whole still rounds up">
+Rounding up magnifies the smallest excess into a whole unit, so a value carrying a tiny
+floating-point error crosses a boundary a reader would swear it sat on. `0.1 + 0.2` is a
+shade above `0.3`, and `math.ceil((0.1 + 0.2) * 10)` is `4` rather than the `3` the
+arithmetic on paper gives. Round a quantity that arrived through float arithmetic only
+after deciding how much of it is signal — or work in whole units from the start.
+</Gotcha>
+
+## See also
+
+- [`math.floor()`](/docs/standard-library/math/floor) — rounding the other way, and where the subtype rule is written out
+- [`math.modf()`](/docs/standard-library/math/modf) — chopping the fraction off instead of rounding either way
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — asking whether a number can be an integer, rather than rounding it into one
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — the division whose result is usually what gets rounded up

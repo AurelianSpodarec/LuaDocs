@@ -1,8 +1,109 @@
 ---
 title: math.modf()
-description: ""
+description: Split a number into its whole part and its fraction.
+lua-compat: math.modf
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.modf
 ---
 
-{/* Not yet written. */}
+Cuts a number in two at the decimal point and hands back both halves — the whole part
+first, the fraction second. Nothing is rounded and nothing is decided: each piece is simply
+one side of the point.
+
+<RunnableExample code={`local whole_hours, part_of_an_hour = math.modf(3.75)\nprint(whole_hours)\nprint(part_of_an_hour)\n-- Expected output:\n-- 3\n-- 0.75`} />
+
+## Syntax
+
+```lua
+math.modf(x)
+```
+
+<Parameters>
+  <Param name="x">The number to split.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">The whole part — `x` with its fraction removed. An integer whenever that value fits in one, and a float when it does not.</Return>
+  <Return type="float">The fraction — what removing the whole part left behind. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The cut runs *toward zero*, so it removes the fraction rather than rounding the number in
+any direction. On a positive number that looks exactly like rounding down; on a negative one
+carrying a fraction it does not, and the difference is a whole unit. `-3.75` splits into
+`-3` and `-0.75`,
+where [`math.floor()`](/docs/standard-library/math/floor) would have given `-4`. Both
+pieces carry the sign of the number they came from, so neither of them has to be corrected
+before it is used.
+
+The two results do not share a subtype and are not meant to. The whole part follows the
+library's rounding rule, [written out on
+`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) — an integer
+whenever the value fits in one, a float when it does not. The fraction is a float always,
+including when it is zero and including when the argument was an integer.
+
+*Two* values come back, which is what separates this from
+[`math.fmod()`](/docs/standard-library/math/fmod) — a name one letter away that divides two
+numbers and returns a single remainder. This one divides nothing and takes one argument.
+
+A number with no fraction to give up splits into itself and a zero. That covers whole
+numbers, and it covers the infinities too: there is nothing to take from one of those, so
+the whole part is the infinity and the fraction is zero.
+
+## Examples
+
+### Turning a decimal duration into whole units
+
+<RunnableExample code={`local shift_length = 7.25\nlocal whole_hours, part_of_an_hour = math.modf(shift_length)\nprint(whole_hours)\nprint(math.floor(part_of_an_hour * 60))\n-- Expected output:\n-- 7\n-- 15`} />
+
+The split gives the hours directly and leaves the rest of the hour as a fraction, which
+becomes minutes once it is scaled. Doing this with a division and a remainder needs the
+number in the smaller unit first; this needs no conversion at all.
+
+### The cut runs toward zero, not downwards
+
+<RunnableExample code={`local temperature_reading = -3.75\nlocal whole_degrees, part_of_a_degree = math.modf(temperature_reading)\nprint(whole_degrees)\nprint(part_of_a_degree)\nprint(math.floor(temperature_reading))\n-- Expected output:\n-- -3\n-- -0.75\n-- -4`} />
+
+The whole part keeps the sign and stays on the side of zero the reading was on, while
+rounding down crosses to the next value away from it.
+
+### Asking whether anything was left over
+
+<RunnableExample code={`local shared_cost = 100 / 8\nlocal whole_units, part_of_a_unit = math.modf(shared_cost)\nprint(whole_units)\nprint(part_of_a_unit ~= 0)\n-- Expected output:\n-- 12\n-- true`} />
+
+Comparing the fraction against zero is a direct answer to "did this divide evenly", and it
+keeps the whole part in hand for the case where it did not.
+
+## Gotchas
+
+<Gotcha title="Cutting the fraction off is not rounding down">
+The two agree on every positive number, and on every negative one carrying a fraction they
+differ by a whole unit: `math.modf(-0.5)` gives a whole part of `0`, while
+[`math.floor(-0.5)`](/docs/standard-library/math/floor) is `-1`. Reaching for this function
+to "round down" therefore works right up until the first negative value arrives, and then
+quietly stops. Where rounding down really is what is wanted,
+[`math.floor()`](/docs/standard-library/math/floor) is the function that does it in one
+value instead of two.
+</Gotcha>
+
+<Gotcha title="The second result is a float even when there is no fraction">
+Splitting a whole number gives a whole part and a float zero, so the two results need not
+be the same kind of number and a subtype test is not a test for "had a fraction". Compare
+the second result against zero instead. That test has one answer worth knowing about in
+advance: an infinity has no fraction to give up either, so it passes as *already whole*
+while being a value nothing downstream can count with.
+</Gotcha>
+
+## See also
+
+- [`math.floor()`](/docs/standard-library/math/floor) — rounding down rather than cutting off, and where the subtype rule is written out
+- [`math.ceil()`](/docs/standard-library/math/ceil) — rounding up rather than cutting off
+- [`math.fmod()`](/docs/standard-library/math/fmod) — the remainder of dividing two numbers, not the split of one
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — asking whether a number is whole, rather than taking it apart to find out

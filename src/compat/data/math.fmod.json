@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Raises when both arguments are integers and the second is zero; 5.1 and 5.2 have no integers to divide, and a zero divisor there answers with a not-a-number value rather than raising."
+  }
+}

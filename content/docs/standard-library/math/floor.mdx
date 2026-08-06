@@ -1,8 +1,126 @@
 ---
 title: math.floor()
-description: ""
+description: Round a number down to the nearest whole number.
+lua-compat: math.floor
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.floor
 ---
 
-{/* Not yet written. */}
+Rounds a number down to the nearest whole number — the largest whole number that is not
+above it. A number that is already whole keeps its value, so rounding an already-rounded
+value changes nothing.
+
+<RunnableExample code={`local full_pages = math.floor(47 / 10)\nprint(full_pages)\n-- Expected output: 4`} />
+
+## Syntax
+
+```lua
+math.floor(x)
+```
+
+<Parameters>
+  <Param name="x">The number to round down.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">The largest whole number that is not above `x`. An integer whenever that value fits in one, and a float when it does not.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+Rounding down means rounding toward minus infinity, not toward zero. On a positive number
+the two agree and the fraction is simply dropped; on a negative one they part company.
+`-3.2` rounds down to `-4`, which is *further* from zero, not to `-3`. A number that is
+already whole is its own floor and comes back with the value it went in with, whatever its
+sign — though not necessarily as the same kind of number, which the next section covers.
+
+## Which subtype comes back
+
+This is a rule of the library rather than of this function, and it has two halves.
+
+A function whose result mirrors its arguments — [`math.abs()`](/docs/standard-library/math/abs),
+[`math.fmod()`](/docs/standard-library/math/fmod), and the arithmetic operators alongside
+them — hands back an integer when every argument is an integer, and a float as soon as one
+of them is a float.
+
+A *rounding* function — this one, [`math.ceil()`](/docs/standard-library/math/ceil), and
+the first result of [`math.modf()`](/docs/standard-library/math/modf) — mirrors nothing. It
+hands back an integer whenever the rounded value fits in the range an integer covers, and a
+float when it does not. That is why rounding a float normally produces an integer, and why
+rounding one too large to be an integer produces a float instead.
+
+That float case is not a failure and nothing raises for it. A float that large has no
+fraction left to drop, so it is already whole and comes back carrying the value it arrived
+with; only its subtype differs from the usual answer.
+
+[`math.sqrt()`](/docs/standard-library/math/sqrt) follows neither half and always answers
+with a float.
+
+## Rounding down and the modulo operator
+
+The `%` [operator](/docs/language/expressions/arithmetic-operators) is defined in terms of
+this rounding: its remainder is what is left of `a` once the quotient has been rounded down
+and multiplied back out. So `math.floor(a / b)` counts the whole parts and `a % b` is the
+piece that count left behind, and the two are read together far more often than either is
+read alone.
+
+## Examples
+
+### Splitting a duration into whole units
+
+<RunnableExample code={`local total_seconds = 5000\nlocal whole_minutes = math.floor(total_seconds / 60)\nlocal leftover_seconds = total_seconds % 60\nprint(whole_minutes)\nprint(leftover_seconds)\n-- Expected output:\n-- 83\n-- 20`} />
+
+Dividing gives a number with a fraction on it; rounding down keeps the whole units, and the
+remainder recovers exactly what the rounding threw away.
+
+### Rounding to the nearest whole number
+
+<RunnableExample code={`local average_score = 78.6\nprint(math.floor(average_score + 0.5))\n-- Expected output: 79`} />
+
+The library has no round-to-nearest function. Adding a half before rounding down is the
+standard stand-in: anything from `.5` upwards is carried over to the next whole number and
+anything below it is not. Halves go upwards on both sides of zero, so `-2.5` treated this
+way becomes `-2` — worth knowing before the idiom meets data that crosses zero.
+
+### Rounding down moves a negative number away from zero
+
+<RunnableExample code={`local celsius_reading = -3.2\nprint(math.floor(celsius_reading))\nprint(math.ceil(celsius_reading))\n-- Expected output:\n-- -4\n-- -3`} />
+
+`-4` really is the largest whole number that is not above `-3.2`. Where the intent is to
+drop the fraction rather than to round down,
+[`math.modf()`](/docs/standard-library/math/modf) is the function that does that.
+
+## Gotchas
+
+<Gotcha title="Rounding down is not chopping the fraction off">
+The two look identical until a negative number with a fraction on it arrives, and then they
+differ by a whole unit: `math.floor(-0.5)` is `-1`, while dropping the fraction from `-0.5`
+leaves `0`. A
+running total that mixes positive and negative amounts therefore loses a unit on every
+negative one. [`math.modf()`](/docs/standard-library/math/modf) chops the fraction off and
+[`math.ceil()`](/docs/standard-library/math/ceil) rounds the other way; choose by which
+direction is wanted, not by whichever sign happens to be in the data at the time.
+</Gotcha>
+
+<Gotcha title="A number too large to be an integer comes back as a float">
+The result is an integer only while the rounded value fits in the range an integer covers.
+Past that it comes back as a float, quietly and without raising, so code written on the
+assumption of an integer result carries a float onward and fails somewhere later rather
+than here. Where the distinction matters,
+[`math.tointeger()`](/docs/standard-library/math/tointeger) asks it directly instead of
+inferring it from the rounding.
+</Gotcha>
+
+## See also
+
+- [`math.ceil()`](/docs/standard-library/math/ceil) — rounding the other way
+- [`math.modf()`](/docs/standard-library/math/modf) — chopping the fraction off instead of rounding down, and keeping it
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — asking whether a number can be an integer, rather than rounding it into one
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `%`, whose remainder is defined by this rounding
+- [Numbers](/docs/language/values-and-types/number) — the numeric model the subtype rule above belongs to

@@ -1,8 +1,106 @@
 ---
 title: math.abs()
-description: ""
+description: Take a number's distance from zero, dropping its sign.
+lua-compat: math.abs
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.abs
 ---
 
-{/* Not yet written. */}
+Hands back a number without its sign — its distance from zero. A negative number comes back
+positive, bar the single exception described below, and everything else comes back as it
+went in.
+
+<RunnableExample code={`local temperature_change = -4.5\nprint(math.abs(temperature_change))\n-- Expected output: 4.5`} />
+
+## Syntax
+
+```lua
+math.abs(x)
+```
+
+<Parameters>
+  <Param name="x">The number to take the absolute value of.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">`x` with its sign dropped. An integer when `x` is an integer, a float when `x` is a float.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The result is the larger of `x` and `-x`, which is the same as the distance from zero for
+every value that has one. Nothing is rounded and nothing is converted: a fraction survives
+the call untouched, and the subtype of the answer mirrors the subtype of the argument, on
+the library's own rule — an integer in gives an integer back, a float in gives a float
+back. That rule is
+[written out on `math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back),
+which owns it for the whole library.
+
+Reading the result as *the larger of `x` and `-x`* rather than as *the distance from zero*
+matters in exactly one place, and it is where this function surprises people. Integer
+arithmetic wraps rather than overflowing, so the smallest integer has no positive
+counterpart to be negated into: negating it lands back on the same value. Its absolute
+value is therefore itself, and it is negative. Every other integer, and every float,
+behaves the way the name suggests.
+
+Two comparisons this replaces are worth naming. `math.abs(a - b)` is how far apart two
+numbers are without caring which is the larger, and `math.abs(a - b) < tolerance` is how
+two computed floats are compared for practical equality, since arithmetic that ought to
+land on the same value often lands a fraction away from it.
+
+## Examples
+
+### How far apart two readings are
+
+<RunnableExample code={`local morning_reading = 18\nlocal evening_reading = 11\nprint(math.abs(morning_reading - evening_reading))\nprint(math.abs(evening_reading - morning_reading))\n-- Expected output:\n-- 7\n-- 7`} />
+
+Subtracting in the other order flips the sign and nothing else, so wrapping the subtraction
+means the two readings need not be sorted before the gap between them is measured.
+
+### Comparing two floats within a tolerance
+
+<RunnableExample code={`local measured_weight = 2.4999\nlocal target_weight = 2.5\nprint(math.abs(measured_weight - target_weight) < 0.001)\n-- Expected output: true`} />
+
+The gap is taken first and its sign discarded, so one comparison covers a measurement that
+came in over the target and one that came in under it.
+
+### Totalling how far each reading strayed
+
+<RunnableExample code={`local daily_highs = {21.5, 19.0, 22.25, 20.0}\nlocal target_temperature = 20.5\nlocal total_drift = 0\nfor reading_index, reading in ipairs(daily_highs) do\n  total_drift = total_drift + math.abs(reading - target_temperature)\nend\nprint(total_drift)\n-- Expected output: 4.75`} />
+
+Without the call the overshoots would cancel the undershoots out and the total would say
+the readings were on target. Dropping each sign first is what makes the sum a measure of
+error rather than of bias.
+
+## Gotchas
+
+<Gotcha title="One number is its own absolute value, and it is negative">
+Integer arithmetic wraps, and the smallest integer — `math.mininteger` — has no positive
+counterpart, so negating it produces the same value again. `math.abs(math.mininteger)` is
+therefore `math.mininteger`: the one argument whose result is neither its distance from
+zero nor even above zero. Code that leans on this call to produce something at or above
+zero, whether as a magnitude to compare or as a size to allocate, has to rule that value
+out first, or hold the number as a float, where negation has no such edge to fall off.
+</Gotcha>
+
+<Gotcha title="The tolerance has to suit the numbers, not the other way round">
+`math.abs(a - b) < tolerance` is only as good as the tolerance, and a figure picked for
+looking small is not a figure fitted to the data. `math.abs(0.1 + 0.2 - 0.3) < 1e-18` is
+`false`: the gap that arithmetic leaves behind is far wider than `1e-18`. Widen the figure
+until that passes and it is now wide enough to call two small values equal that are not.
+The tolerance has to be chosen against the magnitudes actually being compared — and where
+the data can be held in whole units, comparing those exactly avoids the question.
+</Gotcha>
+
+## See also
+
+- [`math.floor()`](/docs/standard-library/math/floor) — where the library's subtype rule is written out
+- [`math.max()`](/docs/standard-library/math/max) — the largest of several numbers, rather than the larger of a number and its negation
+- [`math.mininteger`](/docs/standard-library/math/mininteger) — the one value that is its own absolute value
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — unary minus, and the wrapping this call inherits from it

@@ -1,8 +1,106 @@
 ---
 title: math.sqrt()
-description: ""
+description: Take the square root of a number.
+lua-compat: math.sqrt
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.sqrt
 ---
 
-{/* Not yet written. */}
+Hands back the square root of a number — the value that, multiplied by itself, gives the
+argument. The answer is always a float, even when the argument is a perfect square.
+
+<RunnableExample code={`local paper_ratio = math.sqrt(2)\nprint(paper_ratio)\n-- Expected output: 1.4142135623731`} />
+
+## Syntax
+
+```lua
+math.sqrt(x)
+```
+
+<Parameters>
+  <Param name="x">The number to take the square root of.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The square root of `x`. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The result is the non-negative root: `math.sqrt(9)` is three, never minus three, even
+though both squared give nine. Where the negative root is wanted it is the result negated.
+
+Raising to the power of a half computes the same value: `x ^ 0.5` and `math.sqrt(x)` are
+two spellings of one operation. The named call is the clearer of the two in most code, and
+the operator is the one to reach for when the exponent is a variable that happens to be a
+half rather than a half written out.
+
+This function is the exception to the library's subtype rule. It neither mirrors its
+argument nor rounds anything, so it never hands back an integer — the root of a perfect
+square is a float like every other root, differing only in having no fraction on it. The
+rule it does not follow is
+[written out on `math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back).
+
+An argument below zero is not an error. No real number squares to a negative one, so the
+floating-point answer for "no value here" is what comes back — a not-a-number value, handed
+over silently with nothing raised. It compares equal to nothing, itself included, and every
+arithmetic operation it reaches produces another one, so the failure surfaces a long way
+from the call that caused it. Where the argument is computed rather than written, test it
+before the call.
+
+## Examples
+
+### The distance between two points
+
+<RunnableExample code={`local horizontal_gap = 3\nlocal vertical_gap = 5\nprint(math.sqrt(horizontal_gap * horizontal_gap + vertical_gap * vertical_gap))\n-- Expected output: 5.8309518948453`} />
+
+Squaring both gaps drops their signs on the way, so the two points need not be given in any
+particular order.
+
+### Checking for a perfect square
+
+<RunnableExample code={`local tile_count = 144\nlocal side_length = math.sqrt(tile_count)\nprint(side_length == math.floor(side_length))\n-- Expected output: true`} />
+
+The root comes back as a float either way, so the question "is this a perfect square" is
+asked of the *value* — comparing it against itself rounded down — rather than of its
+subtype.
+
+### Solving for a length
+
+<RunnableExample code={`local circle_area = 50\nlocal radius = math.sqrt(circle_area / math.pi)\nprint(string.format("%.3f", radius))\n-- Expected output: 3.989`} />
+
+A root rarely lands on a value worth printing in full.
+[`string.format()`](/docs/standard-library/string/format) is what decides how many places
+of it are shown, and how the number is written.
+
+## Gotchas
+
+<Gotcha title="An argument below zero does not raise">
+`math.sqrt(-1)` hands back a not-a-number value rather than stopping, and that value then
+travels. It is not equal to itself, so `root == root` is `false` and any equality check
+written against it fails in a way that reads as a logic bug; it also survives every
+arithmetic operation it meets, turning each result into another one. A single negative
+number reaching this call can therefore empty a whole calculation without anything
+appearing to go wrong. Guard the argument, not the answer.
+</Gotcha>
+
+<Gotcha title="The result is always a float, perfect square or not">
+`math.sqrt(16)` is not the integer four; it is a float that happens to have no fraction on
+it. That distinction goes unnoticed until the value is used somewhere an integer is
+required, at which point the failure names the place it was used rather than the call that
+produced it. [`math.tointeger()`](/docs/standard-library/math/tointeger) is the conversion
+that goes through only when the root really did come out whole.
+</Gotcha>
+
+## See also
+
+- [`math.floor()`](/docs/standard-library/math/floor) — the subtype rule this function is the exception to
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — turning a root that came out whole into an integer
+- [`math.abs()`](/docs/standard-library/math/abs) — the other way to get a value's size without its sign
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, which computes the same value when the exponent is a half

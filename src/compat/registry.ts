@@ -34,6 +34,12 @@ import tableRemove from './data/table.remove.json';
 import tableSort from './data/table.sort.json';
 import tableUnpack from './data/table.unpack.json';
 import mathTointeger from './data/math.tointeger.json';
+import mathAbs from './data/math.abs.json';
+import mathCeil from './data/math.ceil.json';
+import mathFloor from './data/math.floor.json';
+import mathFmod from './data/math.fmod.json';
+import mathModf from './data/math.modf.json';
+import mathSqrt from './data/math.sqrt.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -92,6 +98,17 @@ const raw: Record<string, unknown> = {
   'table.sort': tableSort,
   'table.unpack': tableUnpack,
   'math.tointeger': mathTointeger,
+  // The `math` library's version facts are overwhelmingly *language* facts — the integer
+  // subtype arriving at 5.3 changes what these five hand back without changing what any
+  // of them does. ADR 0009 gives that one site-wide disclosure, driven by a `<Return type>`
+  // naming `integer`, so it is deliberately absent from these nodes. Only `fmod` records a
+  // change of its own: a behaviour that used to answer, and now refuses.
+  'math.abs': mathAbs,
+  'math.ceil': mathCeil,
+  'math.floor': mathFloor,
+  'math.fmod': mathFmod,
+  'math.modf': mathModf,
+  'math.sqrt': mathSqrt,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

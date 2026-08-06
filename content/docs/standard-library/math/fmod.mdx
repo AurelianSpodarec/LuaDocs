@@ -1,8 +1,114 @@
 ---
 title: math.fmod()
-description: ""
+description: Take the remainder of a division that rounds toward zero.
+lua-compat: math.fmod
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.fmod
 ---
 
-{/* Not yet written. */}
+Divides one number by another and hands back what is left over, having thrown away the
+fraction of the quotient rather than rounded it down. That one difference is why it is not
+the `%` operator, and why the two part company as soon as the operands have opposite signs.
+
+<RunnableExample code={`local leftover_slices = math.fmod(17, 5)\nprint(leftover_slices)\n-- Expected output: 2`} />
+
+## Syntax
+
+```lua
+math.fmod(x, y)
+```
+
+<Parameters>
+  <Param name="x">The number being divided.</Param>
+  <Param name="y">The number to divide it by.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">What is left of `x` after taking away every whole `y` that fits between it and zero. An integer when both arguments are integers, a float when either is a float.</Return>
+</Returns>
+
+<Errors>
+
+- <Since v="5.3" /> Raises when both arguments are integers and `y` is zero.
+- Raises when either argument is neither a number nor a string that reads as one, and when the call is given fewer than two arguments.
+
+</Errors>
+
+## Description
+
+*One* value comes back, not two — the split into a whole part and a fraction is
+[`math.modf()`](/docs/standard-library/math/modf), whose name is one letter away and whose
+job is unrelated. This function divides.
+
+The quotient is rounded *toward zero* before the remainder is worked out, which is another
+way of saying the fraction of it is discarded rather than rounded in a direction. Two
+consequences follow, and they are the whole entry:
+
+- Wherever the division has an answer at all, the result is smaller than `y` in size and
+  carries the sign of `x` — the number being divided. Dividing a negative number leaves a
+  negative remainder, or none at all, however `y` is signed.
+- The `%` [operator](/docs/language/expressions/arithmetic-operators) rounds its quotient
+  *down* instead, so its remainder carries the sign of `y`. The two agree whenever `x` and
+  `y` share a sign, and whenever the division comes out exactly. Where they disagree they
+  disagree by exactly `y`: the operator's answer is this function's answer plus `y`.
+
+Which subtype comes back is the library's mirroring rule rather than this function's own,
+and it is
+[written out on `math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back):
+two integers give an integer, and one float anywhere gives a float.
+
+A zero `y` is two different situations wearing one face. With two integers there is no
+answer to give and the call raises. With a float at either end the arithmetic is
+floating-point arithmetic, which has a not-a-number value for exactly this, and that value
+is what comes back — silently, with nothing raised.
+
+## Examples
+
+### The sign comes from the number being divided
+
+<RunnableExample code={`local minutes_early = math.fmod(-95, 60)\nlocal minutes_late = math.fmod(95, 60)\nprint(minutes_early)\nprint(minutes_late)\n-- Expected output:\n-- -35\n-- 35`} />
+
+The two results are mirror images, which is what makes this the right choice for a quantity
+where the sign is the information — an offset before or after a mark, a drift above or
+below a target.
+
+### Fractional operands are ordinary here
+
+<RunnableExample code={`local ribbon_length = 7.5\nlocal piece_length = 2\nprint(math.fmod(ribbon_length, piece_length))\n-- Expected output: 1.5`} />
+
+Three whole pieces come off the ribbon and the offcut is what is handed back. Nothing has
+to be a whole number for the division to make sense.
+
+### Where it parts company with the modulo operator
+
+<RunnableExample code={`local offset_degrees = -450\nprint(math.fmod(offset_degrees, 360))\nprint(offset_degrees % 360)\n-- Expected output:\n-- -90\n-- 270`} />
+
+Both answers describe the same direction, and they differ by exactly one full turn.
+Whichever is wanted, it has to be chosen: `-90` reads as "ninety short of the mark" and
+`270` as "a bearing", and neither is a rounding error in the other.
+
+## Gotchas
+
+<Gotcha title="It is not the modulo operator, and swapping them changes the answer">
+They agree on every pair of operands that share a sign, so a substitution made while reading
+data of one sign survives every test built from that data. Mix the signs and they part:
+`math.fmod(-7, 3)` is `-1` and `-7 % 3` is `2` — the same remainder counted from opposite
+ends. Anything that then uses the result as a position, an index or a bucket number lands
+somewhere different, or out of range altogether, and only for the half of the input that
+crosses zero.
+</Gotcha>
+
+<Gotcha title="A zero divisor does not always stop anything">
+Dividing by zero raises here only while both arguments are integers. Let a float in at
+either end and the same call answers with a not-a-number value instead, which is not equal
+to anything including itself, spreads through every arithmetic operation it touches, and
+surfaces as a wrong answer far from the division that produced it. Where `y` is computed
+rather than written, check it before the call rather than checking the result afterwards.
+</Gotcha>
+
+## See also
+
+- [`math.modf()`](/docs/standard-library/math/modf) — splitting one number into two parts, rather than dividing one number by another
+- [`math.floor()`](/docs/standard-library/math/floor) — the rounding the `%` operator does, and where the subtype rule is written out
+- [`math.abs()`](/docs/standard-library/math/abs) — dropping the sign this function is careful to keep
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — the modulo operator this one is most often mistaken for
