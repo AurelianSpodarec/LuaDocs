@@ -1,8 +1,217 @@
 ---
 title: require()
-description: ""
+description: Find a module by name, load it, and record what it produced so later calls need not load it again.
+lua-compat: globals.require
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-require
 ---
 
-{/* Not yet written. */}
+Turns a module's *name* into the value that module produces. The first call to name a module
+finds it, runs it and records the result; later calls read that record rather than loading the
+module again, so the work of setting a module up is not repeated for each caller that wants it.
+
+<RunnableExample code={`local rates_path = "require_example_postage.lua"\nlocal module_file = assert(io.open(rates_path, "w"))\nmodule_file:write("return { overnight = 12, standard = 4 }")\nmodule_file:close()\n\nlocal postage = require("require_example_postage")\nprint(postage.overnight)\nprint(require("require_example_postage") == postage)\n\npackage.loaded["require_example_postage"] = nil\nos.remove(rates_path)\n-- Expected output:\n-- 12\n-- true`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a module file write one first, then remove it and clear the record the load left behind.
+Nothing on this page reads or writes a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+require(modname)
+```
+
+<Parameters>
+  <Param name="modname">The module's name — a name rather than a path. A dot in it separates the parts of a nested name, and the searchers that read from disk turn each dot into a directory separator and supply the file extension themselves, so a name written to look like a filename has its dot read as a directory step too.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">What the module's record holds once the loading is done: the value the module produced, `true` where it left nothing to record, or whatever it wrote into the record itself. See [What gets remembered](/docs/standard-library/globals/require#what-gets-remembered).</Return>
+  <Only since="5.4">
+    <Return type="any">The loader data that came back from the searcher which found the module — for the searchers that read from disk, the path the module was found at. Nothing arrives here when the call found the module already loaded and did no loading of its own, which is how the two cases are told apart.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all.
+- Raises when `modname` is something other than a string or a number. A number in that position is read as the name it spells.
+- Raises when no searcher can supply a loader for the name. What is raised gathers up the explanations the searchers gave, so the report names the places that were tried rather than saying just that something is missing.
+- Raises when a module's file is found but does not compile.
+- Raises whatever the module's own code raises while it is running. Nothing here runs under protection, so a module that fails part way through reaches this call's caller with the rest of it unrun.
+
+</Errors>
+
+## Description
+
+A module is a file — or something registered in advance — that produces a value, usually a
+table of functions. This call is what turns the module's name into that value, and it does two
+things [`dofile()`](/docs/standard-library/globals/dofile) does not: it *searches* for the
+module rather than being told where it lives, and it *remembers* what it found.
+
+The remembering is what everything after the first call is about. `require("parcel_rates")`
+written in ten files runs `parcel_rates` once; the other nine calls read the record and hand
+back the value the first call produced. That is what makes a module the sensible place for work
+that must not happen twice — opening a connection, reading a configuration file, building a
+lookup table. One kind of value does not settle the question that way, and
+[What gets remembered](/docs/standard-library/globals/require#what-gets-remembered) is where it
+is set out.
+
+The name being a name rather than a path is the other half of the bargain. Where a module lives
+is settled by the search paths described below, in one place, rather than by each call that
+wants it; moving a module, or shipping it from somewhere else, is a change to those paths
+rather than to the calls.
+
+Failure is loud here. Where [`load()`](/docs/standard-library/globals/load) and
+[`loadfile()`](/docs/standard-library/globals/loadfile) report trouble by handing back `nil`
+and a message, this call raises — not finding the module, not compiling it, and anything the
+module itself raises while running all arrive that way. A caller that means to survive a module
+it may not have wraps the call in [`pcall()`](/docs/standard-library/globals/pcall).
+
+## How a module is found
+
+`package.searchers` is a list of search functions, tried in order. Each one is handed the
+module name and either answers with a *loader* — the function that will actually produce the
+module — or explains why it could not. The first one to answer wins, and its loader is then
+called with the module name and with whatever extra value the searcher supplied alongside it.
+What the loader hands back is the module. Lua fills that list with four searchers:
+
+- *Loaders registered by hand.* `package.preload` is a table keyed by module name, and a
+  function stored there is taken as the loader with nothing read from disk. It is how a module
+  can be built into a program that has no filesystem to search.
+- *Lua files, through `package.path`.* That is a string of templates separated by semicolons,
+  each carrying a `?`. The `?` is replaced by the module name with every dot turned into a
+  directory separator, and the first template whose file can be opened for reading is the one
+  used.
+- *C libraries, through `package.cpath`.* The same template scheme against a separate string of
+  templates. The library is linked in and a function inside it becomes the loader; that
+  function's name is `luaopen_` followed by the module name with each dot turned into an
+  underscore. Where the name carries a version after a hyphen, the hyphen and what follows it
+  are dropped before the function name is built, so `parcels.rates-v2` looks for
+  `luaopen_parcels_rates`.
+- *One C library holding several submodules.* For a dotted name, this looks for a library under
+  the root of the name and, inside it, an opening function for the whole name — so
+  `parcels.rates` can be packed into a library built for `parcels`.
+
+Both paths are ordinary strings a program can read and rewrite, and the list of searchers is an
+ordinary table. Teaching this call about somewhere new is a matter of editing one of the three,
+which is why a program that vendors its dependencies, or loads them out of an archive, can do
+so without changing its call sites.
+
+When no searcher answers, the explanations they gave are what the raised failure is built from.
+That is why a module that cannot be found produces a report naming the places that were tried
+rather than a bare complaint.
+
+## What gets remembered
+
+`package.loaded` is the record: a table keyed by module name, holding what each loaded module
+produced. This call consults it before it searches for anything, and writes to it once the
+loader has finished.
+
+What gets written is what the module handed back. A module ending in `return` and a table has
+that table recorded under its name. Where a module hands back nothing — or hands back `nil`,
+which is not something a table entry can hold — `true` is recorded in its place instead, so the
+record still shows the module as loaded. The exception is a module that wrote its own entry
+while it was running: where it did, that entry is what stands and no `true` displaces it.
+Whatever ends up there is what comes back, from this call and from later calls that find it.
+
+The awkward value is `false`. It is recorded like any other and it is what comes back, but the
+check deciding whether a module has already been loaded reads it the way an `if` would — as
+*no*. So a module ending in `return false` is searched for and run again by the next call that
+names it, and the record it leaves does not stop that.
+
+The record is written once the loader has finished, and not before. A module that fails part
+way through leaves nothing behind in it, so the next call to name that module starts the search
+over — and a module reaching back to this call for *itself* while it is still running does not
+find itself in the record either.
+
+Because the record is an ordinary table, a program can write to it directly. Putting the
+module's value there under a name is how a module gets stood in for without a file existing
+anywhere, and clearing an entry is how a module is made to load again.
+
+## Examples
+
+### The second call does not reach the file
+
+<RunnableExample code={`local ledger_path = "require_example_ledger.lua"\nlocal module_file = assert(io.open(ledger_path, "w"))\nmodule_file:write("print('opening the ledger') return { entries = {} }")\nmodule_file:close()\n\nlocal first_view = require("require_example_ledger")\nlocal second_view = require("require_example_ledger")\nprint(first_view == second_view)\n\npackage.loaded["require_example_ledger"] = nil\nos.remove(ledger_path)\n-- Expected output:\n-- opening the ledger\n-- true`} />
+
+The module printed once and two calls asked for it, so the second call never reached the file.
+Both names hold the same table, not two copies of it — a value written into one is visible
+through the other, which is what makes a module a place to keep shared state.
+
+### Registering a loader instead of a file
+
+<RunnableExample code={`package.preload["require_example_clock"] = function(module_name)\n  return { asked_for = module_name, now = function() return "09:30" end }\nend\n\nlocal clock = require("require_example_clock")\nprint(clock.asked_for)\nprint(clock.now())\n\npackage.loaded["require_example_clock"] = nil\npackage.preload["require_example_clock"] = nil\n-- Expected output:\n-- require_example_clock\n-- 09:30`} />
+
+The first searcher looks here before any disk is touched, so a module registered this way needs
+no file and no search path. The loader is handed the module name it was asked for, which is what
+lets one function serve several names.
+
+### Standing in for a module that is not there
+
+<RunnableExample code={`package.loaded["require_example_postcodes"] = {\n  lookup = function(postcode) return postcode == "SW1A 1AA" end,\n}\n\nlocal postcodes = require("require_example_postcodes")\nprint(postcodes.lookup("SW1A 1AA"))\nprint(postcodes.lookup("nowhere"))\n\npackage.loaded["require_example_postcodes"] = nil\n-- Expected output:\n-- true\n-- false`} />
+
+Writing the record before anybody reads it settles the question of what that module is. No
+search happens, because the first thing this call does is look here. It is the seam a test uses
+to replace something slow or absent with something predictable.
+
+### Catching a module that cannot be found
+
+<RunnableExample code={`local loaded_ok, reason = pcall(require, "require_example_missing")\nprint(loaded_ok)\nprint(type(reason))\n-- Expected output:\n-- false\n-- string`} />
+
+A missing module raises rather than answering with `nil`, so a program that treats a module as
+optional has to catch it. Note what is *not* printed: the report names the places that were
+tried, in the library's own words, and those words are not something to compare against.
+
+## Gotchas
+
+<Gotcha title="A module that hands nothing back still counts as loaded">
+A module that does its work by writing somewhere else — installing a global, filling in a table
+it was given — has nothing to `return`. It is still recorded, as `true`, so the next call
+naming it reads that record and the module body does not run a second time. What a caller
+receives is that `true` rather than anything the module wrote elsewhere.
+
+<RunnableExample code={`local theme_path = "require_example_theme.lua"\nlocal module_file = assert(io.open(theme_path, "w"))\nmodule_file:write("chosen_theme = 'high contrast'")\nmodule_file:close()\n\nlocal theme_result = require("require_example_theme")\nprint(theme_result)\nprint(chosen_theme)\n\nchosen_theme = nil\npackage.loaded["require_example_theme"] = nil\nos.remove(theme_path)\n-- Expected output:\n-- true\n-- high contrast`} />
+</Gotcha>
+
+<Gotcha title="A module ending in return false is loaded again every time">
+`false` is recorded and handed back like any other value, but the test for *has this been
+loaded* treats it as `no`. Every call therefore searches again and runs the module again, and a
+module written to report a failed initialisation this way repeats that initialisation for each
+caller.
+
+<RunnableExample code={`local switch_path = "require_example_switch.lua"\nlocal module_file = assert(io.open(switch_path, "w"))\nmodule_file:write("switch_reads = (switch_reads or 0) + 1 return false")\nmodule_file:close()\n\nlocal first_answer = require("require_example_switch")\nlocal second_answer = require("require_example_switch")\nprint(first_answer)\nprint(second_answer)\nprint(switch_reads)\n\nswitch_reads = nil\npackage.loaded["require_example_switch"] = nil\nos.remove(switch_path)\n-- Expected output:\n-- false\n-- false\n-- 2`} />
+
+Two reads, from two calls that both answered `false`. A module with nothing useful to hand back
+is better ending in `return true`, which is recorded and settles the question.
+</Gotcha>
+
+<Gotcha title="A module that failed has still done whatever it did first">
+Nothing is undone when a module raises part way through. Globals it assigned stay assigned,
+files it opened stay open, and tables it filled in stay filled — the failure stops the module,
+it does not rewind it. The record is what is left untouched, so the next call runs the module
+from the top again, over whatever the failed attempt left behind.
+
+<RunnableExample code={`local report_path = "require_example_report.lua"\nlocal module_file = assert(io.open(report_path, "w"))\nmodule_file:write("report_columns = { 'date', 'total' } error('no printer configured')")\nmodule_file:close()\n\nlocal loaded_ok = pcall(require, "require_example_report")\nprint(loaded_ok)\nprint(report_columns[2])\n\nreport_columns = nil\npackage.loaded["require_example_report"] = nil\nos.remove(report_path)\n-- Expected output:\n-- false\n-- total`} />
+</Gotcha>
+
+<Gotcha title="More than the module's value comes back">
+The module's value arrives first, and where the call did the loading the searcher's loader data
+arrives after it. A call written directly inside another call's argument list therefore hands
+over two values rather than one: `print(require("parcel_rates"))` writes the module *and* the
+path it was found at, and a function with a second parameter of its own receives that path
+where it expected an argument. Binding the result to a name first —
+`local rates = require("parcel_rates")` — keeps the first value and drops the rest, and so does
+an extra pair of parentheses around the call.
+</Gotcha>
+
+## See also
+
+- [`dofile()`](/docs/standard-library/globals/dofile) — running a file every time it is named, rather than loading it once
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling a file without running it, and reporting failure as a value
+- [`load()`](/docs/standard-library/globals/load) — compiling source directly, and where [what a chunk is](/docs/standard-library/globals/load#what-a-chunk-is) is explained
+- [`module()`](/docs/standard-library/globals/module) — the older way a file declared itself a module to this call
+- [`pcall()`](/docs/standard-library/globals/pcall) — catching what this call raises

@@ -99,6 +99,7 @@ import globalsSetfenv from './data/globals.setfenv.json';
 import globalsUnpack from './data/globals.unpack.json';
 import globalsLoadstring from './data/globals.loadstring.json';
 import globalsModule from './data/globals.module.json';
+import globalsRequire from './data/globals.require.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -453,6 +454,17 @@ const raw: Record<string, unknown> = {
   'globals.unpack': globalsUnpack,
   'globals.loadstring': globalsLoadstring,
   'globals.module': globalsModule,
+  // The one global that is really an interface to the `package` library, and the section's
+  // only entry whose *arity* moved: `ll_require` in `loadlib.c` is `return 1` at v5.1 through
+  // v5.3.6 and `return 2` from v5.4.0, handing back the searcher's loader data beside the
+  // module's value — and `return 1` still, from the already-loaded branch, which is what the
+  // 5.4 manual's parenthesis about "the absence of a second result" is describing. The 5.2
+  // rename is the one fact a manual states outright (5.2 §8.2, `package.loaders` →
+  // `package.searchers`); the loop marker that went with it is source-only, from the sentinel
+  // v5.1's `ll_require` writes into `_LOADED[name]` before running the loader and no later
+  // version has. What did *not* change is the storage rule: 5.1's manual says "any value"
+  // where 5.2's says "any non-nil value", and both implementations test `!lua_isnil`.
+  'globals.require': globalsRequire,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
