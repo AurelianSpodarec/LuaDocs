@@ -295,4 +295,81 @@ describe('an example on an entry the reader does not have', () => {
     await waitFor(() => expect(mockRunLua).toHaveBeenCalled());
     expect(screen.queryByRole('note', { name: /runtime version/i })).toBeNull();
   });
+
+  it('does not tell a reader below the runtime that it is older than theirs', async () => {
+    // The runtime is one fixed version. "Newer" is true here and false at 5.5, which is
+    // where most readers arrive — so the badge says what the dataset knows instead.
+    renderInEntry('5.1');
+    await waitFor(() => screen.getByRole('note', { name: /runtime version/i }));
+
+    const badge = screen.getByRole('note', { name: /runtime version/i });
+    expect(badge).toHaveTextContent(`Running this uses Lua ${RUNTIME_LUA_VERSION}`);
+    expect(badge).toHaveTextContent('does have it');
+    expect(badge).not.toHaveTextContent(/older/i);
+  });
+});
+
+/**
+ * The removal fork. `table.getn` and its three neighbours were removed in 5.2, so a
+ * reader at the default 5.5 does not have them — and every example on those entries
+ * shows the *replacement*, which runs.
+ */
+describe('an example on an entry the reader’s version has dropped', () => {
+  const removedIn52: CompatNode = {
+    support: { lua: { version_added: '5.1', version_removed: '5.2' } },
+  };
+
+  beforeEach(() => {
+    mockRunLua.mockReset();
+    mockRunLua.mockResolvedValue({ output: '3\n', error: null });
+  });
+
+  function renderInEntry(version: LuaVersion, usesEntry?: boolean) {
+    render(
+      <SelectedVersionProvider>
+        <VersionSwitcher />
+        <EntryAvailabilityProvider node={removedIn52}>
+          <RunnableExample usesEntry={usesEntry} code="print(#shipping_labels)" />
+        </EntryAvailabilityProvider>
+      </SelectedVersionProvider>,
+    );
+    fireEvent.change(screen.getByLabelText(/lua version/i), { target: { value: version } });
+  }
+
+  it('never claims the runtime is newer than a version above it', async () => {
+    // At 5.5 the runtime is 5.4 — older. The badge asserted the opposite on every
+    // removed entry, and would on every 5.5-only symbol.
+    renderInEntry('5.5', true);
+    await waitFor(() => screen.getByRole('note', { name: /runtime version/i }));
+
+    const badge = screen.getByRole('note', { name: /runtime version/i });
+    expect(badge).not.toHaveTextContent(/newer/i);
+    expect(badge).toHaveTextContent(
+      `Not in Lua 5.5. Running this uses Lua ${RUNTIME_LUA_VERSION}, which does not have it either.`,
+    );
+  });
+
+  it('runs an example that does not use the symbol the entry documents', async () => {
+    // `print(#shipping_labels)` is valid in every version. Keyed on the entry, all four
+    // of `table.getn`'s cards sat silent and captioned for everyone on the default.
+    renderInEntry('5.5', false);
+
+    await waitFor(() => expect(screen.getByLabelText('output')).toHaveTextContent('3'));
+    expect(mockRunLua).toHaveBeenCalledWith('print(#shipping_labels)');
+    expect(document.querySelector('[data-example-unavailable]')).toBeNull();
+  });
+
+  it('still suppresses one that does use it, and still says so', async () => {
+    renderInEntry('5.5', true);
+
+    await waitFor(() => screen.getByRole('note', { name: /runtime version/i }));
+    expect(screen.queryByLabelText('output')).toBeNull();
+    expect(document.querySelector('[data-example-unavailable]')).not.toBeNull();
+  });
+
+  it('leaves an opted-out example alone on a version that has the entry', async () => {
+    renderInEntry('5.1', false);
+
+    await waitFor(() => expect(screen.getByLabelText('output')).toHaveTextContent('3'));
+  });
 });

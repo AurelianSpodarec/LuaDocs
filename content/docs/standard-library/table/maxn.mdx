@@ -11,7 +11,7 @@ zero. Nothing else asks that question, so unlike most of what has left this libr
 replacement to swap in — a table that needs the answer works it out for itself, in the same
 loop the call was running.
 
-<RunnableExample code={`local sensor_slots = {[1] = 18, [7] = 24}\nlocal largest_key = 0\nfor key in pairs(sensor_slots) do\n  if type(key) == "number" and key > largest_key then\n    largest_key = key\n  end\nend\nprint(largest_key)\n-- Expected output: 7`} />
+<RunnableExample usesEntry={false} code={`local sensor_slots = {[1] = 18, [7] = 24}\nlocal largest_key = 0\nfor key in pairs(sensor_slots) do\n  if type(key) == "number" and key > largest_key then\n    largest_key = key\n  end\nend\nprint(largest_key)\n-- Expected output: 7`} />
 
 <Note>
 Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
@@ -80,7 +80,7 @@ standing in for another reports only what it holds itself.
 
 ### The furthest key, not the number of elements
 
-<RunnableExample code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nlocal sensor_slots = {[1] = 18, [7] = 24, station = "north"}\nprint(largest_numeric_key(sensor_slots))\nprint(#sensor_slots)\n-- Expected output:\n-- 7\n-- 1`} />
+<RunnableExample usesEntry={false} code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nlocal sensor_slots = {[1] = 18, [7] = 24, station = "north"}\nprint(largest_numeric_key(sensor_slots))\nprint(#sensor_slots)\n-- Expected output:\n-- 7\n-- 1`} />
 
 Two readings are stored, at positions `1` and `7`, and the station's name sits beside them
 under a key that is not a number. The furthest numeric key is `7`, and it is `7` however the
@@ -91,7 +91,7 @@ were never asking the same thing, and only one of them has a single right answer
 
 ### What counts, and what comes back as zero
 
-<RunnableExample code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nprint(largest_numeric_key({[2.5] = "half past two"}))\nprint(largest_numeric_key({[-4] = "below datum"}))\nprint(largest_numeric_key({station = "north"}))\n-- Expected output:\n-- 2.5\n-- 0\n-- 0`} />
+<RunnableExample usesEntry={false} code={`local function largest_numeric_key(source_table)\n  local largest = 0\n  for key in pairs(source_table) do\n    if type(key) == "number" and key > largest then\n      largest = key\n    end\n  end\n  return largest\nend\n\nprint(largest_numeric_key({[2.5] = "half past two"}))\nprint(largest_numeric_key({[-4] = "below datum"}))\nprint(largest_numeric_key({station = "north"}))\n-- Expected output:\n-- 2.5\n-- 0\n-- 0`} />
 
 A key of `2.5` is a number above zero and wins outright. A key of `-4` is a number and loses
 to the zero the search starts from. A key that is not a number never enters the comparison at

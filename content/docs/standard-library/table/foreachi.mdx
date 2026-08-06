@@ -3,7 +3,7 @@ title: table.foreachi()
 description: Call a function once for each numbered position in a list, in order, stopping when it answers something.
 lua-compat: table.foreachi
 entry-type: function
-source: https://www.lua.org/manual/5.1/manual.html#pdf-table.foreachi
+source: https://www.lua.org/manual/5.1/manual.html#7.2
 ---
 
 Walks the numbered positions of a list from `1` upwards and calls a function with each
@@ -12,7 +12,7 @@ position and the element stored there. It is
 fields left out. A generic `for` over [`ipairs()`](/docs/standard-library/globals/ipairs) is
 what to write instead — with one difference, and it is the one worth reading this page for.
 
-<RunnableExample code={`local reading_list = {"dune", "solaris", "ubik"}\n-- table.foreachi(reading_list, ...) walked exactly these positions\nfor position, title in ipairs(reading_list) do\n  print(position .. ". " .. title)\nend\n-- Expected output:\n-- 1. dune\n-- 2. solaris\n-- 3. ubik`} />
+<RunnableExample usesEntry={false} code={`local reading_list = {"dune", "solaris", "ubik"}\n-- table.foreachi(reading_list, ...) walked exactly these positions\nfor position, title in ipairs(reading_list) do\n  print(position .. ". " .. title)\nend\n-- Expected output:\n-- 1. dune\n-- 2. solaris\n-- 3. ubik`} />
 
 <Note>
 Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
@@ -89,7 +89,7 @@ loop starts rather than either of them.
 
 ### Stopping at the first position that matches
 
-<RunnableExample code={`local queue_times = {4, 9, 21, 6}\nlocal slow_position = nil\nfor position, minutes in ipairs(queue_times) do\n  if minutes > 15 then\n    slow_position = position\n    break\n  end\nend\nprint(slow_position)\n-- Expected output: 3`} />
+<RunnableExample usesEntry={false} code={`local queue_times = {4, 9, 21, 6}\nlocal slow_position = nil\nfor position, minutes in ipairs(queue_times) do\n  if minutes > 15 then\n    slow_position = position\n    break\n  end\nend\nprint(slow_position)\n-- Expected output: 3`} />
 
 `break` ends the walk the way an answer other than `nil` ended it, and the position that
 stopped it is kept in a variable rather than travelling out through the call's result. The
@@ -97,7 +97,7 @@ fourth entry is never looked at.
 
 ### Walking every position to the end
 
-<RunnableExample code={`local monthly_totals = {120, 95, 143}\nlocal highest_month = 1\nfor position, total in ipairs(monthly_totals) do\n  if total > monthly_totals[highest_month] then\n    highest_month = position\n  end\nend\nprint(highest_month)\n-- Expected output: 3`} />
+<RunnableExample usesEntry={false} code={`local monthly_totals = {120, 95, 143}\nlocal highest_month = 1\nfor position, total in ipairs(monthly_totals) do\n  if total > monthly_totals[highest_month] then\n    highest_month = position\n  end\nend\nprint(highest_month)\n-- Expected output: 3`} />
 
 Nothing here stops early, so the walk runs to the last position and the answer is whatever
 the variable holds afterwards. Written as a callback, answering nothing on every turn is what
@@ -105,7 +105,7 @@ kept the walk going.
 
 ### A list that may have gaps in it
 
-<RunnableExample code={`local daily_rainfall = {0, nil, 4}\nlocal recorded_days = 3\nlocal days_missing = 0\nfor day_number = 1, recorded_days do\n  if daily_rainfall[day_number] == nil then\n    days_missing = days_missing + 1\n  end\nend\nprint(recorded_days)\nprint(days_missing)\n-- Expected output:\n-- 3\n-- 1`} />
+<RunnableExample usesEntry={false} code={`local daily_rainfall = {0, nil, 4}\nlocal recorded_days = 3\nlocal days_missing = 0\nfor day_number = 1, recorded_days do\n  if daily_rainfall[day_number] == nil then\n    days_missing = days_missing + 1\n  end\nend\nprint(recorded_days)\nprint(days_missing)\n-- Expected output:\n-- 3\n-- 1`} />
 
 This is the shape the old walk had: a count settled before the loop begins, and every position
 up to it visited whether or not anything is stored there.

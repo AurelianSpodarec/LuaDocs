@@ -3,7 +3,7 @@ title: table.getn()
 description: Count the elements in a list — the same count the length operator gives.
 lua-compat: table.getn
 entry-type: function
-source: https://www.lua.org/manual/5.1/manual.html#pdf-table.getn
+source: https://www.lua.org/manual/5.1/manual.html#7.2
 ---
 
 Counts the elements in a list and hands the count back. It asks exactly the question the
@@ -12,7 +12,7 @@ same number, so `#list` is what to write in its place. The number is the same; t
 not interchangeable in every other respect, and the differences are worth reading before
 making the swap.
 
-<RunnableExample code={`local shipping_labels = {"first class", "airmail", "signed for"}\n-- table.getn(shipping_labels) asked exactly this\nprint(#shipping_labels)\n-- Expected output: 3`} />
+<RunnableExample usesEntry={false} code={`local shipping_labels = {"first class", "airmail", "signed for"}\n-- table.getn(shipping_labels) asked exactly this\nprint(#shipping_labels)\n-- Expected output: 3`} />
 
 <Note>
 Nothing on this page calls the function. The examples run on a Lua that no longer has it,
@@ -75,7 +75,7 @@ the reason it has nothing of its own to offer.
 
 ### Counting a list that also carries named fields
 
-<RunnableExample code={`local recipe = {"cocoa", "flour", "sugar", servings = 4}\n-- table.getn(recipe) counted the ingredients, never the servings\nprint(#recipe)\n-- Expected output: 3`} />
+<RunnableExample usesEntry={false} code={`local recipe = {"cocoa", "flour", "sugar", servings = 4}\n-- table.getn(recipe) counted the ingredients, never the servings\nprint(#recipe)\n-- Expected output: 3`} />
 
 Three ingredients sit at positions `1` to `3` and `servings` sits beside them under a name.
 The count reaches the first three and stops, which is what makes the two halves of the table
@@ -83,14 +83,14 @@ able to share one value without interfering.
 
 ### Walking the positions the count reaches
 
-<RunnableExample code={`local shipping_labels = {"first class", "airmail", "signed for"}\nfor position = 1, #shipping_labels do\n  print(position .. ": " .. shipping_labels[position])\nend\n-- Expected output:\n-- 1: first class\n-- 2: airmail\n-- 3: signed for`} />
+<RunnableExample usesEntry={false} code={`local shipping_labels = {"first class", "airmail", "signed for"}\nfor position = 1, #shipping_labels do\n  print(position .. ": " .. shipping_labels[position])\nend\n-- Expected output:\n-- 1: first class\n-- 2: airmail\n-- 3: signed for`} />
 
 The count's most common use is as the upper limit of a numeric `for`. Written as a call it
 was the same loop with a longer first line.
 
 ### The count is read fresh every time
 
-<RunnableExample code={`local parcel_weights = {2.5, 1.0, 4.25}\nprint(#parcel_weights)\ntable.remove(parcel_weights)\nprint(#parcel_weights)\n-- Expected output:\n-- 3\n-- 2`} />
+<RunnableExample usesEntry={false} code={`local parcel_weights = {2.5, 1.0, 4.25}\nprint(#parcel_weights)\ntable.remove(parcel_weights)\nprint(#parcel_weights)\n-- Expected output:\n-- 3\n-- 2`} />
 
 Nothing is stored and nothing is cached: the answer is worked out from the table each time
 it is asked for, so a list that has just lost an element reports its new length without being

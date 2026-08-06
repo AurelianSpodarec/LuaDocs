@@ -19,7 +19,10 @@ import { listContentFiles, PLACEHOLDER } from '@/content-tree/scaffold';
  * Node environment, not jsdom: this loads the real Lua runtime rather than a stub.
  */
 const DEST = 'content/docs';
-const EXAMPLE = /<RunnableExample\s+code=\{`([\s\S]*?)`\}/g;
+// `[^`]*?` swallows any attribute written before `code` — `usesEntry`, and whatever
+// comes next. Anchored on `code=` alone it matched nothing on a card with a prop in
+// front of it, and an example this pattern misses is one that never runs here.
+const EXAMPLE = /<RunnableExample\s[^`]*?code=\{`([\s\S]*?)`\}/g;
 const EXPECTED = /--[ \t]*Expected output:[ \t]*([\s\S]*)$/;
 
 /** The buffer the Lua-side `print` writes into — the same shim `luaWorker.ts` installs. */

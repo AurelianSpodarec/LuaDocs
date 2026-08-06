@@ -126,6 +126,32 @@ export function fnsFrom(version: LuaVersion, lib: string, names: string): Entry[
   return build(lib, names, 'function', version);
 }
 
+/**
+ * Functions the manual they are sourced to no longer documents *either* — it names them
+ * only where it records their deprecation.
+ *
+ * `fnsFrom` derives `pdf-<name>` from the name, which holds for a symbol the older
+ * manual still has an entry for and fails silently for one it does not: Lua 5.1 anchors
+ * `pdf-table.maxn` but says `table.getn`, `table.foreach` and `table.foreachi` only in
+ * §7.2, "Changes in the Libraries". Three entries therefore cited an anchor that has
+ * never existed, and a fragment that resolves to nothing lands the reader at the top of
+ * a 250KB manual with no sign anything went wrong.
+ *
+ * The anchor is given rather than guessed, which is the whole point: there is no rule
+ * that produces it, so it has to be read out of the manual, and the caller is where
+ * somebody has done that.
+ */
+export function fnsDeprecatedIn(
+  version: LuaVersion,
+  lib: string,
+  names: string,
+  anchor: string,
+): Entry[] {
+  return split(names).map((slug) =>
+    entry(slug, lib ? `${lib}.${slug}` : slug, 'function', anchor, version),
+  );
+}
+
 /** Tables, strings and numbers exposed by a library — `math.pi`, `package.loaded`. */
 export function consts(lib: string, names: string): Entry[] {
   return build(lib, names, 'constant', '5.5');
@@ -263,7 +289,10 @@ export const CONTENT_TREE: Section[] = [
       related: relatedGlobals('tostring') },
     { ...section('table', 'table', '6.7', [
         ...fns('table', 'concat create insert move pack remove sort unpack'),
-        ...fnsFrom('5.1', 'table', 'foreach foreachi getn maxn'),
+        // §7.2 is where the 5.1 manual mentions these three at all; only `maxn` still
+        // has an entry of its own there.
+        ...fnsDeprecatedIn('5.1', 'table', 'foreach foreachi getn', '7.2'),
+        ...fnsFrom('5.1', 'table', 'maxn'),
       ]),
       related: relatedGlobals(
         'getmetatable ipairs next pairs rawget rawlen rawset setmetatable',

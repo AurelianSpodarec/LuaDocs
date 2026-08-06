@@ -18,7 +18,11 @@ const SHADOWED = [
   '_G', '_VERSION',
 ];
 
-const EXAMPLE = /<RunnableExample\s+code=\{`([\s\S]*?)`\}/g;
+// `[^`]*?` swallows any attribute written before `code` — `usesEntry`, and whatever
+// comes next. Anchored on `code=` alone it matched nothing on a card with a prop in
+// front of it, and an example this pattern misses is an example nothing here checks:
+// the count floor below would still pass while a whole entry went unread.
+const EXAMPLE = /<RunnableExample\s[^`]*?code=\{`([\s\S]*?)`\}/g;
 // A Lua 5.4 attribute (`<const>`, `<close>`) can sit between a name and its comma —
 // `local a <const>, b <close> = 1, 2` — and must not stop the match before `b`.
 const LOCAL = /\blocal\s+([A-Za-z_]\w*(?:\s*<\w+>)?(?:\s*,\s*[A-Za-z_]\w*(?:\s*<\w+>)?)*)/g;

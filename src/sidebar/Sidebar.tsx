@@ -11,7 +11,8 @@ import {
   type ReactNode,
 } from 'react';
 import { compatNodeFor } from '@/compat/registry';
-import { isAvailable } from '@/compat/resolve';
+import { availabilityRanges, isAvailable } from '@/compat/resolve';
+import { LUA_VERSIONS, type CompatNode } from '@/compat/schema';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
 import { SidebarLabel, textOf } from './Label';
 
@@ -57,13 +58,42 @@ const groupClass = `${row} px-2 py-1 text-xs font-medium text-fd-muted-foregroun
  */
 const itemClassName = `${row} px-2 py-1 text-sm leading-6 text-fd-muted-foreground hover:bg-fd-accent/50 hover:text-fd-foreground data-[unavailable]:opacity-50 data-[status=active]:bg-fd-primary/10 data-[status=active]:font-medium data-[status=active]:text-fd-primary`;
 
+const NEWEST = LUA_VERSIONS[LUA_VERSIONS.length - 1];
+
+/**
+ * The badge beside a dimmed row: when the entry *is* there, in as few characters as the
+ * fact takes.
+ *
+ * It used to be `${version_added}+` for every unavailable row, which reads "from here
+ * on" — the one thing `version_removed` denies. On `table.getn` at 5.5 it said "5.1+",
+ * asserting availability across every version the reader could pick, beside a row dimmed
+ * for not being available at all.
+ *
+ * Written from the availability of each version rather than from the bounds, so an entry
+ * that left and came back gets both of its runs ("5.1–5.2, 5.5+") instead of a single
+ * span covering the hole in the middle. A run reaching the newest version keeps the `+`,
+ * so the not-yet-added row this replaces is unchanged: `table.pack` at 5.1 still reads
+ * "5.2+".
+ */
+export function availabilityBadge(node: CompatNode): string | null {
+  const ranges = availabilityRanges(node);
+  if (ranges.length === 0) return null;
+
+  return ranges
+    .map(({ from, to }) => {
+      if (to === NEWEST) return `${from}+`;
+      return from === to ? from : `${from}–${to}`;
+    })
+    .join(', ');
+}
+
 export function createSidebarItem(compatByUrl: Record<string, string>) {
   return function SidebarItem({ item }: { item: PageTree.Item }) {
     const { version } = useSelectedVersion();
     const { pathname } = useLocation();
     const node = compatNodeFor(compatByUrl[item.url]);
     const unavailable = node ? !isAvailable(node, version) : false;
-    const addedIn = node?.support.lua.version_added;
+    const badge = node ? availabilityBadge(node) : null;
 
     // The tree is ~295 entries and no longer scoped to one Section, so landing on
     // `debug.sethook` can leave the highlighted row far below the fold. `nearest`
@@ -79,8 +109,10 @@ export function createSidebarItem(compatByUrl: Record<string, string>) {
       <>
         {item.icon}
         <SidebarLabel name={item.name} />
-        {unavailable && addedIn !== false && addedIn !== undefined && (
-          <span className="rounded border px-1 text-xs">{addedIn}+</span>
+        {unavailable && badge && (
+          <span data-availability className="rounded border px-1 text-xs">
+            {badge}
+          </span>
         )}
       </>
     );

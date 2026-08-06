@@ -3,7 +3,7 @@ title: table.foreach()
 description: Call a function once for every key and value in a table, stopping when it answers something.
 lua-compat: table.foreach
 entry-type: function
-source: https://www.lua.org/manual/5.1/manual.html#pdf-table.foreach
+source: https://www.lua.org/manual/5.1/manual.html#7.2
 ---
 
 Walks a table and calls a function once for each key, handing it the key and the value stored
@@ -12,7 +12,7 @@ answer becomes the result of the call. A generic `for` over
 [`pairs()`](/docs/standard-library/globals/pairs) does the same work, and is what to write
 instead.
 
-<RunnableExample code={`local stock_levels = {cocoa = 2, flour = 5, sugar = 1}\nlocal total_units = 0\n-- table.foreach(stock_levels, ...) walked exactly these pairs\nfor item_name, quantity in pairs(stock_levels) do\n  total_units = total_units + quantity\nend\nprint(total_units)\n-- Expected output: 8`} />
+<RunnableExample usesEntry={false} code={`local stock_levels = {cocoa = 2, flour = 5, sugar = 1}\nlocal total_units = 0\n-- table.foreach(stock_levels, ...) walked exactly these pairs\nfor item_name, quantity in pairs(stock_levels) do\n  total_units = total_units + quantity\nend\nprint(total_units)\n-- Expected output: 8`} />
 
 <Note>
 Nothing on this page calls the function. The examples run on a Lua that no longer has it, so
@@ -87,7 +87,7 @@ match.
 
 ### Stopping at the first key that matches
 
-<RunnableExample code={`local response_times = {login = 120, search = 890, upload = 340}\nlocal slow_endpoint = nil\nlocal slow_time = nil\nfor endpoint_name, milliseconds in pairs(response_times) do\n  if milliseconds > 500 then\n    slow_endpoint = endpoint_name\n    slow_time = milliseconds\n    break\n  end\nend\nprint(slow_endpoint .. " took " .. slow_time .. " ms")\n-- Expected output: search took 890 ms`} />
+<RunnableExample usesEntry={false} code={`local response_times = {login = 120, search = 890, upload = 340}\nlocal slow_endpoint = nil\nlocal slow_time = nil\nfor endpoint_name, milliseconds in pairs(response_times) do\n  if milliseconds > 500 then\n    slow_endpoint = endpoint_name\n    slow_time = milliseconds\n    break\n  end\nend\nprint(slow_endpoint .. " took " .. slow_time .. " ms")\n-- Expected output: search took 890 ms`} />
 
 `break` ends the walk the way an answer other than `nil` ended it. Two values come out here,
 the key and the value found under it, which the call's single result could not have carried
@@ -95,7 +95,7 @@ without a table built to hold them both.
 
 ### Every key, named or numbered
 
-<RunnableExample code={`local recipe = {"cocoa", "flour", servings = 4}\nlocal key_count = 0\nfor recipe_key in pairs(recipe) do\n  key_count = key_count + 1\nend\nprint(key_count)\n-- Expected output: 3`} />
+<RunnableExample usesEntry={false} code={`local recipe = {"cocoa", "flour", servings = 4}\nlocal key_count = 0\nfor recipe_key in pairs(recipe) do\n  key_count = key_count + 1\nend\nprint(key_count)\n-- Expected output: 3`} />
 
 Three keys, of two kinds: positions `1` and `2`, and the name `servings`. This walk makes no
 distinction between them, which is exactly what separates it from
@@ -103,7 +103,7 @@ distinction between them, which is exactly what separates it from
 
 ### Answering a question about every entry
 
-<RunnableExample code={`local backup_status = {nightly = "ok", weekly = "ok", monthly = "ok"}\nlocal all_ok = true\nfor job_name, status in pairs(backup_status) do\n  if status ~= "ok" then\n    all_ok = false\n    break\n  end\nend\nprint(all_ok)\n-- Expected output: true`} />
+<RunnableExample usesEntry={false} code={`local backup_status = {nightly = "ok", weekly = "ok", monthly = "ok"}\nlocal all_ok = true\nfor job_name, status in pairs(backup_status) do\n  if status ~= "ok" then\n    all_ok = false\n    break\n  end\nend\nprint(all_ok)\n-- Expected output: true`} />
 
 The answer lives in a variable outside the loop and is read once the walk is over. Written as
 a callback this shape has a trap in it, which the first gotcha below is about.

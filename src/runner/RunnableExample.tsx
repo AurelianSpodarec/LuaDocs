@@ -5,7 +5,7 @@ import { hashForProgram } from '@/playground/shareUrl';
 import { runLua, RUNTIME_LUA_VERSION } from './runLua';
 import { highlightLua, type LuaToken } from './highlightLua';
 import { useSelectedVersion } from '@/version/SelectedVersionProvider';
-import { useEntryUnavailable } from '@/version/EntryAvailability';
+import { useEntryUnavailable, useEntryUnavailableIn } from '@/version/EntryAvailability';
 
 // Re-exported because it was defined here first and is imported from here in tests and
 // in content. It belongs to the runner: the playground has to disclose the same fact.
@@ -25,9 +25,38 @@ const codeLayer = 'px-4 py-3 font-mono text-[0.8125rem] leading-6 whitespace-pre
  * padding, wrapping), which is why those live in one shared constant rather than being
  * written out twice. The textarea still owns the height, so `rows` drives both.
  */
-export function RunnableExample({ code }: { code: string }) {
+export function RunnableExample({
+  code,
+  usesEntry = true,
+}: {
+  code: string;
+  /**
+   * Whether this example's code uses the symbol its entry documents. Default `true`,
+   * because that is what an example normally is.
+   *
+   * It exists for the fork where it is not. An entry for a symbol Lua has *removed*
+   * shows the replacement in every example — `#list` on `table.getn()`, `pairs` on
+   * `table.foreach()` — so the code runs, and is precisely what a reader arriving at the
+   * default version came for. Suppression keyed on the entry hid all four of `getn`'s
+   * cards from everyone on 5.5, captioned "Not in Lua 5.5", attached to
+   * `print(#shipping_labels)`.
+   *
+   * Declared per example rather than inferred by looking for the entry's own name in the
+   * code: the entry's prose names the removed call in a comment beside the replacement,
+   * so a scan would go on suppressing exactly the examples this frees, and would do it
+   * silently. An author says which it is; the renderer does not guess.
+   */
+  usesEntry?: boolean;
+}) {
   const { version } = useSelectedVersion();
-  const unavailable = useEntryUnavailable();
+  const entryUnavailable = useEntryUnavailable();
+  // An example that does not touch the symbol is not a demonstration of it, so nothing
+  // about the entry's availability makes its output misleading.
+  const unavailable = entryUnavailable && usesEntry;
+  // The second reading of the same dataset: whether the Lua that actually executes has
+  // the entry. It is what makes the badge below able to say something true in both
+  // directions — the reader's version can sit either side of the runtime's.
+  const missingFromRuntime = useEntryUnavailableIn(RUNTIME_LUA_VERSION);
   const [source, setSource] = useState(code);
   const [output, setOutput] = useState('');
   const [failed, setFailed] = useState(false);
@@ -86,10 +115,13 @@ export function RunnableExample({ code }: { code: string }) {
   // on mount, and only for the authored code — after that, running is the reader's
   // call, because their edit may be halfway through a thought.
   useEffect(() => {
-    // Not on an entry the reader's version does not have. Running would print a result
-    // for a function they cannot call, and an unasked-for demonstration outweighs a
-    // notice further up the page. The Run button still works — this withholds the
-    // claim, it does not withhold the tool.
+    // Not where the reader's version does not have what this example uses. Running would
+    // print a result for a function they cannot call, and an unasked-for demonstration
+    // outweighs a notice further up the page. The Run button still works — this withholds
+    // the claim, it does not withhold the tool.
+    //
+    // `unavailable` is the example's fact, not the entry's: an example on a removed entry
+    // that shows the replacement runs like any other, because nothing in it is missing.
     //
     // Clearing rather than merely skipping, because the selected version is not known
     // on the first pass: `SelectedVersionProvider` renders the default so the prerender
@@ -140,7 +172,15 @@ export function RunnableExample({ code }: { code: string }) {
             data-example-unavailable
             className="text-xs text-amber-700 dark:text-amber-400"
           >
-            Not in Lua {version}. Running this uses a newer Lua than you have selected.
+            {/* The claim this replaced was "Running this uses a newer Lua than you have
+                selected", which is a guess about a direction rather than a fact: the
+                runtime is one fixed version, so the sentence was false for every reader
+                above it — including at the site's own default, where 5.4 is the older
+                Lua. What a reader needs is not which way the gap points but whether the
+                thing they are being kept from running exists over there, and the dataset
+                answers that outright. */}
+            Not in Lua {version}. Running this uses Lua {RUNTIME_LUA_VERSION}, which{' '}
+            {missingFromRuntime ? 'does not have it either' : 'does have it'}.
           </span>
         ) : (
           version !== RUNTIME_LUA_VERSION && (

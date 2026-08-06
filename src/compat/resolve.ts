@@ -15,6 +15,75 @@ export function changeNoteFor(node: CompatNode, v: LuaVersion): string | null {
   return node.changed_in?.[v] ?? null;
 }
 
+/**
+ * Why an entry is missing from a version — four cases, not one.
+ *
+ * `version_added` alone answered only the first of them, which is how a removed entry
+ * came to be announced as "Introduced in Lua 5.1", full stop. The shapes are read off
+ * the availability of every documented version rather than off the two bound fields, so
+ * `restored` falls out of the same walk instead of needing its own field: whatever the
+ * schema grows to express, a gap in availability is a gap here.
+ *
+ * ADR 0009's rule — a renderer states a version fact from the dataset, never from a
+ * hand-written string — is why this returns versions rather than sentences.
+ */
+export type Unavailable =
+  /** In no version the site documents. */
+  | { kind: 'never' }
+  /** Below `version_added`: the reader is early. */
+  | { kind: 'not-yet'; addedIn: LuaVersion }
+  /** Past the last version that has it, with nothing after. */
+  | { kind: 'removed'; addedIn: LuaVersion; removedIn: LuaVersion; lastAvailable: LuaVersion }
+  /** Inside a gap: gone here, documented again later — `math.frexp`, `math.ldexp`. */
+  | {
+      kind: 'restored';
+      addedIn: LuaVersion;
+      removedIn: LuaVersion;
+      lastAvailable: LuaVersion;
+      restoredIn: LuaVersion;
+    };
+
+/** `null` when the entry does exist in `v` — so this doubles as the render guard. */
+export function unavailableIn(node: CompatNode, v: LuaVersion): Unavailable | null {
+  if (isAvailable(node, v)) return null;
+
+  const before = LUA_VERSIONS.slice(0, idx(v)).filter((other) => isAvailable(node, other));
+  const after = LUA_VERSIONS.slice(idx(v) + 1).filter((other) => isAvailable(node, other));
+  const restoredIn = after[0];
+  const lastAvailable = before[before.length - 1];
+
+  if (!lastAvailable) {
+    return restoredIn ? { kind: 'not-yet', addedIn: restoredIn } : { kind: 'never' };
+  }
+
+  const addedIn = before[0];
+  // Safe: `lastAvailable` sits strictly below `v`, so a version follows it.
+  const removedIn = LUA_VERSIONS[idx(lastAvailable) + 1];
+
+  return restoredIn
+    ? { kind: 'restored', addedIn, removedIn, lastAvailable, restoredIn }
+    : { kind: 'removed', addedIn, removedIn, lastAvailable };
+}
+
+/**
+ * The runs of consecutive versions that have the entry, oldest first.
+ *
+ * One run for the ordinary entry, two for one that came back. Empty for a symbol no
+ * documented version has.
+ */
+export function availabilityRanges(node: CompatNode): { from: LuaVersion; to: LuaVersion }[] {
+  const ranges: { from: LuaVersion; to: LuaVersion }[] = [];
+
+  for (const version of LUA_VERSIONS) {
+    if (!isAvailable(node, version)) continue;
+    const open = ranges[ranges.length - 1];
+    if (open && idx(open.to) === idx(version) - 1) open.to = version;
+    else ranges.push({ from: version, to: version });
+  }
+
+  return ranges;
+}
+
 export function supportRow(node: CompatNode) {
   return LUA_VERSIONS.map((version) => {
     if (!isAvailable(node, version)) return { version, state: 'no' as const };

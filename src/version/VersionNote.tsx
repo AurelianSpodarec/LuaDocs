@@ -1,4 +1,4 @@
-import { changeNoteFor, isAvailable } from '@/compat/resolve';
+import { changeNoteFor, isAvailable, unavailableIn, type Unavailable } from '@/compat/resolve';
 import type { CompatNode } from '@/compat/schema';
 import { Callout } from '@/entry/Callout';
 import { renderChangeNote } from './changeNote';
@@ -16,12 +16,35 @@ import { useSelectedVersion } from './SelectedVersionProvider';
  * `data-note` is what `tests/e2e/string-format.test.tsx` queries; both keep theirs.
  */
 
+/**
+ * What the callout says after "Not in Lua X" — one sentence per shape of absence.
+ *
+ * The single branch this replaced ended every one of them with "Everything below
+ * describes it as it exists from then on", which is true only of an entry the reader is
+ * *early* for. On a removed one it promised a present tense the symbol does not have,
+ * and the removal itself went unmentioned — the matrix at the foot of the page carried
+ * it alone, as rows of "Not available" with no "removed in" anywhere.
+ *
+ * Every version named here comes from the dataset (ADR 0009).
+ */
+export function unavailableText(reason: Unavailable): string {
+  switch (reason.kind) {
+    case 'never':
+      return 'Not part of any documented Lua version.';
+    case 'not-yet':
+      return `Introduced in Lua ${reason.addedIn}. Everything below describes it as it exists from then on.`;
+    case 'removed':
+      return `Introduced in Lua ${reason.addedIn} and removed in Lua ${reason.removedIn}. Everything below describes it as it was, up to Lua ${reason.lastAvailable}.`;
+    case 'restored':
+      return `Introduced in Lua ${reason.addedIn}, removed in Lua ${reason.removedIn}, and back in Lua ${reason.restoredIn}. Everything below describes it as it exists there.`;
+  }
+}
+
 /** Renders only when the entry does not exist in the selected version. */
 export function VersionUnavailable({ node }: { node: CompatNode }) {
   const { version } = useSelectedVersion();
-  if (isAvailable(node, version)) return null;
-
-  const added = node.support.lua.version_added;
+  const reason = unavailableIn(node, version);
+  if (!reason) return null;
 
   return (
     /* Sticky, not merely first. Moving it to the top only helps a reader who has not
@@ -37,11 +60,7 @@ export function VersionUnavailable({ node }: { node: CompatNode }) {
               "Format strings for pack and unpack was introduced in Lua 5.3" — the verb
               cannot agree with a title it does not know the number of, and the title is
               directly above the callout anyway. */}
-          <strong>Not in Lua {version}.</strong>{' '}
-          {added === false
-            ? 'Not part of any documented Lua version.'
-            : `Introduced in Lua ${added}.`}{' '}
-          Everything below describes it as it exists from then on.
+          <strong>Not in Lua {version}.</strong> {unavailableText(reason)}
         </span>
       </Callout>
     </div>

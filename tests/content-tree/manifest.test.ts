@@ -182,6 +182,70 @@ describe('the standard library', () => {
   });
 });
 
+describe('entries sourced to an older manual', () => {
+  /**
+   * Every entry the 5.5 manual no longer documents, with the passage it is cited to —
+   * checked, one by one, against the manual named in the key.
+   *
+   * `fnsFrom` derives the anchor from the name, and the derivation is only as good as
+   * the assumption behind it: that the older manual still gives the symbol an entry of
+   * its own. Lua 5.1 had already dropped three of `table`'s, keeping them only in §7.2
+   * where it records what was deprecated — so `#pdf-table.getn`, `#pdf-table.foreach`
+   * and `#pdf-table.foreachi` were anchors to nothing, and a fragment that resolves to
+   * nothing lands the reader at the top of the manual looking like it worked.
+   *
+   * Nothing in the generator can tell the two apart, so this list is the check: a new
+   * symbol sourced backwards fails here until somebody opens that manual and records
+   * where it actually is. That is the whole point — the anchor has to be *read*, not
+   * derived, and this is where the reading is written down.
+   */
+  const OLDER_SOURCES: Record<string, string> = {
+    // Globals the 5.1 manual still documents in full.
+    'globals/getfenv': '5.1#pdf-getfenv',
+    'globals/loadstring': '5.1#pdf-loadstring',
+    'globals/module': '5.1#pdf-module',
+    'globals/setfenv': '5.1#pdf-setfenv',
+    'globals/unpack': '5.1#pdf-unpack',
+    // The three 5.1 mentions only in §7.2, "Changes in the Libraries" …
+    'table/foreach': '5.1#7.2',
+    'table/foreachi': '5.1#7.2',
+    'table/getn': '5.1#7.2',
+    // … and the one it still gives an entry of its own.
+    'table/maxn': '5.1#pdf-table.maxn',
+    'math/atan2': '5.1#pdf-math.atan2',
+    'math/cosh': '5.1#pdf-math.cosh',
+    'math/log10': '5.1#pdf-math.log10',
+    'math/pow': '5.1#pdf-math.pow',
+    'math/sinh': '5.1#pdf-math.sinh',
+    'math/tanh': '5.1#pdf-math.tanh',
+    'package/seeall': '5.1#pdf-package.seeall',
+    'package/loaders': '5.1#pdf-package.loaders',
+    'debug/getfenv': '5.1#pdf-debug.getfenv',
+    'debug/setfenv': '5.1#pdf-debug.setfenv',
+  };
+
+  const older = all.flatMap((s) =>
+    s.entries
+      .filter((e) => e.source.version !== '5.5')
+      .map((e) => [`${s.slug}/${e.slug}`, `${e.source.version}#${e.source.anchor}`] as const),
+  );
+
+  it('cites each of them where the list says it is', () => {
+    expect(Object.fromEntries(older)).toEqual(OLDER_SOURCES);
+  });
+
+  it('gives a symbol with no entry of its own the section that records its removal', () => {
+    const table = all.find((s) => s.slug === 'table')!;
+    expect(sourceUrl(table.entries.find((e) => e.slug === 'getn')!.source)).toBe(
+      'https://www.lua.org/manual/5.1/manual.html#7.2',
+    );
+    // `pdf-table.getn` is not an anchor the 5.1 manual defines, and never was.
+    expect(
+      older.filter(([, cite]) => /pdf-table\.(getn|foreach|foreachi)$/.test(cite)),
+    ).toEqual([]);
+  });
+});
+
 describe('the language section', () => {
   it('has 74 entries in total', () => {
     const language = all.find((s) => s.slug === 'language')!;
