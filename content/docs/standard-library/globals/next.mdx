@@ -32,7 +32,8 @@ next(table [, index])
 <Errors>
 
 - Raises when the first argument is not a table, including when it is left out. Anything passed after `index` is ignored rather than rejected.
-- Raises when `index` is a value the table does not hold as a key. Clearing a key during a traversal is allowed and does not make it unusable as the place to step from, which is what lets a traversal delete as it goes.
+- Raises when `index` is a value the table does not hold as a key — but not dependably. An integer position inside the room the table has already made for its numbered part is accepted and stepped from as though something had been stored there, so whether a given absent key is refused depends on how the table was built rather than on what it holds.
+- Clearing a key during a traversal does *not* make it unusable as the place to step from, which is what lets a traversal delete as it goes.
 
 </Errors>
 
@@ -65,8 +66,9 @@ wanted.
 
 ## The order is not specified
 
-Every key that has a value is reached exactly once, and nothing at all is promised about the
-sequence they arrive in. It is not the order they were written in, and it is not numeric
+A traversal left to run undisturbed reaches every key that has a value exactly once — the
+next heading is about what forfeits that — and nothing at all is promised about the sequence
+they arrive in. It is not the order they were written in, and it is not numeric
 order for the keys that happen to be numbers: a table holding `1`, `2` and `3` may hand them
 back in any arrangement.
 
@@ -127,10 +129,15 @@ wants; the starting position is left out and reads as `nil`. This is what
 ## Gotchas
 
 <Gotcha title="It is not a way to ask whether a key exists">
-Stepping from a value the table has never held as a key raises rather than answering `nil`,
-so `next(inventory, "gone")` is an error and not a test. The question is asked directly —
-`inventory.gone ~= nil` — and this call is for moving through keys that are already known to
-be there.
+Stepping from a value the table has never held as a key does not answer `nil` — it does one
+of two other things, and which one is not yours to predict. Usually it raises, so
+`next(inventory, "gone")` is an error rather than a `false`. But an integer position inside
+the room a table has already made for its numbered part is taken at face value and stepped
+from, and the call then answers as though that position had been there all along — with some
+*later* key, or with the `nil` that means there are none left. That second outcome is the
+worse one, because it looks like a considered answer and reads exactly like *not found*. Ask
+the question directly — `inventory.gone ~= nil` — and keep this call for moving through keys
+already known to be there.
 </Gotcha>
 
 <Gotcha title="`next(list)` is not the first element">

@@ -74,9 +74,10 @@ follows runs on whatever traversal the metamethod described. That is what lets a
 present something other than its own storage: a view that walks in a settled order, a
 read-only wrapper, a proxy over data that is not a table at all.
 
-Whatever the metamethod answers is passed through as it stands. One that hands back only an
-iteration function still drives a loop, because the missing state and starting position read
-as `nil` — which is all a self-contained closure needs.
+The results this call needs are taken from the front of what the metamethod answers, and
+anything past them is dropped. Handing back fewer is fine, though: a metamethod that answers
+with only an iteration function still drives a loop, because the state and starting position
+it left out read as `nil` — which is all a self-contained closure needs.
 
 Indexing metamethods have no say in the traversal this call sets up on its own. That
 traversal reads the keys the table itself holds, so a default reached through `__index` is
