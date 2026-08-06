@@ -111,10 +111,10 @@ answering. Assigning the result to a local first turns *no value* into `nil`, an
 back into an answer.
 </Gotcha>
 
-<Gotcha title="One name covers both kinds of number">
-Integers and floats both answer `"number"`, which is the right answer nearly everywhere and no
-help at all when the difference matters — as it does for a value used as a table key, printed
-to a user, or pushed to the edge of the numeric range.
+<Gotcha title="One name covers every number">
+Every number answers `"number"`, however it is written and however it is stored — which is the
+right answer nearly everywhere and no help at all when the difference matters, as it does for
+a value printed to a user, or pushed to the edge of the numeric range.
 [`math.type()`](/docs/standard-library/math/type) is the finer question, and
 [`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) explains which
 subtype the library hands back.

@@ -24,7 +24,7 @@ tonumber(e [, base])
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">The number `e` names, and `nil` when it names none. For a string, the subtype follows the numeral: a fractional part or an exponent reads as a float, and digits with neither read as an integer, given a value the integer range can hold. A number handed in with no `base` comes back exactly as it was.</Return>
+  <Return type="integer or float">The number `e` names, and `nil` when it names none. For a string, the subtype follows the numeral: a fractional part or an exponent reads as a float, and digits with neither read as an integer. A *decimal* numeral too large for the integer range reads as a float instead; a *hexadecimal* one stays an integer and wraps around. A number handed in with no `base` comes back exactly as it was.</Return>
 </Returns>
 
 <Errors>
@@ -43,15 +43,23 @@ There are two functions here wearing one name, and `base` is the switch between 
 
 Called with one argument, this is Lua's own string-to-number conversion made explicit. A value
 that is already a number comes back as it stands, unrounded and unconverted. A string is read
-as a numeral written the way Lua writes one: an optional sign, decimal digits with an optional
-fractional part and an optional exponent marked `e` or `E`, or hexadecimal notation such as
-`0xff`. Whitespace at either end is tolerated and ignored. Everything else — a boolean, a
-table, a function, and a string with anything left over after the numeral — answers `nil`.
+as a numeral written the way Lua writes one: an optional sign, then either decimal digits with
+an optional fractional part and an optional exponent marked `e` or `E`, or hexadecimal
+notation opening `0x` — which takes a fractional part of its own and a binary exponent marked
+`p` or `P`, so `0xff`, `0x0.8` and `0x1.fp10` are all numerals. Whitespace at either end is
+tolerated and ignored. Everything else — a boolean, a table, a function, and a string with
+anything left over after the numeral — answers `nil`.
 
 That last clause is stricter than most parsers a reader will have met. The numeral has to
 account for the whole string: `"42 items"` is not forty-two with a note attached, it is a
-failure, because `items` is not part of any numeral. Nothing partial comes back, and nothing
-is silently truncated.
+failure, because `items` is not part of any numeral. A numeral is read whole or not at all,
+and nothing partial comes back.
+
+The two notations part company at the top of the integer range, and that is worth knowing
+before it bites. A decimal numeral naming a whole number too large to store as an integer
+becomes a float, losing precision but keeping roughly the right magnitude. A hexadecimal one
+stays an integer and *wraps*, so a 64-bit identifier written out in full can arrive as a
+small negative number without anything being raised or reported.
 
 No metamethod takes part. A table with a `__tostring` that produces `"5"` is still answered
 `nil`, because the conversion looks at the value rather than at how the value likes to be
@@ -113,6 +121,15 @@ two-argument form wants — and exactly what the one-argument form would refuse,
 not a Lua numeral.
 
 ## Gotchas
+
+<Gotcha title="A hexadecimal numeral wraps where a decimal one overflows">
+The two notations disagree about what to do with a value that will not fit in an integer, and
+only one of them tells you. `tonumber("9223372036854775808")` gives back a float, which is
+imprecise but recognisably enormous. `tonumber("0xFFFFFFFFFFFFFFFF")` gives back `-1`, and
+`tonumber("0x10000000000000000")` gives back `0` — integers, silently wrapped, with nothing
+raised and no `nil` to test. Anything reading a full-width identifier, hash or bitmask out of
+hexadecimal text should check the range itself, or keep the value as the string it arrived as.
+</Gotcha>
 
 <Gotcha title="The numeral has to be the whole string">
 `tonumber("42 items")` is `nil`, not 42. So is `tonumber("12px")` and `tonumber("1 000")`. Text

@@ -42,11 +42,12 @@ and what you would have written by hand: `nil` becomes `"nil"`, the two booleans
 comes back unchanged rather than quoted or escaped.
 
 Everything else — a table, a function, a coroutine, a file — has no text form of its own, so
-unless its metatable supplies one, what comes back is the type name followed by something
-standing for *which one*: an identity, not a description. Two tables that are both in play get
-different text; one table gets the same text twice running. That identity separates one value
-from another and does no more than that — it differs between runs of the same program, and
-carries nothing a program should read back out of it.
+what comes back is a name followed by something standing for *which one*: an identity, not a
+description. Both halves are open to the value's metatable, which is the next section; left to
+itself, the name is the type name. Two tables that are both in play get different text; one
+table gets the same text twice running. That identity separates one value from another and
+does no more than that — nothing about how it is spelled is promised, and nothing a program
+needs can be read back out of it.
 
 The one thing this function is not is a formatter.
 [`string.format()`](/docs/standard-library/string/format) is where you go to decide how many
@@ -70,9 +71,8 @@ stand in where the type name would have gone, so a value reads as `Vector: …` 
 `table: …`. It replaces a word in a spelling that is not promised in the first place, which is
 why it is a debugging convenience and not a text format.
 
-Neither field affects [`type()`](/docs/standard-library/globals/type), which reports what the
-value *is* and is deaf to metatables, or
-[`tonumber()`](/docs/standard-library/globals/tonumber), which consults no metamethod at all.
+The order is what makes the pair predictable: a value carrying both fields is written entirely
+by its `__tostring`, and `__name` never appears in the result.
 
 ## The format is not a promise
 
@@ -95,6 +95,13 @@ therefore stable by construction.
 
 The metamethod receives the value itself, so it can read the fields it wants. Nothing about
 the table changes — the second line proves the fields are still where they were.
+
+### When both metatable fields are set, `__tostring` wins
+
+<RunnableExample code={`local heading = setmetatable({}, {\n  __name = "Vector",\n  __tostring = function() return "V!" end,\n})\n\nprint(tostring(heading))\n-- Expected output: V!`} />
+
+`__name` is consulted only for a value that has no `__tostring` to fall back on, so adding one
+takes the whole result over and the name never reaches the page.
 
 ### Writing out values that might be anything
 
