@@ -30,8 +30,8 @@ string.format(formatstring, ···)
 <Errors>
 
 - Raises when a directive is not one Lua recognises, such as `%y`.
-- Raises `bad argument` when a value is missing, or is the wrong kind for its directive.
-- <Since v="5.3" /> Raises `number has no integer representation` when a float with a fractional part reaches an integer directive such as `%d`.
+- Raises when a value is missing for a directive, or is not of the kind that directive expects.
+- <Since v="5.3" /> Raises when a float with a fractional part reaches an integer directive such as `%d`.
 
 </Errors>
 

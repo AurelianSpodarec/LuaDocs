@@ -32,10 +32,10 @@ string.gsub(s, pattern, repl [, n])
 
 <Errors>
 
-- Raises `invalid capture index` when a replacement string names a capture the pattern does not have, such as `%2` against a pattern that captures once.
-- <Since v="5.2" /> Raises `invalid use of '%' in replacement string` when a `%` in a replacement string is followed by anything other than a digit or a second `%` — including nothing at all, as in a trailing one.
-- Raises `invalid replacement value` when a table lookup or a function call answers with something that is neither a string, a number, `nil` nor `false`.
-- Raises `bad argument` when `repl` is not a string, a number, a table or a function.
+- Raises when a replacement string names a capture the pattern does not have, such as `%2` against a pattern that captures once.
+- <Since v="5.2" /> Raises when a `%` in a replacement string is followed by anything other than a digit or a second `%` — including nothing at all, as in a trailing one.
+- Raises when a table lookup or a function call answers with something that is neither a string, a number, `nil` nor `false`.
+- Raises when `repl` is not a string, a number, a table or a function.
 
 </Errors>
 
