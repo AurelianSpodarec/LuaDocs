@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A file run from here may suspend. A `coroutine.yield()` inside the file reaches whoever resumed the coroutine and the run picks up where it left off; 5.1 raises rather than let a yield cross the call this function makes into the chunk."
+  }
+}

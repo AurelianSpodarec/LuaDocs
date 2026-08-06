@@ -1,8 +1,129 @@
 ---
 title: loadfile()
-description: ""
+description: Compile a file's contents into a function without running any of it.
+lua-compat: globals.loadfile
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-loadfile
 ---
 
-{/* Not yet written. */}
+Compiles the contents of a file into a function and hands it back without running any of it —
+[`load()`](/docs/standard-library/globals/load) with the source coming off disk instead of out
+of a string. A file that cannot be opened, or whose contents do not compile, is not an error
+here: `nil` comes back, followed by a message.
+
+<RunnableExample code={`local settings_chunk, reason = loadfile("settings.lua")\nif settings_chunk then\n  print("the file compiled")\nelse\n  print("no chunk came back")\nend\nprint(type(reason))\n-- Expected output:\n-- no chunk came back\n-- string`} />
+
+<Note>
+The examples here run in a sandbox with no files in it, so every one of them takes the failing
+path — which is the path worth showing anyway, because it is the one a caller has to write
+code for. The shape of a call that succeeds is in the plain snippets below, which are not run.
+</Note>
+
+## Syntax
+
+```lua
+loadfile([filename [, mode [, env]]])
+```
+
+<Parameters>
+  <Param name="filename">The file to read the chunk from. Left out entirely, the source is read from standard input instead.</Param>
+  <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
+  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — [`load()`](/docs/standard-library/globals/load#choosing-the-environment) covers what changing it buys.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the file could not be read or its contents could not be compiled.</Return>
+  <Return type="string">A message describing what went wrong. It is there on the failing path only; a call that compiled something hands back the function and nothing after it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `filename` is something other than a string or a number. Leaving it out, or passing `nil`, is not a mistake — either one is the request to read standard input.
+- <Since v="5.2" /> Raises when `mode` is something other than a string or a number. Leaving it out and passing `nil` both mean the default.
+- A file that is missing, unreadable or full of source that does not compile does not raise. All three arrive as the two return values, which is the whole difference between this call and [`dofile()`](/docs/standard-library/globals/dofile).
+
+</Errors>
+
+## Description
+
+The file is opened, its contents are compiled, and the file is closed again. Nothing in it
+runs. What comes back is a function holding the file's
+[chunk](/docs/standard-library/globals/load#what-a-chunk-is), waiting to be called — and
+calling it is a separate decision the caller makes afterwards, or never makes at all.
+
+That separation is what the call is for. A configuration file can be compiled at startup and
+run later, or compiled and thrown away just to find out whether it parses. A file of untrusted
+origin can be compiled with a table of its own, so that the global names it can see are the
+ones the caller put there. And a file that turns out to be missing produces a value to branch
+on rather than a failure to catch.
+
+```lua
+local chunk, reason = loadfile("settings.lua")
+if not chunk then
+  report("settings could not be read: " .. reason)
+  return defaults
+end
+return chunk()
+```
+
+The chunk is named after the file automatically, so a failure raised while the returned
+function is running names `settings.lua` in what it reports. Nothing has to be passed for that
+to happen, and the `chunkname` argument [`load()`](/docs/standard-library/globals/load) takes
+is absent here because the file has already supplied one.
+
+One piece of the file is skipped rather than compiled: a first line beginning with `#` is
+ignored. That is what lets a Lua script carry a `#!` line and still be an ordinary Lua file to
+this call.
+
+The chunk this call builds is a function like any other, so it takes arguments and returns
+values. `loadfile("report.lua")` followed by calling the result with two arguments puts those
+two in the file's `...`; whatever the file returns is what the call answers with.
+
+## Examples
+
+### Falling back when the file is not there
+
+<RunnableExample code={`local function compile_file(path)\n  local chunk = loadfile(path)\n  if chunk then\n    return chunk\n  end\n  return function() return "using the built-in defaults" end\nend\n\nlocal settings = compile_file("settings.lua")\nprint(settings())\n-- Expected output:\n-- using the built-in defaults`} />
+
+A missing file is an ordinary answer, so the fallback is an `if` rather than a protected call.
+Handing back a stand-in function keeps the shape of the result the same for the caller, whether
+the file was there or not.
+
+### What a failed call actually hands back
+
+<RunnableExample code={`print(select("#", loadfile("settings.lua")))\nprint(loadfile("settings.lua") == nil)\nprint(type(select(2, loadfile("settings.lua"))))\n-- Expected output:\n-- 2\n-- true\n-- string`} />
+
+Two values on the failing path, one on the succeeding one. Code that writes
+`local chunk = loadfile(path)` keeps only the first and discards the explanation, which is fine
+until somebody wants to know why.
+
+## Gotchas
+
+<Gotcha title="Nothing in the file has run yet">
+A call that came back with a function has read the file and compiled it, and that is all.
+Anything the file *does* — assigning globals, registering handlers, opening a connection —
+happens when the returned function is called, and a caller that loads the file and never calls
+it has quietly done nothing at all.
+
+```lua
+loadfile("register-handlers.lua")   -- compiles it, and stops
+dofile("register-handlers.lua")     -- compiles it and runs it
+```
+</Gotcha>
+
+<Gotcha title="Every call reads the file again">
+Nothing here is remembered. Two calls naming the same file open it twice, compile it twice, and
+hand back two unrelated functions — so a file edited between the two compiles differently the
+second time, and a file loaded in a loop is recompiled on every pass.
+[`require()`](/docs/standard-library/globals/require) is the call that loads a module once and
+hands the same result back afterwards; this one deliberately does not.
+</Gotcha>
+
+## See also
+
+- [`load()`](/docs/standard-library/globals/load) — the same compilation from a string or a supplying function, and where chunks, modes and environments are explained
+- [`dofile()`](/docs/standard-library/globals/dofile) — reading a file and running it in one step, reporting failure by raising
+- [`require()`](/docs/standard-library/globals/require) — finding a module by name and loading it once
+- [`assert()`](/docs/standard-library/globals/assert) — turning the two return values into a raise
+- [`io.open()`](/docs/standard-library/io/open) — reading a file as data rather than as code
+- [The global environment](/docs/language/environments/the-global-environment) — the table a chunk gets when `env` is left out

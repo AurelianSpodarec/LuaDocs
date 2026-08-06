@@ -1,8 +1,132 @@
 ---
 title: dofile()
-description: ""
+description: Run a Lua file straight away, letting any failure propagate to the caller.
+lua-compat: globals.dofile
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-dofile
 ---
 
-{/* Not yet written. */}
+Opens a file, compiles its contents as a Lua chunk, runs it, and hands back everything the
+chunk returned. Where [`load()`](/docs/standard-library/globals/load) and
+[`loadfile()`](/docs/standard-library/globals/loadfile) report a failure by returning `nil` and
+a message, this one raises: a missing file, source that does not compile, and an error thrown
+while the file is running all propagate to the caller untouched.
+
+<RunnableExample code={`local completed = pcall(dofile, "setup.lua")\nprint(completed)\n-- Expected output:\n-- false`} />
+
+<Note>
+The examples here run in a sandbox with no files in it, so the calls that appear all fail —
+which does at least demonstrate the thing this entry is about, since failing is what this call
+does differently. The shape of a call that succeeds is in the plain snippet below, which is not
+run.
+</Note>
+
+## Syntax
+
+```lua
+dofile([filename])
+```
+
+<Parameters>
+  <Param name="filename">The file to run. Left out entirely, the chunk is read from standard input instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">Everything the file's chunk returned, in the order it returned them — as many values as there were, or none at all when the file returned nothing.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the file cannot be opened or read.
+- Raises when the file's contents do not compile.
+- Raises whatever the file's own code raises. Nothing here runs under protection, so a failure part way through a file reaches this call's caller with the rest of the file unrun.
+- Raises when `filename` is something other than a string or a number. Leaving it out, or passing `nil`, is not a mistake — either one is the request to read standard input.
+
+</Errors>
+
+## Description
+
+This is [`loadfile()`](/docs/standard-library/globals/loadfile) and a call to what it produced,
+collapsed into one step and with the two-value failure report dropped in favour of raising. The
+file's [chunk](/docs/standard-library/globals/load#what-a-chunk-is) is called with no arguments
+— `...` inside the file is empty — and everything it returns comes straight back here.
+
+```lua
+local settings = dofile("settings.lua")   -- the file's return value
+```
+
+There is no `mode` argument and no `env` argument. The file is compiled in whatever form it is
+found in, and it runs against the program's own globals: a global the file assigns is a global
+the rest of the program then sees. Restricting either is what
+[`loadfile()`](/docs/standard-library/globals/loadfile) is for — compile the file with the
+`mode` and the environment you want, then call the result yourself.
+
+Nothing is remembered between calls. Each call opens the file again, compiles it again and runs
+it again, so a file run twice has its side effects twice.
+[`require()`](/docs/standard-library/globals/require) is the call that loads a module once and
+hands the same result back on every call afterwards; this one is for running a file, not for
+importing one.
+
+## How a failure is reported
+
+This is the one place the three loading calls genuinely part company, and it is worth being
+deliberate about which one a piece of code wants.
+
+- [`load()`](/docs/standard-library/globals/load) and
+  [`loadfile()`](/docs/standard-library/globals/loadfile) hand back `nil` and a message. The
+  caller tests the first value and decides what to do. Nothing has run yet, so there is nothing
+  to undo.
+- This call raises. The caller either lets the failure travel — which is right for a startup
+  file the program cannot sensibly continue without — or wraps the call in
+  [`pcall()`](/docs/standard-library/globals/pcall) and reads the status back.
+
+A raise carries an [error object](/docs/standard-library/globals/error#what-an-error-carries)
+like any other, and everything true of catching one elsewhere is true here. What is worth
+knowing is that a failure *inside* the file is indistinguishable, at this call, from a failure
+to find the file at all: both arrive as one raise, and telling them apart means looking at the
+object rather than at the call.
+
+## Examples
+
+### Catching what this call would otherwise propagate
+
+<RunnableExample code={`local completed, reason = pcall(dofile, "setup.lua")\nprint(completed)\nprint(type(reason))\n-- Expected output:\n-- false\n-- string`} />
+
+`pcall()` is how a program survives a file that might not be there. Note what is *not* printed:
+the message describes the failure in the compiler's or the library's own words, and those words
+are not something to compare against.
+
+### The same thing built out of the other two
+
+<RunnableExample usesEntry={false} code={`local function run_file(path)\n  local chunk, reason = loadfile(path)\n  if not chunk then\n    error(reason, 0)\n  end\n  return chunk()\nend\n\nlocal completed = pcall(run_file, "setup.lua")\nprint(completed)\n-- Expected output:\n-- false`} />
+
+Compile, check, raise the message as it stands, call. That is what this entry's own call does,
+and writing it out is the way to change one piece of it — to pass arguments to the chunk, to
+give it an environment, or to answer with a default instead of raising.
+
+## Gotchas
+
+<Gotcha title="It runs a file, it does not import one">
+Two calls naming the same file run it twice. A file that appends to a list appends twice; a
+file that opens a connection opens two. Anything meant to happen once wants
+[`require()`](/docs/standard-library/globals/require), which remembers what it has already
+loaded and hands the same value back.
+</Gotcha>
+
+<Gotcha title="The file's globals become the program's globals">
+A file run this way shares the global environment with everything else. A name the file assigns
+without `local` in front of it is set for the whole program, and a name it assigns by accident
+— a misspelling, or a leftover from an earlier version of the file — silently overwrites
+whatever was there. Compiling the file with
+[`loadfile()`](/docs/standard-library/globals/loadfile) and giving it a table of its own is what
+keeps a file's names inside the file.
+</Gotcha>
+
+## See also
+
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling the same file without running it, and reporting failure as a value
+- [`load()`](/docs/standard-library/globals/load) — the same compilation from a string, and where chunks and environments are explained
+- [`require()`](/docs/standard-library/globals/require) — loading a module by name, once, with the result remembered
+- [`pcall()`](/docs/standard-library/globals/pcall) — catching what this call raises
+- [`error()`](/docs/standard-library/globals/error) — the raise itself, and what the object it carries can be
+- [`io.open()`](/docs/standard-library/io/open) — reading a file as data rather than running it as code

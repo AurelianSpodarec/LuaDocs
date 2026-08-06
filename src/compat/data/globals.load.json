@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Takes the chunk as source text as well as a supplying function; earlier versions accept a function only, and a string in that position is refused as a bad argument. Two arguments arrive alongside it: `mode`, which says whether text, precompiled chunks or both are acceptable, and `env`, which gives the loaded chunk a table of its own to resolve global names through. The chunk-name argument was already there; what changes is its default, which becomes the source text itself when the chunk is text."
+  }
+}

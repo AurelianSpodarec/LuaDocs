@@ -85,6 +85,9 @@ import globalsPcall from './data/globals.pcall.json';
 import globalsXpcall from './data/globals.xpcall.json';
 import globalsError from './data/globals.error.json';
 import globalsAssert from './data/globals.assert.json';
+import globalsLoad from './data/globals.load.json';
+import globalsLoadfile from './data/globals.loadfile.json';
+import globalsDofile from './data/globals.dofile.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -348,6 +351,24 @@ const raw: Record<string, unknown> = {
   // message had to be a string or a number; a table was refused as a bad argument, which is
   // a different failure from the one the assertion was written to report.
   'globals.assert': globalsAssert,
+  // The three loading calls. `load`'s signature is the most-moved in this section, and it
+  // moved in one step: 5.1 takes a supplying function and a chunk name, full stop, and
+  // `luaL_checktype(L, 1, LUA_TFUNCTION)` refuses a string outright. 5.2 rewrote
+  // `luaB_load` to try `lua_tolstring` on the first argument first, and added `mode` and
+  // `env` in the same release — the chunk-name argument is the one that was always there.
+  // Checked argument by argument against all five passages rather than assumed to have
+  // travelled together.
+  'globals.load': globalsLoad,
+  // `loadfile` gained `mode` and `env` at 5.2 alongside `load`, and nothing since. 5.2 §8
+  // names both functions when it records that bytecode verification was dropped, and
+  // points at `mode` as the guard — which is why the two arguments arrive together.
+  'globals.loadfile': globalsLoadfile,
+  // `dofile`'s passage is the same behaviour in all five manuals; its one delta is
+  // invisible there. 5.1's `luaB_dofile` calls `lua_call`, and 5.1's `lua_yield` refuses
+  // while a C call is pending, so a chunk run by `dofile` could not suspend. 5.2 switched
+  // to `lua_callk` with a `dofilecont` continuation. ADR 0010 rule 3, the same shape as
+  // `pcall`'s 5.2 note above, and probed on 5.3 and 5.4 from the positive side.
+  'globals.dofile': globalsDofile,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

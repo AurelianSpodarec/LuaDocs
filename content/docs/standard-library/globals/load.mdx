@@ -1,8 +1,210 @@
 ---
 title: load()
-description: ""
+description: Compile Lua source into a function without running any of it.
+lua-compat: globals.load
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-load
 ---
 
-{/* Not yet written. */}
+Compiles a chunk of Lua source and hands it back as a function, without running a line of it.
+The source can be the text itself, or a function called over and over to supply it a piece at
+a time. Source that does not compile is not an error here: `nil` comes back, followed by a
+message saying what the compiler objected to.
+
+<RunnableExample code={`local adder = load("local left, right = ... ; return left + right")\nprint(adder(2, 3))\nlocal broken, reason = load("return 2 +")\nprint(broken)\nprint(type(reason))\n-- Expected output:\n-- 5\n-- nil\n-- string`} />
+
+## Syntax
+
+```lua
+load(chunk [, chunkname [, mode [, env]]])
+```
+
+<Parameters>
+  <Param name="chunk">The source to compile — either the text of it, or a function that hands it over a piece at a time. See [Reading the source a piece at a time](#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
+  <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, source text is named after itself and a supplying function gets a fixed placeholder instead.</Param>
+  <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
+  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — see [Choosing the environment](#choosing-the-environment).</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
+  <Return type="string">A message describing what went wrong. It is there on the failing path only; a call that compiled something hands back the function and nothing after it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all.
+- Raises when `chunk` is a value there is no source to be read from. A table, a boolean or `nil` in that position is refused before anything is compiled.
+- Raises when `chunkname` is something other than a string or a number. Leaving it out and passing `nil` both mean the default name, and neither is a mistake.
+- <Since v="5.2" /> Raises when `mode` is something other than a string or a number. Leaving it out and passing `nil` both mean the default, as above.
+- Source that does not compile does not raise, and neither does a `mode` that refuses the chunk it was handed, nor a failure inside a supplying function. All three arrive as the two return values instead.
+
+</Errors>
+
+## Description
+
+Two steps hide behind every piece of Lua that runs: the source is compiled into a function,
+and then the function is called. Usually they happen together and neither is visible. This
+call does the first and stops there. What comes back is an ordinary function value —
+assignable, passable, callable as often as you like, and inert until something calls it.
+
+That gap is the whole point. Source that arrives while the program is already running — a
+pricing rule out of a config file, an expression somebody typed, a template assembled from
+parts — can be checked for syntax before anything acts on it, handed a restricted set of
+globals to work against, and called at a moment of the caller's choosing rather than at the
+moment it was read.
+
+A failure to compile is reported the way a lookup that found nothing is reported, not the way
+a mistake is: `nil` first, then a message. Nothing is raised, so this call needs no
+[`pcall()`](/docs/standard-library/globals/pcall) around it, and a caller that wants the
+failure to be loud writes [`assert()`](/docs/standard-library/globals/assert) around it
+instead. `assert(load(source))` is the usual shape — it hands back the function when there is
+one and raises carrying the compiler's message when there is not.
+
+That message is written for a person to read, and its exact wording belongs to the compiler
+rather than to the language. Code that branches on *whether* the source compiled has the
+first return value to test; code that branches on the wording of the second is reading
+something that can be phrased differently by a later Lua.
+
+## What a chunk is
+
+A *chunk* is the unit Lua compiles: a run of statements, the same thing a `.lua` file holds.
+Lua handles one as the body of an anonymous function taking a variable number of arguments,
+and three things follow from that.
+
+- **It can take arguments.** `...` inside the chunk holds whatever the returned function was
+  called with, so a chunk is parameterisable without being rewritten.
+- **It can return values.** A `return` at the end of the chunk becomes the returned
+  function's result, and a caller reads it like any other.
+- **Its locals are its own.** A `local` declared in the chunk is invisible to the code that
+  loaded it. Only what the chunk returns, and what it writes into its environment, comes back
+  out — though a function the chunk returns keeps hold of the locals it closed over, as any
+  closure does.
+
+A chunk can also be carried in *precompiled* form — the binary shape
+[`string.dump()`](/docs/standard-library/string/dump) produces. This call takes either by
+default, and works out which it has been given rather than being told.
+
+<Warning>
+Lua does not check that the code inside a precompiled chunk is consistent, and running a
+maliciously crafted one can crash the interpreter. A chunk from a source you do not control
+should be loaded as text and nothing else, which is what a `mode` of `"t"` is for.
+</Warning>
+
+## Reading the source a piece at a time
+
+When `chunk` is a function, it is called repeatedly and each call hands back the next piece of
+the source. The pieces are joined end to end in the order they arrive, and nothing about where
+the joins fall matters — a piece may stop mid-word, mid-string or mid-statement.
+
+The chunk ends when that function returns an empty string, returns `nil`, or returns nothing
+at all. All three mean the same thing. The last is easy to reach by accident: a function whose
+final `if` did not fire returns nothing, and the source stops there rather than continuing.
+
+The empty string is the one worth pausing on, because it reads as *nothing to add just now*
+and means *there is no more*. A supplier that answers `""` between two real pieces has ended
+the chunk before the second one, and what was gathered up to that point is what gets compiled
+— which will sometimes be valid Lua doing the wrong thing rather than a visible failure.
+
+A failure inside the supplier does not escape either. An error raised while it is running is
+caught here and reported the way a syntax error is, as `nil` and a message, so a supplier
+reading from somewhere unreliable is checked through this call's own return values rather
+than by wrapping the call in a protected one.
+
+## Choosing the environment
+
+A chunk resolves its global names through a table: reading `paper_size` inside the chunk reads
+the field `paper_size` of that table, and assigning to that name writes there. Left alone, the
+chunk uses the same global environment as the rest of the program, so a chunk that assigns to
+a global changes the program's globals.
+
+`env` replaces that table with one of your choosing. The chunk then reads and writes only that
+table's fields: a name the table does not hold reads as `nil`, and a metatable on the table is
+what turns that miss into a lookup somewhere else. Handing over a small table holding just the
+globals the source is meant to see is the usual way to run code of unknown provenance.
+
+Leaving the argument out and passing `nil` are different requests. Leaving it out means *the
+global environment*; passing `nil` means *this value*, and a chunk with `nil` where its
+environment should be fails on the first global name it touches.
+
+All of that describes a chunk compiled from source, which has its environment as its first and
+only upvalue. A precompiled chunk that was dumped from an ordinary function rather than from a
+whole chunk can carry any number of upvalues, and there is no promise that the first of them is
+an environment at all — what `env` sets is the first upvalue, whatever that turns out to be.
+
+## Examples
+
+### Compiling a rule that was stored as text
+
+<RunnableExample code={`local rules = {\n  standard = "return unit_price * quantity",\n  bulk = "return unit_price * quantity - 5",\n}\n\nlocal function total_for(rule_name, unit_price, quantity)\n  local source = "local unit_price, quantity = ... " .. rules[rule_name]\n  local rule = assert(load(source, rule_name))\n  return rule(unit_price, quantity)\nend\n\nprint(total_for("standard", 20, 4))\nprint(total_for("bulk", 20, 4))\n-- Expected output:\n-- 80\n-- 75`} />
+
+The rule arrives as text and leaves as a function that takes arguments. Naming the chunk after
+the rule is what makes a later failure inside it point at `bulk` rather than at a truncated
+copy of the source, which is what an unnamed chunk of text is identified by.
+
+### Checking that source compiles before doing anything with it
+
+<RunnableExample code={`local function compiles(source)\n  return load(source) ~= nil\nend\n\nprint(compiles("return unit_price * quantity"))\nprint(compiles("return unit_price *"))\n-- Expected output:\n-- true\n-- false`} />
+
+Compiling and running are separate steps, so asking whether something *would* run costs
+nothing but the compile. Comparing against `nil` is also what reduces the call to its first
+result: written as `return load(source)`, the same function would hand its caller the message
+as well.
+
+### Gathering the source from a supplier
+
+<RunnableExample code={`local pieces = {\n  "local guest_name = ... ",\n  "return 'welcome, ' .. guest_name",\n}\n\nlocal next_piece = 0\nlocal greeter = assert(load(function()\n  next_piece = next_piece + 1\n  return pieces[next_piece]\nend))\n\nprint(greeter("Ada"))\nprint(next_piece)\n-- Expected output:\n-- welcome, Ada\n-- 3`} />
+
+Three calls, not two: the third finds nothing at that index, returns `nil`, and that is what
+ends the chunk.
+
+### Running source against a table of its own
+
+<RunnableExample code={`local sandbox = { starting_total = 5 }\nlocal recipe = assert(load("running_total = starting_total * 3", "recipe", "t", sandbox))\nrecipe()\nprint(sandbox.running_total)\nprint(rawget(_G, "running_total"))\n-- Expected output:\n-- 15\n-- nil`} />
+
+The chunk read `starting_total` out of the table it was given and wrote `running_total` back
+into it. The program's own globals never saw either name.
+
+## Gotchas
+
+<Gotcha title="Nothing in the chunk runs until you call what came back">
+A successful call has compiled the source and done nothing else. Side effects the source
+describes — a global assigned, a table filled in, a message sent — have not happened yet, and
+a caller that loads a chunk and forgets to call it sees no error and no effect.
+
+<RunnableExample code={`local record = {}\nlocal sender = assert(load("delivered = true return 'sent'", "sender", "t", record))\nprint(record.delivered)\nprint(sender())\nprint(record.delivered)\n-- Expected output:\n-- nil\n-- sent\n-- true`} />
+</Gotcha>
+
+<Gotcha title="An empty piece ends the chunk">
+A supplying function that answers with an empty string has said *the chunk is finished*, not
+*nothing this time*. Everything gathered before it is compiled and everything after it is
+never asked for.
+
+<RunnableExample code={`local pieces = { "return 'first'", "", "return 'second'" }\nlocal next_piece = 0\nlocal built = assert(load(function()\n  next_piece = next_piece + 1\n  return pieces[next_piece]\nend))\nprint(built())\nprint(next_piece)\n-- Expected output:\n-- first\n-- 2`} />
+
+The third piece was never read, and nothing complained — the chunk that came back is a
+perfectly good function that happens to be half of what was meant.
+</Gotcha>
+
+<Gotcha title="Passing nil for the environment is not the same as leaving it out">
+An absent `env` means the global environment. An `env` written as `nil` means the chunk has no
+table to resolve names through at all, which compiles without complaint and fails the first
+time the chunk reads a global.
+
+<RunnableExample code={`local using_default = assert(load("return select('#', 'a', 'b')"))\nprint(using_default())\nlocal using_nil = assert(load("return select('#', 'a', 'b')", "chunk", "t", nil))\nlocal completed = pcall(using_nil)\nprint(completed)\n-- Expected output:\n-- 2\n-- false`} />
+
+The failure surfaces at the call, not at the load, which is what makes it hard to place. A
+variable holding `nil` where a table of globals was meant reaches this argument looking exactly
+like a deliberate choice.
+</Gotcha>
+
+## See also
+
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — the same compilation, with the source read from a file
+- [`dofile()`](/docs/standard-library/globals/dofile) — reading a file and running it in one step, reporting failure by raising
+- [`loadstring()`](/docs/standard-library/globals/loadstring) — the separate name for compiling a chunk from a string, which this call also takes
+- [`assert()`](/docs/standard-library/globals/assert) — the usual wrapper, turning the two return values into a raise
+- [`string.dump()`](/docs/standard-library/string/dump) — turning a function back into the precompiled form this call reads
+- [`require()`](/docs/standard-library/globals/require) — loading a module by name, with the searching and the caching this call does not do
+- [`_ENV`](/docs/language/environments/env) — the name a chunk's environment is bound to
+- [The global environment](/docs/language/environments/the-global-environment) — the table a chunk gets when `env` is left out

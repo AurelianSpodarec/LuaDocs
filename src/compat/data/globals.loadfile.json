@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Takes two more arguments after the file name: `mode`, which says whether text, precompiled chunks or both are acceptable, and `env`, which gives the loaded chunk a table of its own to resolve global names through. 5.1 takes the file name and nothing else, and ignores anything written after it."
+  }
+}
