@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Compares its arguments with the language's less-than test and hands back the winning argument itself, so the answer keeps the subtype it was passed with; earlier versions convert every argument to a number first, which accepts a string that reads as a number and answers with the converted value rather than with the argument."
+  }
+}

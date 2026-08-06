@@ -1,8 +1,133 @@
 ---
 title: math.log()
-description: ""
+description: Take the logarithm of a number, naturally or in a chosen base.
+lua-compat: math.log
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.log
 ---
 
-{/* Not yet written. */}
+Answers the question "what power gives this number?". With one argument the base is *e* and
+the answer is the natural logarithm; a second argument names a different base. The result is
+always a float.
+
+<RunnableExample code={`local growth_rate = 0.07\nlocal periods_to_double = math.log(2) / math.log(1 + growth_rate)\nprint(string.format("%.1f years", periods_to_double))\n-- Expected output: 10.2 years`} />
+
+## Syntax
+
+```lua
+math.log(x [, base])
+```
+
+<Parameters>
+  <Param name="x">The number to take the logarithm of.</Param>
+  <Param name="base">The base to take it in. Left out, the base is *e*, which is what makes the one-argument call the natural logarithm.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The power that `base` must be raised to in order to give `x`. Always a float, whatever the arguments were.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+- <Since v="5.2" /> Raises when `base` is given and is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+A logarithm is the inverse of raising something to a power, so this function and
+[`math.exp()`](/docs/standard-library/math/exp) undo each other for the default base — to
+the precision a float carries — and this function and `^` do the same for any other base.
+That is the whole of what it does, and
+almost every use follows from it: a growth rate turns into a doubling time, a ratio turns
+into a count of steps, a range spanning many orders of magnitude turns into one a chart can
+show.
+
+The result is always a float, whatever went in. This function neither mirrors its arguments
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+it.
+
+An argument of zero or below has no logarithm, and this function says so without raising. A
+zero argument answers with a negative infinity, and a negative one with a not-a-number value.
+Both are ordinary float values that travel onward through arithmetic, so a pipeline that can
+produce a zero — a count that came out empty, a ratio whose numerator vanished — needs its
+guard here rather than three functions later.
+
+## Choosing a base
+
+Any base can be reached from any other by dividing: the logarithm of `x` in base `b` is
+`math.log(x) / math.log(b)`, which is what the second argument spares you writing. Three
+bases cover nearly everything.
+
+- *e*, the default, is the one that pairs with continuous growth and decay. A rate and a
+  duration multiply into an exponent, and this is the function that reads one back out.
+- Ten measures orders of magnitude — decibels, pH, an axis that has to hold both `3` and
+  `3000000`.
+- Two counts halvings and doublings, which is how many bits, levels or comparisons something
+  takes.
+
+The second argument is not only shorter than the division, though. A base of ten is handled
+directly rather than by dividing two natural logarithms, so a power of ten comes back exactly
+whole where the division comes back a hair off it. The example below shows the pair
+disagreeing. Neither answer is wrong — the division is simply doing more rounding — but only
+one of them survives a comparison against a whole number.
+
+Away from that case, inexactness is the rule rather than the exception. A logarithm that
+lands on a whole number in the mathematics usually lands beside one in a float, so treat a
+whole-looking result as a number to round rather than as a number to compare.
+
+[`math.log10()`](/docs/standard-library/math/log10) is an older spelling of the base-ten
+call.
+
+## Examples
+
+### Turning a ratio into decibels
+
+<RunnableExample code={`local power_ratio = 250\nprint(string.format("%.1f dB", 10 * math.log(power_ratio, 10)))\n-- Expected output: 24.0 dB`} />
+
+A decibel figure is a base-ten logarithm scaled by ten, which is the shape of every "measure
+this on a log scale" formula: pick the base that matches the unit, then scale.
+
+### How many bits a range needs
+
+<RunnableExample code={`local distinct_values = 1000\nprint(math.ceil(math.log(distinct_values, 2)))\n-- Expected output: 10`} />
+
+Ten bits hold a thousand distinct values and nine do not. Rounding up is doing two jobs here:
+it turns a fractional answer into the whole number the question wanted, and it settles any
+question about the last digit before the answer is used.
+
+### The base argument is not just shorthand for a division
+
+<RunnableExample code={`print(math.log(1000, 10) == 3)\nprint(math.log(1000) / math.log(10) == 3)\n-- Expected output:\n-- true\n-- false`} />
+
+Both lines are asking whether a thousand is ten cubed. The first gets a base-ten logarithm
+computed as one; the second divides two natural logarithms and rounds twice on the way. Where
+the answer is going to be compared or rounded, pass the base.
+
+## Gotchas
+
+<Gotcha title="A whole-looking logarithm is usually not a whole number">
+Most bases are reached by dividing one logarithm by another, and the division leaves the
+result a fraction below or above the whole number the mathematics promises. `==` sees a
+difference that nothing printed will show. Round the result,
+compare it against a tolerance, or ask the question the other way round — testing `base ^ 3`
+against `x` involves no logarithm at all.
+</Gotcha>
+
+<Gotcha title="Zero and negative arguments answer rather than fail">
+There is no error here to catch. A zero gives a negative infinity and a negative number gives
+a not-a-number value, and both flow onward looking like results. A not-a-number value is
+especially quiet, because every comparison against it is false — including `==` against
+itself — so a guard written as "if the answer is bad" tends not to fire. Check the argument
+before the call, not the result after it.
+</Gotcha>
+
+## See also
+
+- [`math.exp()`](/docs/standard-library/math/exp) — the inverse for the default base
+- [`math.log10()`](/docs/standard-library/math/log10) — the older spelling of the base-ten call
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity a zero argument answers with, negated
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, the operation this one undoes
+- [Numbers](/docs/language/values-and-types/number) — why a logarithm rarely lands exactly on a whole number

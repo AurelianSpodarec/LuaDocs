@@ -46,6 +46,12 @@ import mathTan from './data/math.tan.json';
 import mathAsin from './data/math.asin.json';
 import mathAcos from './data/math.acos.json';
 import mathAtan from './data/math.atan.json';
+import mathDeg from './data/math.deg.json';
+import mathRad from './data/math.rad.json';
+import mathExp from './data/math.exp.json';
+import mathLog from './data/math.log.json';
+import mathMax from './data/math.max.json';
+import mathMin from './data/math.min.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -126,6 +132,22 @@ const raw: Record<string, unknown> = {
   'math.asin': mathAsin,
   'math.acos': mathAcos,
   'math.atan': mathAtan,
+  // The unit conversions and the two exponential functions. `rad` and `exp` are
+  // unchanged across all five lines; `deg` is not, and the difference is a rounding
+  // one — the conversion became a multiplication where it used to be a division, which
+  // moves the last bit. `log` gained its base argument, and the half that matters is
+  // that an older Lua accepts the same two-argument call and ignores the base.
+  'math.deg': mathDeg,
+  'math.rad': mathRad,
+  'math.exp': mathExp,
+  'math.log': mathLog,
+  // `max` and `min` stopped converting their arguments and started comparing them, so
+  // the value that comes back is now one of the arguments rather than a number derived
+  // from it. The manual annotated both `integer/float` at 5.3 and dropped the
+  // annotation afterwards; that is a correction to the annotation, not a second change,
+  // and it is deliberately not recorded here.
+  'math.max': mathMax,
+  'math.min': mathMin,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

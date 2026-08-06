@@ -1,8 +1,113 @@
 ---
 title: math.deg()
-description: ""
+description: Convert an angle from radians to degrees.
+lua-compat: math.deg
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.deg
 ---
 
-{/* Not yet written. */}
+Converts an angle measured in radians into the same angle measured in degrees. Nothing
+about the angle itself changes — it is one unit of measurement expressed in another — and
+the answer is always a float.
+
+<RunnableExample code={`local pendulum_swing = 0.35\nprint(string.format("%.2f degrees", math.deg(pendulum_swing)))\n-- Expected output: 20.05 degrees`} />
+
+## Syntax
+
+```lua
+math.deg(x)
+```
+
+<Parameters>
+  <Param name="x">The angle to convert, in radians.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The same angle expressed in degrees. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+Every function in this library that hands back an angle hands it back in radians, and every
+function that takes one takes radians — this pair of conversions aside, which is the whole
+reason the pair exists. Degrees are for people. So this conversion
+belongs at the outer edge of a calculation — on the way to a label, a log line or a saved
+file — with [`math.rad()`](/docs/standard-library/math/rad) at the opposite edge, where a
+number somebody typed comes in.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+it: an angle of a whole number of radians converts to a float, not to an integer.
+
+Nothing is wrapped, reduced or normalised on the way past. An angle of several full turns
+converts to a degree measure of several full turns, and a negative angle stays negative.
+Bringing an angle back inside a single turn is a job for `%` on the converted value.
+
+## Round-tripping between the two units
+
+On paper this function and [`math.rad()`](/docs/standard-library/math/rad) undo each other
+exactly. In floating point they very nearly do, and the gap is worth knowing about before a
+comparison discovers it.
+
+Each direction multiplies by a constant built from pi, and pi is not a number a float can
+hold. So each conversion can land a fraction away from the exact answer, and the second has
+no way to undo a rounding the first already made. Some angles come back unchanged and some
+come back a hair off: thirty degrees converted to radians and back is not equal to `30`,
+while forty-five degrees makes the same trip and arrives intact. Which angles fall on which
+side is a property of how the numbers round, not a pattern worth memorising.
+
+What this amounts to is the usual float advice, reached from a direction that looks safer
+than it is. Do not compare a converted angle against a whole number with `==`, and do not
+build a loop or a lookup on an angle surviving a conversion unchanged. Where a degree
+measure has to stay exact, keep the degree measure and convert a copy of it.
+
+## Examples
+
+### Reading an angle back out of an inverse function
+
+<RunnableExample code={`local slope_ratio = 0.5\nlocal angle_in_radians = math.asin(slope_ratio)\nprint(string.format("%.2f degrees", math.deg(angle_in_radians)))\n-- Expected output: 30.00 degrees`} />
+
+[`math.asin()`](/docs/standard-library/math/asin), like every other inverse in the library,
+answers in radians. Converting at the point of display keeps the calculation in the unit the
+library works in and puts the unit a reader wants only where a reader will see it.
+
+### The round trip does not always land where it started
+
+<RunnableExample code={`print(math.deg(math.rad(30)) == 30)\nprint(math.deg(math.rad(45)) == 45)\nprint(string.format("%.6f", math.deg(math.rad(30))))\n-- Expected output:\n-- false\n-- true\n-- 30.000000`} />
+
+Thirty degrees does not survive the trip and forty-five does. The third line is why this is
+worth saying out loud: the value that failed the comparison prints as `30.000000`, so
+nothing about the number as it is normally displayed reveals that `==` will refuse it.
+
+## Gotchas
+
+<Gotcha title="A converted angle is not something to feed back into the library">
+The result of this function is in degrees, and every angle-reading function in this library
+expects radians. `math.sin(math.deg(x))` is not a mistake Lua can catch: it is the sine of
+an angle some fifty-seven times larger than the one intended, and it answers with a
+perfectly ordinary number. Convert on the way *out* of a calculation, and use
+[`math.rad()`](/docs/standard-library/math/rad) on the way in.
+</Gotcha>
+
+<Gotcha title="An angle that prints as a whole number need not be one">
+A degree measure that displays as `30.00` may be a hair below thirty, and `==` will say so
+even though nothing on screen does. That is the ordinary behaviour of floats meeting a
+constant built from pi, and it bites here more often than elsewhere because degree measures
+are exactly the ones people expect to be tidy. Compare against a tolerance, or compare the
+degree measures you started with rather than ones that have been converted twice.
+</Gotcha>
+
+## See also
+
+- [`math.rad()`](/docs/standard-library/math/rad) — the conversion in the other direction
+- [`math.pi`](/docs/standard-library/math/pi) — the constant both conversions are built from
+- [`math.atan()`](/docs/standard-library/math/atan) — the usual source of an angle that wants converting
+- [`math.sin()`](/docs/standard-library/math/sin) — one of the functions that reads radians rather than degrees
+- [Numbers](/docs/language/values-and-types/number) — why a conversion and its inverse need not cancel exactly

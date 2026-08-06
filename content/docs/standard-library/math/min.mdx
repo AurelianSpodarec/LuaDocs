@@ -1,8 +1,122 @@
 ---
 title: math.min()
-description: ""
+description: Return the smallest of the values passed to it.
+lua-compat: math.min
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.min
 ---
 
-{/* Not yet written. */}
+Hands back the smallest of the values it was given. Every value is passed as a separate
+argument — this function compares its arguments, and never looks inside a table.
+
+<RunnableExample code={`local cheapest_quote = math.min(129, 98, 145)\nprint(cheapest_quote)\n-- Expected output: 98`} />
+
+## Syntax
+
+```lua
+math.min(x, ···)
+```
+
+<Parameters>
+  <Param name="x">The first value. At least this one is required.</Param>
+  <Param name="···">Any number of further values to compare against it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">Whichever argument compared smallest, handed back exactly as it was passed.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no arguments at all.
+- Raises when two arguments cannot be ordered against one another — a number against `nil`, a boolean, or a table with no ordering of its own.
+- <Since v="5.3" /> Raises when a number and a string are given together: arguments are compared as they arrive rather than converted to numbers first, so a string that reads as a number is not a number here.
+
+</Errors>
+
+## Description
+
+This is [`math.max()`](/docs/standard-library/math/max) pointed the other way, and everything
+about how the arguments are read is the same:
+[how the arguments are compared](/docs/standard-library/math/max#how-the-arguments-are-compared)
+covers the argument count, the comparison itself, what happens to the winner's subtype and
+what happens on a tie. Only the direction differs: the smallest argument comes back instead
+of the largest.
+
+What this function has that its counterpart does not is the capping half of a clamp — the
+idiom either of them is most often part of.
+
+## Clamping a value to a range
+
+Pinning a number inside a range is the two functions nested: this one caps it from above, and
+[`math.max()`](/docs/standard-library/math/max) lifts it from below.
+
+```lua
+math.max(lowest_allowed, math.min(highest_allowed, value))
+```
+
+Read from the inside out, the inner call says "no higher than this" and the outer says "no
+lower than that". Writing the pair the other way round — `math.min` outside `math.max` — gives
+the same answer for every sensible range, so the choice between them is a matter of habit
+rather than of correctness.
+
+It stops being a matter of habit when the bounds cross. If the lower bound is above the upper
+one there is no range left to be inside, and the nesting decides which bound wins: the outer
+call is applied last, so its bound is the one that survives. Nothing raises and nothing warns.
+The place to catch that is where the bounds are set, not here.
+
+The idiom has one more thing worth noticing. When a clamp bites it returns the bound *itself*,
+so the answer's subtype is the bound's — clamping a float between two integer bounds gives an
+integer whenever the clamp does anything at all.
+
+## Examples
+
+### Holding a value inside a range
+
+<RunnableExample code={`local requested_volume = 143\nlocal safe_volume = math.max(0, math.min(100, requested_volume))\nprint(safe_volume)\n-- Expected output: 100`} />
+
+One line, no branches, and no way for a value to escape the range. The same two calls cover
+the too-low case without any extra code.
+
+### Bounds the wrong way round pick a winner rather than complaining
+
+<RunnableExample code={`local lower_bound = 80\nlocal upper_bound = 20\nprint(math.max(lower_bound, math.min(upper_bound, 50)))\nprint(math.min(upper_bound, math.max(lower_bound, 50)))\n-- Expected output:\n-- 80\n-- 20`} />
+
+The same impossible range, the same input, two different answers — and neither call raises.
+Both results violate one of the two bounds, and which one they violate is decided by nesting
+order alone. Validate the range before using it.
+
+### Reducing a list to its smallest value
+
+<RunnableExample code={`local overnight_lows = { 3.5, -1.2, 0.8, -4.6, 2.1 }\nlocal coldest_night = overnight_lows[1]\nfor index = 2, #overnight_lows do\n  coldest_night = math.min(coldest_night, overnight_lows[index])\nend\nprint(coldest_night)\n-- Expected output: -4.6`} />
+
+The running value is seeded from the first element, not from a large constant. Seeding from a
+constant is a habit that works until the data climbs past whichever constant was chosen, and
+then fails by returning the constant — a wrong answer rather than an error.
+[`table.unpack()`](/docs/standard-library/table/unpack) can spread a short list into the call
+instead, with the limits noted on
+[`math.max()`](/docs/standard-library/math/max).
+
+## Gotchas
+
+<Gotcha title="A missing value is an error, not a value to skip">
+`nil` has no place in an ordering, so a value that is missing rather than small is not skipped
+over — the comparison fails as soon as it reaches one. That is easy to run into when the values
+are gathered from a table by key, where a key that was never set produces a `nil` and not an
+absence. Filter the values before comparing them.
+</Gotcha>
+
+<Gotcha title="It takes values, not a list of them">
+`math.min(readings)` does not read the table. Passing it is at best an error, and at worst no
+error at all — the table becomes the only thing there is to compare and comes straight back
+out, to fail much further down where something tries to do arithmetic on it. Spread the list
+with [`table.unpack()`](/docs/standard-library/table/unpack), or loop.
+</Gotcha>
+
+## See also
+
+- [`math.max()`](/docs/standard-library/math/max) — the same comparison in the other direction, and where the comparison rules are written up
+- [`table.unpack()`](/docs/standard-library/table/unpack) — turning a list into the arguments this function needs
+- [`table.sort()`](/docs/standard-library/table/sort) — when the whole ordering is wanted rather than one end of it
+- [Relational operators](/docs/language/expressions/relational-operators) — `<`, the comparison this function performs
+- [`math.huge`](/docs/standard-library/math/huge) — the value every finite number is below

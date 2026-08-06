@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Converts by multiplying by the number of degrees in one radian, where earlier versions divide by the number of radians in one degree; the two answers differ by at most one unit in the last place, which is enough to move a result compared with `==` from one side of a whole number to the other."
+  }
+}

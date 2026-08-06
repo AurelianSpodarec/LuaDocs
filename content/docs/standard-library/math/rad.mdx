@@ -1,8 +1,101 @@
 ---
 title: math.rad()
-description: ""
+description: Convert an angle from degrees to radians.
+lua-compat: math.rad
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.rad
 ---
 
-{/* Not yet written. */}
+Converts an angle measured in degrees into the same angle measured in radians — the unit the
+rest of this library works in. The answer is always a float.
+
+<RunnableExample code={`local roof_pitch_degrees = 30\nprint(math.rad(roof_pitch_degrees))\n-- Expected output: 0.5235987755983`} />
+
+## Syntax
+
+```lua
+math.rad(x)
+```
+
+<Parameters>
+  <Param name="x">The angle to convert, in degrees.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The same angle expressed in radians. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+This is the conversion that belongs at the point where a degree measure enters a
+calculation. [`math.sin()`](/docs/standard-library/math/sin),
+[`math.cos()`](/docs/standard-library/math/cos) and
+[`math.tan()`](/docs/standard-library/math/tan) all read radians and none of them can tell
+that a degree measure was meant, so wrapping the number here is the difference between a
+correct answer and a plausible wrong one. A full turn is `2 * math.pi` radians rather than
+`360`, which is the whole of why the two units cannot be used interchangeably.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+it: a whole number of degrees converts to a float, not to an integer.
+
+Nothing is wrapped or reduced along the way. Seven hundred and twenty degrees converts to
+two full turns' worth of radians rather than to zero, and a negative measure stays negative.
+
+Going the other way is [`math.deg()`](/docs/standard-library/math/deg), and the two do not
+always cancel each other exactly —
+[what a round trip costs](/docs/standard-library/math/deg#round-tripping-between-the-two-units)
+is written up there.
+
+## Examples
+
+### Converting at the point of use
+
+<RunnableExample code={`local ramp_length = 4.8\nlocal incline_degrees = 12\nlocal height_gained = ramp_length * math.sin(math.rad(incline_degrees))\nprint(string.format("%.3f", height_gained))\n-- Expected output: 0.998`} />
+
+The conversion sits inside the call that needs it rather than in a variable further up. That
+keeps the degree measure available under its own name and leaves no radian value lying
+around for a later line to mistake for degrees.
+
+### A full turn, and a half of one
+
+<RunnableExample code={`print(math.rad(360) == 2 * math.pi)\nprint(math.rad(180) == math.pi)\n-- Expected output:\n-- true\n-- true`} />
+
+Both comparisons hold, and neither says the conversion is exact. `math.pi` is the nearest
+float to pi rather than pi itself, so what these two lines show is that converting a half or
+a whole turn lands on the same float the constant already holds — a fact about how these
+particular numbers round, not a promise that carries over to other angles.
+
+## Gotchas
+
+<Gotcha title="Converting twice is silent and wrong">
+`math.rad(math.rad(90))` is not a redundant call, it is a different angle: the second
+conversion treats the radian measure from the first as though it were a number of degrees.
+Nothing raises and the result is a small, plausible angle. It happens most often when a
+helper already converts and a caller converts again on the way in, so convert in exactly one
+place and name the variable for the unit it holds — `incline_degrees`, not `incline`.
+</Gotcha>
+
+<Gotcha title="A degree measure is accepted everywhere a radian one is">
+Passing degrees straight to [`math.sin()`](/docs/standard-library/math/sin) or
+[`math.cos()`](/docs/standard-library/math/cos) is not an error and produces no warning; it
+produces the sine of a much larger angle. The mistake survives review because both the code
+and the result look ordinary, and it usually surfaces as something drawn or aimed in the
+wrong place rather than as a failure. This function is the fix, applied where the number
+crosses into the library.
+</Gotcha>
+
+## See also
+
+- [`math.deg()`](/docs/standard-library/math/deg) — the conversion in the other direction
+- [`math.pi`](/docs/standard-library/math/pi) — the constant a turn is measured against
+- [`math.sin()`](/docs/standard-library/math/sin) — one of the functions this conversion feeds
+- [`math.atan()`](/docs/standard-library/math/atan) — recovering an angle, which arrives in radians already
+- [Numbers](/docs/language/values-and-types/number) — the float model both conversions work in

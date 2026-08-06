@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Takes an optional second argument naming the base to use; earlier versions take one argument, always answer with the natural logarithm, and silently ignore anything passed after it."
+  }
+}

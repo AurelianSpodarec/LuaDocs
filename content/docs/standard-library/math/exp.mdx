@@ -1,8 +1,129 @@
 ---
 title: math.exp()
-description: ""
+description: Raise e, the base of natural logarithms, to a power.
+lua-compat: math.exp
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.exp
 ---
 
-{/* Not yet written. */}
+Raises *e* — the base of natural logarithms, a little over `2.718` — to the power given.
+This is the function behind continuous growth and decay, and the one
+[`math.log()`](/docs/standard-library/math/log) undoes. The answer is always a float.
+
+<RunnableExample code={`local decay_rate = 0.11\nlocal elapsed_hours = 6\nlocal fraction_remaining = math.exp(-decay_rate * elapsed_hours)\nprint(string.format("%.4f", fraction_remaining))\n-- Expected output: 0.5169`} />
+
+## Syntax
+
+```lua
+math.exp(x)
+```
+
+<Parameters>
+  <Param name="x">The power to raise *e* to.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">*e* raised to the power `x`. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+A positive argument grows the answer and a negative one shrinks it, and the sign of the
+answer never changes: in the mathematics the curve approaches zero without ever arriving,
+and stays above it for every argument. An argument of zero gives one. That shape is why the
+function turns up wherever a quantity changes by a proportion of itself over time — compound
+interest, radioactive decay, a cooling body, a queue draining — and why the exponent in those
+formulas is a *rate* multiplied by a *duration* rather than a count of anything. A float has
+limits the mathematics does not, and both ends of the curve run into them; the section below
+covers where.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+it: `math.exp(0)` is a float that happens to have no fraction on it, not an integer.
+
+The library has no constant for *e*. `math.exp(1)` is how the number itself is obtained, and
+it is worth reaching for the function rather than that value in the general case:
+`math.exp(x)` is computed directly, while `math.exp(1) ^ x` rounds *e* to a float first and
+then raises the rounded number, so the two can disagree in the last digits.
+
+## Where the result stops being finite
+
+There is a ceiling, and it is reached quietly. Somewhere a little past an argument of `709`
+the answer grows beyond the largest float there is and becomes an infinity. Nothing raises,
+nothing returns `nil`, and the infinity behaves like any other number until it reaches
+something that cannot cope with it — an infinity multiplied by zero is a not-a-number value,
+and from there it spreads through a calculation without a trace of where it began.
+
+The floor is quieter still. A sufficiently negative argument gives an answer too small for a
+float to represent as anything but zero, so a decay curve that should be shrinking towards
+zero *arrives* there instead. That matters when the result is then divided by, or fed to
+[`math.log()`](/docs/standard-library/math/log), which answers a zero argument with a
+negative infinity of its own.
+
+Neither edge is an error and neither is worth guarding against most of the time. It is worth
+knowing where they are, because the symptom is always somewhere else.
+
+## Examples
+
+### Continuous compounding
+
+<RunnableExample code={`local principal = 1000\nlocal annual_rate = 0.05\nlocal years = 3\nprint(string.format("%.2f", principal * math.exp(annual_rate * years)))\n-- Expected output: 1161.83`} />
+
+The rate and the duration multiply to make the exponent, so the same call covers any
+combination of the two. This is the continuous form; interest compounded a fixed number of
+times a year is `principal * (1 + annual_rate / times) ^ (times * years)` instead, and comes
+out slightly lower.
+
+### The number *e* itself
+
+<RunnableExample code={`print(math.exp(1))\n-- Expected output: 2.718281828459`} />
+
+There is no `math.e`, and this is the call that stands in for one.
+
+### Squaring *e* is not the same as raising it
+
+<RunnableExample code={`print(string.format("%.6f", math.exp(2)))\nprint(string.format("%.6f", math.exp(1) ^ 2))\nprint(math.exp(2) == math.exp(1) ^ 2)\n-- Expected output:\n-- 7.389056\n-- 7.389056\n-- false`} />
+
+The two agree to every digit shown and are not the same float. The second route rounds *e*
+before using it; the first does not. Prefer the call whenever the exponent is a variable.
+
+### Finding the ceiling
+
+<RunnableExample code={`print(math.exp(709) < math.huge)\nprint(math.exp(710) == math.huge)\n-- Expected output:\n-- true\n-- true`} />
+
+One step apart, and the second one is over the edge. Neither call raises, which is the part
+worth remembering: an exponent that can grow without bound produces an infinity rather than
+an error, and the infinity is what the rest of the calculation has to deal with.
+
+## Gotchas
+
+<Gotcha title="A large argument answers with an infinity instead of failing">
+The overflow is silent: no error, no `nil`, just a value that is larger than every finite
+number and stays that way through every arithmetic operation it touches. Code that assumes
+the answer is finite — dividing by it, summing it, comparing it against a threshold —
+carries the infinity onward and reports the problem somewhere unrelated. Compare against
+[`math.huge`](/docs/standard-library/math/huge) at the point the result is produced if the
+exponent can grow without bound.
+</Gotcha>
+
+<Gotcha title="Raising a stored copy of e is not the same call">
+`math.exp(1) ^ exponent` looks like a reasonable substitute and is a slightly worse one: it
+rounds *e* to the nearest float and then compounds that rounding through the power. The
+difference is small, and it is the kind that grows where these calls usually sit — inside a
+loop, one step feeding the next. There is no reason to keep *e* in a variable at all.
+</Gotcha>
+
+## See also
+
+- [`math.log()`](/docs/standard-library/math/log) — the inverse, and the way back from a ratio to an exponent
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity a large enough argument reaches
+- [`math.sqrt()`](/docs/standard-library/math/sqrt) — the other function here that always answers with a float
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, which raises any base rather than this one
+- [Numbers](/docs/language/values-and-types/number) — the float range these results live in

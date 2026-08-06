@@ -1,8 +1,120 @@
 ---
 title: math.max()
-description: ""
+description: Return the largest of the values passed to it.
+lua-compat: math.max
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.max
 ---
 
-{/* Not yet written. */}
+Hands back the largest of the values it was given. Every value is passed as a separate
+argument — this function compares its arguments, and never looks inside a table.
+
+<RunnableExample code={`local highest_reading = math.max(12, 47, 3, 28)\nprint(highest_reading)\n-- Expected output: 47`} />
+
+## Syntax
+
+```lua
+math.max(x, ···)
+```
+
+<Parameters>
+  <Param name="x">The first value. At least this one is required.</Param>
+  <Param name="···">Any number of further values to compare against it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or float">Whichever argument compared largest, handed back exactly as it was passed.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no arguments at all.
+- Raises when two arguments cannot be ordered against one another — a number against `nil`, a boolean, or a table with no ordering of its own.
+- <Since v="5.3" /> Raises when a number and a string are given together: arguments are compared as they arrive rather than converted to numbers first, so a string that reads as a number is not a number here.
+
+</Errors>
+
+## Description
+
+The call takes one argument or many, and one is genuinely the minimum: there is no
+zero-argument form and no identity value to start a fold from, which is the first thing to
+plan around when the values come from a list that might be empty.
+
+Everything else about this function follows from what it does *not* do. It does not add,
+round or convert anything. It looks at the arguments, decides which is largest, and returns
+that one — the same value, not a copy of its numeric worth.
+
+## How the arguments are compared
+
+Comparison is the language's own less-than test, the one `<` performs, applied left to right
+across the arguments. Three consequences are worth having explicitly.
+
+*The winner comes back as it was passed.* Its subtype is whatever it already had, so
+`math.max(2, 3.5)` gives a float because the float won, and `math.max(2.5, 3)` gives an
+integer because the integer won. This is not the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) at work: that rule
+describes functions that compute a number, and this one computes nothing. It picks.
+
+*A tie goes to the earliest argument.* When two arguments compare equal, no later one
+displaces the one already held, so `math.max(2, 2.0)` gives the integer and `math.max(2.0, 2)`
+gives the float. The values are equal and the results are not interchangeable — one of them
+prints with a fractional part and one does not, so anything that formats, concatenates or
+writes out the answer shows the difference.
+
+*Comparing across kinds is where it stops.* Numbers order against each other. A number and a
+string do not, and neither does anything involving `nil`, a boolean, or a table with no
+ordering of its own. What comes back from those pairings is an error, not a decision.
+
+[`math.min()`](/docs/standard-library/math/min) applies all three in the other direction, and
+links back here rather than repeating them.
+
+## Examples
+
+### Reducing a list to its largest value
+
+<RunnableExample code={`local daily_rainfall = { 4.5, 0, 12.2, 7.1, 3.8 }\nlocal wettest_day = daily_rainfall[1]\nfor index = 2, #daily_rainfall do\n  wettest_day = math.max(wettest_day, daily_rainfall[index])\nend\nprint(wettest_day)\n-- Expected output: 12.2`} />
+
+Seeding the running value from the first element rather than from a constant is the
+version of this loop that keeps working when every reading is negative. A seed of `0` would
+quietly answer `0` for a list of temperatures below freezing.
+
+### Spreading a list into the call
+
+<RunnableExample code={`local daily_rainfall = { 4.5, 0, 12.2, 7.1, 3.8 }\nprint(math.max(table.unpack(daily_rainfall)))\n-- Expected output: 12.2`} />
+
+[`table.unpack()`](/docs/standard-library/table/unpack) turns the list into the separate
+arguments this function needs. It is the shorter answer and not the general one: a very long
+list can exceed what a single call can carry, and a list with a `nil` hole in it has no
+dependable length to unpack in the first place. The loop above has neither limit.
+
+### The winner keeps its own subtype
+
+<RunnableExample code={`local gauge_reading = 2\nlocal radar_estimate = 3.5\nprint(math.max(gauge_reading, radar_estimate))\nlocal morning_total = 2.5\nlocal afternoon_total = 3\nprint(math.max(morning_total, afternoon_total))\n-- Expected output:\n-- 3.5\n-- 3`} />
+
+The first call answers with a float and the second with an integer, and the difference is
+decided entirely by which argument won. Nothing is converted to match the other.
+
+## Gotchas
+
+<Gotcha title="It takes values, not a list of them">
+`math.max(readings)` is not a smaller way of writing the same thing. Passing the table itself
+is at best an error, and at worst no error at all — the table becomes the only thing there is
+to compare, and comes straight back out as its own maximum, to fail much further down where
+something tries to do arithmetic on it. Spread the list with
+[`table.unpack()`](/docs/standard-library/table/unpack), or loop.
+</Gotcha>
+
+<Gotcha title="There is no maximum of nothing">
+Calling this with no arguments raises rather than answering with a floor value, so a fold over
+a list that might be empty has to handle the empty case itself. That is a feature more than a
+nuisance: the alternatives — a negative infinity, or a zero — are both values that would flow
+onward silently and be mistaken for a real measurement.
+</Gotcha>
+
+## See also
+
+- [`math.min()`](/docs/standard-library/math/min) — the same comparison in the other direction, and where the clamping idiom is written up
+- [`table.unpack()`](/docs/standard-library/table/unpack) — turning a list into the arguments this function needs
+- [`table.sort()`](/docs/standard-library/table/sort) — when the whole ordering is wanted rather than one end of it
+- [Relational operators](/docs/language/expressions/relational-operators) — `<`, the comparison this function performs
+- [`math.huge`](/docs/standard-library/math/huge) — the value nothing finite exceeds
