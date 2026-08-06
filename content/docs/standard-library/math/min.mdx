@@ -39,9 +39,10 @@ math.min(x, ···)
 This is [`math.max()`](/docs/standard-library/math/max) pointed the other way, and everything
 about how the arguments are read is the same:
 [how the arguments are compared](/docs/standard-library/math/max#how-the-arguments-are-compared)
-covers the argument count, the comparison itself, what happens to the winner's subtype and
-what happens on a tie. Only the direction differs: the smallest argument comes back instead
-of the largest.
+covers the comparison itself, what happens to the winner's subtype and what happens on a tie.
+Like its counterpart it takes one argument or many, and there is no zero-argument form to fold
+an empty list into. Only the direction differs: the smallest argument comes back instead of
+the largest.
 
 What this function has that its counterpart does not is the capping half of a clamp — the
 idiom either of them is most often part of.
@@ -75,8 +76,9 @@ integer whenever the clamp does anything at all.
 
 <RunnableExample code={`local requested_volume = 143\nlocal safe_volume = math.max(0, math.min(100, requested_volume))\nprint(safe_volume)\n-- Expected output: 100`} />
 
-One line, no branches, and no way for a value to escape the range. The same two calls cover
-the too-low case without any extra code.
+One line, no branches, and nothing can come out below `0` or above `100`. The same two calls
+cover the too-low case without any extra code — provided the two bounds are the right way
+round, which the next example is about.
 
 ### Bounds the wrong way round pick a winner rather than complaining
 

@@ -30,7 +30,7 @@ math.log(x [, base])
 <Errors>
 
 - Raises when `x` is neither a number nor a string that reads as one.
-- <Since v="5.2" /> Raises when `base` is given and is neither a number nor a string that reads as one.
+- <Since v="5.2" /> Raises when `base` is something other than a number or a string that reads as one. Leaving it out and passing `nil` both mean the default base, and neither is an error.
 
 </Errors>
 
@@ -74,9 +74,11 @@ whole where the division comes back a hair off it. The example below shows the p
 disagreeing. Neither answer is wrong — the division is simply doing more rounding — but only
 one of them survives a comparison against a whole number.
 
-Away from that case, inexactness is the rule rather than the exception. A logarithm that
-lands on a whole number in the mathematics usually lands beside one in a float, so treat a
-whole-looking result as a number to round rather than as a number to compare.
+Wherever a base *is* reached by dividing one logarithm by another, inexactness is the rule
+rather than the exception: a logarithm that lands on a whole number in the mathematics lands
+beside one in a float. Which bases take that route is a property of the build rather than
+something to rely on, so treat a whole-looking result as a number to round rather than as a
+number to compare, unless you have checked the case in front of you.
 
 [`math.log10()`](/docs/standard-library/math/log10) is an older spelling of the base-ten
 call.
@@ -118,10 +120,12 @@ against `x` involves no logarithm at all.
 
 <Gotcha title="Zero and negative arguments answer rather than fail">
 There is no error here to catch. A zero gives a negative infinity and a negative number gives
-a not-a-number value, and both flow onward looking like results. A not-a-number value is
-especially quiet, because every comparison against it is false — including `==` against
-itself — so a guard written as "if the answer is bad" tends not to fire. Check the argument
-before the call, not the result after it.
+a not-a-number value, and both flow onward looking like results. A not-a-number value is quiet
+in a particular way: `==`, `<`, `>`, `<=` and `>=` are all *false* against it, so a guard
+written as "is the answer inside sensible limits" never fires. The one operator that does fire
+is `~=`, and it fires even against itself — `answer ~= answer` is true for a not-a-number value
+and false for everything else, which makes it the way to test for one. Checking the argument
+before the call is still the simpler guard, because it catches the negative infinity too.
 </Gotcha>
 
 ## See also

@@ -56,7 +56,7 @@ On paper this function and [`math.rad()`](/docs/standard-library/math/rad) undo 
 exactly. In floating point they very nearly do, and the gap is worth knowing about before a
 comparison discovers it.
 
-Each direction multiplies by a constant built from pi, and pi is not a number a float can
+Each direction scales by a constant built from pi, and pi is not a number a float can
 hold. So each conversion can land a fraction away from the exact answer, and the second has
 no way to undo a rounding the first already made. Some angles come back unchanged and some
 come back a hair off: thirty degrees converted to radians and back is not equal to `30`,
@@ -89,11 +89,12 @@ nothing about the number as it is normally displayed reveals that `==` will refu
 ## Gotchas
 
 <Gotcha title="A converted angle is not something to feed back into the library">
-The result of this function is in degrees, and every angle-reading function in this library
-expects radians. `math.sin(math.deg(x))` is not a mistake Lua can catch: it is the sine of
-an angle some fifty-seven times larger than the one intended, and it answers with a
-perfectly ordinary number. Convert on the way *out* of a calculation, and use
-[`math.rad()`](/docs/standard-library/math/rad) on the way in.
+The result of this function is in degrees, and the library's angle-reading functions read
+radians. `math.sin(math.deg(x))` is not a mistake Lua can catch: it is the sine of an angle
+some fifty-seven times larger than the one intended, and it answers with a perfectly ordinary
+number. Convert on the way *out* of a calculation, and use
+[`math.rad()`](/docs/standard-library/math/rad) — the one function here that does want
+degrees — on the way in.
 </Gotcha>
 
 <Gotcha title="An angle that prints as a whole number need not be one">

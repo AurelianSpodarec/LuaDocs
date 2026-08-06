@@ -68,7 +68,7 @@ zero *arrives* there instead. That matters when the result is then divided by, o
 negative infinity of its own.
 
 Neither edge is an error and neither is worth guarding against most of the time. It is worth
-knowing where they are, because the symptom is always somewhere else.
+knowing where they are, because the symptom usually turns up somewhere else.
 
 ## Examples
 
@@ -105,12 +105,15 @@ an error, and the infinity is what the rest of the calculation has to deal with.
 ## Gotchas
 
 <Gotcha title="A large argument answers with an infinity instead of failing">
-The overflow is silent: no error, no `nil`, just a value that is larger than every finite
-number and stays that way through every arithmetic operation it touches. Code that assumes
-the answer is finite — dividing by it, summing it, comparing it against a threshold —
-carries the infinity onward and reports the problem somewhere unrelated. Compare against
-[`math.huge`](/docs/standard-library/math/huge) at the point the result is produced if the
-exponent can grow without bound.
+The overflow is silent: no error, no `nil`, just a value larger than every finite number. What
+happens next depends on what touches it, and the three outcomes are easy to run together.
+Adding to it or scaling it up keeps the infinity. Multiplying it by zero, subtracting it from
+itself or dividing it by itself gives a not-a-number value, which then spreads through the
+calculation with no trace of where it began. And dividing *by* it gives zero — an ordinary,
+plausible, finite number carrying no sign at all that an overflow ever happened, which is the
+hardest of the three to notice. Comparing against
+[`math.huge`](/docs/standard-library/math/huge) at the point the result is produced is the
+guard that works: a comparison is the one thing here that behaves exactly as it reads.
 </Gotcha>
 
 <Gotcha title="Raising a stored copy of e is not the same call">
@@ -124,6 +127,6 @@ loop, one step feeding the next. There is no reason to keep *e* in a variable at
 
 - [`math.log()`](/docs/standard-library/math/log) — the inverse, and the way back from a ratio to an exponent
 - [`math.huge`](/docs/standard-library/math/huge) — the infinity a large enough argument reaches
-- [`math.sqrt()`](/docs/standard-library/math/sqrt) — the other function here that always answers with a float
+- [`math.sqrt()`](/docs/standard-library/math/sqrt) — another function that answers with a float whatever it is given
 - [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — `^`, which raises any base rather than this one
 - [Numbers](/docs/language/values-and-types/number) — the float range these results live in
