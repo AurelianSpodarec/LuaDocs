@@ -31,7 +31,7 @@ math.tanh (x)
 </Parameters>
 
 <Returns>
-  <Return type="float">The hyperbolic tangent of `x`. A float whatever `x` was, lying between `-1` and `1`, and settling on one of those two values once the argument is far enough from zero that the remaining gap stops being representable.</Return>
+  <Return type="float">The hyperbolic tangent of `x`. A float whatever `x` was, lying at or between `-1` and `1`, and settling on one of those two values once the argument is far enough from zero that the remaining gap stops being representable.</Return>
 </Returns>
 
 <Errors>
@@ -42,16 +42,16 @@ math.tanh (x)
 
 ## Description
 
-This is the *squashing* function: it takes a number of any size and returns one between `-1`
-and `1`, steeply near zero and ever more gently further out. That shape is what makes it a
-standard activation in a neural network, a soft clipper in audio, and the usual way to turn an
-unbounded score into a bounded one without a hard cut-off at the ends.
+This is the *squashing* function: it takes a number of any size and returns one at or
+between `-1` and `1`, steeply near zero and ever more gently further out. That shape is what
+makes it a standard activation in a neural network, a soft clipper in audio, and the usual
+way to turn an unbounded score into a bounded one without a hard cut-off at the ends.
 
 It is *odd* — negating the argument negates the answer — and it passes through zero at zero
 with a slope of one, which is why it looks like the identity function for small arguments and
 diverges from it as the argument grows. It approaches its two limits without reaching them in
 the mathematics; in floating point it arrives, because the difference stops being
-representable somewhere past an argument of about `20`.
+representable once the argument is somewhere around `19`.
 
 The answer is a float, and stays one at an argument of zero where it lands exactly on `0`.
 Nothing here rounds or mirrors its argument, so the library's
@@ -133,10 +133,10 @@ has no such argument.
 
 <Gotcha title="The curve reaches its limits in floating point">
 In the mathematics the answer approaches `1` without arriving. In a float it arrives, because
-past an argument somewhere around `20` the gap between the true answer and `1` is too small to
-represent. Code that expects a value strictly inside the limits — dividing by `1 - answer`,
-say, or taking the inverse function — meets a zero or an infinity rather than a large finite
-number. That is a property of the function itself rather than of any way of writing it.
+once the argument reaches somewhere around `19` the gap between the true answer and `1` is
+too small to represent. Code that expects a value strictly inside the limits — dividing by
+`1 - answer`, say, or taking the inverse function — meets a zero or an infinity rather than a
+large finite number. That is a property of the function itself rather than of any way of writing it.
 </Gotcha>
 
 ## See also

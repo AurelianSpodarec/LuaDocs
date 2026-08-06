@@ -77,12 +77,12 @@ operations in practice, and the two are not the same thing. A hand-built version
 limits of [`math.exp()`](/docs/standard-library/math/exp) and adds arithmetic of its own, so
 it can go wrong in two ways that a single library call does not:
 
-- **It can overflow earlier than the function it replaces.** `math.exp` runs out of float
+- *It can overflow earlier than the function it replaces.* `math.exp` runs out of float
   somewhere past an argument of `709`, and the hyperbolic cosine and sine are about *half*
   the exponential — so their own answers are still comfortably inside the float range at
   arguments where the intermediate `math.exp(x)` has already become an infinity. The division
   by two comes after the overflow, and there is nothing left to divide.
-- **It can lose precision where the two terms nearly cancel.** Each exponential is rounded to
+- *It can lose precision where the two terms nearly cancel.* Each exponential is rounded to
   a float before anything is done with it, and that rounding is negligible beside the value it
   sits in. Subtract two such values that nearly agree and the digits they share disappear,
   leaving an answer made largely of the rounding that was already there — a small absolute

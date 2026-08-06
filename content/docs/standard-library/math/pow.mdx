@@ -7,11 +7,12 @@ source: https://www.lua.org/manual/5.1/manual.html#pdf-math.pow
 ---
 
 Raises a base to an exponent and hands the answer back as a float. The exponentiation
-operator computes the same value from the same two numbers, so `base ^ exponent` is what to
+operator computes the same power from the same two numbers, so `base ^ exponent` is what to
 write in its place — the manual's own description of this call points at the operator
-sitting beside it. The value is the same. What the operator adds is a precedence, a grouping
-rule and a route through a metatable, and those are the parts of the swap worth reading
-before making it.
+sitting beside it. Both routes reach the same underlying exponentiation, and where a build
+squares by multiplying rather than by raising, the two still agree on any sensible
+floating-point library. What the operator adds is a precedence, a grouping rule and a route
+through a metatable, and those are the parts of the swap worth reading before making it.
 
 <RunnableExample usesEntry={false} code={`local principal = 1200\nlocal growth_factor = 1.045\nlocal years = 5\n-- math.pow(growth_factor, years) computed exactly this power\nprint(string.format("%.2f", principal * growth_factor ^ years))\n-- Expected output: 1495.42`} />
 
@@ -64,7 +65,7 @@ by itself rather than call the power function at all — the faster of the two, 
 answer on any sensible floating-point library. What changes is everything else around the
 value.
 
-**The operator has a precedence; the call had none.** Inside a call the arguments are fenced
+*The operator has a precedence; the call had none.* Inside a call the arguments are fenced
 off by the brackets and the comma, so nothing outside can bind to them. Written as an
 operator, `^` binds more tightly than a leading minus sign and groups from the right when
 several are chained, so `-base ^ 2` is the negation of a square rather than the square of a
@@ -72,7 +73,7 @@ negation, and `2 ^ 3 ^ 2` is two raised to the ninth rather than eight squared. 
 the examples below, and both are places where unwrapping a call into an operator changes the
 answer without changing anything visible.
 
-**The operator can be answered by a metatable.** This call reads two numbers and turns down
+*The operator can be answered by a metatable.* This call reads two numbers and turns down
 anything that is not one. The operator consults a value's
 [`__pow` metamethod](/docs/language/metatables/arithmetic-metamethods) when the value is not
 a number, so an object standing in for a quantity — a vector, a decimal, a measurement

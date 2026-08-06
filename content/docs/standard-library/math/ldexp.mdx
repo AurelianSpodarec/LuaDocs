@@ -53,9 +53,10 @@ the range where a float holds its full precision. That is what separates this fr
 multiplying by `10`, or by `1.5`: those introduce a rounding step, and this does not.
 
 Two consequences follow, and they are the reason the operation is worth a name. Scaling up and
-back down again returns the original number bit for bit, so a value can be moved into a
-convenient range for a calculation and moved back afterwards with nothing lost. And the
-operation is cheap in a way a general power is not, because there is no power to compute.
+back down again returns the original number bit for bit, so long as neither step leaves the
+range where a float holds its full precision — so a value can be moved into a convenient
+range for a calculation and moved back afterwards with nothing lost. And the operation is
+cheap in a way a general power is not, because there is no power to compute.
 
 The answer is a float, and stays one where both arguments were whole numbers and the answer
 has no fraction on it. Nothing here rounds or mirrors its arguments, so the library's

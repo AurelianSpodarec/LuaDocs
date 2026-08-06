@@ -40,7 +40,8 @@ math.atan2 (y, x)
 <Errors>
 
 - Raises when `y` is neither a number nor a string that reads as one, including when it is left out.
-- Raises when `x` is neither a number nor a string that reads as one, including when it is left out. Both arguments are required here.
+- Raises when `x` is given and is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Leaving `x` out does not raise. The run is read as `1`, so what comes back is the arc tangent of `y` on its own — a plausible angle rather than a complaint. An explicit `nil` counts as leaving the argument out rather than as a bad one.
 
 </Errors>
 
@@ -72,6 +73,12 @@ call carried into that setting produces an angle rather than an error: the arc t
 rise on its own, which is a perfectly plausible number and the answer to a question nobody
 asked. Nothing at the call site distinguishes the two, and the failure shows up as a heading
 wrong by a quadrant rather than as anything that looks like a bug.
+
+The run is also not everywhere a required argument of *this* call. Where it may be left out,
+leaving it out is answered rather than reported: the run is read as `1`, and back comes the arc
+tangent of the rise on its own. So an edit that drops the second argument is not certain to be
+caught here any more than it is on the replacement, which makes it worth checking alongside the
+rename rather than after it.
 
 That asymmetry is the reason this entry stays useful after the call itself is gone. Code that
 reads `math.atan(rise, run)` needs a Lua whose `math.atan` reads both arguments; code that
