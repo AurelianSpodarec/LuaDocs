@@ -14,18 +14,40 @@ one that comes out the same every time.
 
 ## Syntax
 
+<Only before="5.4">
+
+```lua
+math.randomseed(x)
+```
+
+</Only>
+
+<Only since="5.4">
+
 ```lua
 math.randomseed([x [, y]])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="x">The seed's first component — on its own, the whole seed.</Param>
-  <Param name="y">A second component, folded in with the first. Left out, it counts as zero.</Param>
+  <Only before="5.4">
+    <Param name="x">The seed. It has to be given — there is no call without one.</Param>
+  </Only>
+  <Only since="5.4">
+    <Param name="x">The seed's first component — on its own, the whole seed.</Param>
+    <Param name="y">A second component, folded in with the first. Left out, it counts as zero.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="integer">The first component of the seed that was actually used.</Return>
-  <Return type="integer">The second component. Passing this pair back sets the same state again.</Return>
+  <Only before="5.4">
+    <Return type="none">Nothing comes back. The state is set, and reading it again is not offered.</Return>
+  </Only>
+  <Only since="5.4">
+    <Return type="integer">The first component of the seed that was actually used.</Return>
+    <Return type="integer">The second component. Passing this pair back sets the same state again.</Return>
+  </Only>
 </Returns>
 
 <Errors>

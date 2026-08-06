@@ -4,6 +4,7 @@ import { RunnableExample } from '@/runner/RunnableExample';
 import { Param, Parameters } from '@/entry/Parameters';
 import { Return, Returns } from '@/entry/Returns';
 import { Errors, Since } from '@/entry/Errors';
+import { Only } from '@/entry/Only';
 import { Gotcha, Note, Warning } from '@/entry/Callout';
 
 export function getMDXComponents(components?: MDXComponents) {
@@ -16,6 +17,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Return,
     Errors,
     Since,
+    Only,
     Note,
     Warning,
     Gotcha,
