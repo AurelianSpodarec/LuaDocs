@@ -1,6 +1,6 @@
 ---
 title: require()
-description: Find a module by name, load it, and record what it produced so later calls need not load it again.
+description: Find a module by name, load it, and record what it produced for the calls that come after.
 lua-compat: globals.require
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-require
@@ -8,7 +8,8 @@ source: https://www.lua.org/manual/5.5/manual.html#pdf-require
 
 Turns a module's *name* into the value that module produces. The first call to name a module
 finds it, runs it and records the result; later calls read that record rather than loading the
-module again, so the work of setting a module up is not repeated for each caller that wants it.
+module again, so the work of setting a module up is not repeated for each caller that wants it —
+unless what the module handed back was `false`, which the record does not count as loaded.
 
 <RunnableExample code={`local rates_path = "require_example_postage.lua"\nlocal module_file = assert(io.open(rates_path, "w"))\nmodule_file:write("return { overnight = 12, standard = 4 }")\nmodule_file:close()\n\nlocal postage = require("require_example_postage")\nprint(postage.overnight)\nprint(require("require_example_postage") == postage)\n\npackage.loaded["require_example_postage"] = nil\nos.remove(rates_path)\n-- Expected output:\n-- 12\n-- true`} />
 
@@ -56,9 +57,8 @@ The remembering is what everything after the first call is about. `require("parc
 written in ten files runs `parcel_rates` once; the other nine calls read the record and hand
 back the value the first call produced. That is what makes a module the sensible place for work
 that must not happen twice — opening a connection, reading a configuration file, building a
-lookup table. One kind of value does not settle the question that way, and
-[What gets remembered](/docs/standard-library/globals/require#what-gets-remembered) is where it
-is set out.
+lookup table. The `false` exception is set out in
+[What gets remembered](/docs/standard-library/globals/require#what-gets-remembered).
 
 The name being a name rather than a path is the other half of the bargain. Where a module lives
 is settled by the search paths described below, in one place, rather than by each call that
@@ -91,7 +91,8 @@ What the loader hands back is the module. Lua fills that list with four searcher
   function's name is `luaopen_` followed by the module name with each dot turned into an
   underscore. Where the name carries a version after a hyphen, the hyphen and what follows it
   are dropped before the function name is built, so `parcels.rates-v2` looks for
-  `luaopen_parcels_rates`.
+  `luaopen_parcels_rates` — and where the library holds no function under that name, the older
+  form built from the part *after* the hyphen, `luaopen_v2`, is tried as well.
 - *One C library holding several submodules.* For a dotted name, this looks for a library under
   the root of the name and, inside it, an opening function for the whole name — so
   `parcels.rates` can be packed into a library built for `parcels`.

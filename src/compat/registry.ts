@@ -465,6 +465,15 @@ const raw: Record<string, unknown> = {
   // v5.1's `ll_require` writes into `_LOADED[name]` before running the loader and no later
   // version has. What did *not* change is the storage rule: 5.1's manual says "any value"
   // where 5.2's says "any non-nil value", and both implementations test `!lua_isnil`.
+  //
+  // The C searcher's versioned-name rule belongs to **5.2, not 5.3**, and the 5.3
+  // Incompatibilities entry that describes it says so itself — "(Lua 5.2 already worked that
+  // way, but it did not document the change.)" `loadfunc` takes the part before the first
+  // hyphen and falls back to the part after it on `ERRFUNC` at every tag from v5.2.0 to
+  // v5.5.1; the whole 5.1 line, including the shipped 5.1.5, has `mkfuncname` with a bare
+  // `if (mark) modname = mark + 1;` and no fallback. A `changed_in` at 5.3 was drafted here
+  // and is false for 5.2 — the note is dated where the behaviour moved, not where a manual
+  // caught up with it.
   'globals.require': globalsRequire,
   // The section's own node, on the shape `string.library` set and `table.library` and
   // `math.library` followed: the section's existence and its *membership*, never the union
