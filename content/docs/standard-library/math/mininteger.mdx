@@ -8,7 +8,7 @@ source: https://www.lua.org/manual/5.5/manual.html#pdf-math.mininteger
 
 The smallest integer there is. It is not the negation of
 [`math.maxinteger`](/docs/standard-library/math/maxinteger) but one step further from zero,
-which leaves it as the one integer with no positive counterpart.
+which leaves it as the one negative integer with no positive counterpart.
 
 <RunnableExample code={`local daily_signups = {12, 47, 8, 33}\nlocal highest_signups = math.mininteger\nfor day_index = 1, #daily_signups do\n  if daily_signups[day_index] > highest_signups then\n    highest_signups = daily_signups[day_index]\n  end\nend\nprint(highest_signups)\n-- Expected output: 47`} />
 

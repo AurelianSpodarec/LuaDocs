@@ -114,13 +114,17 @@ describe('the anatomy of a written entry', () => {
 
   it('gives every constant entry a Value section, and no Syntax', () => {
     for (const entry of constants) {
-      expect(entry.body, entry.rel).toContain('## Value');
-      // A constant has no call to quote. The section that would hold one is where the
-      // function shape leaks into this fork, so it is asserted absent rather than left
-      // to review.
+      // Anchored to a whole line. `toContain('## Value')` also passes on `### Value`,
+      // which would let the one structural fact this fork exists to enforce through as
+      // a subheading buried under Description.
+      expect(entry.body, entry.rel).toMatch(/^## Value$/m);
+      // A constant has no call to quote and nothing that can raise. The sections that
+      // would hold either are where the function shape leaks into this fork, so they
+      // are asserted absent rather than left to review.
       expect(entry.body, entry.rel).not.toContain('## Syntax');
       expect(entry.body, entry.rel).not.toContain('<Parameters>');
       expect(entry.body, entry.rel).not.toContain('<Returns>');
+      expect(entry.body, entry.rel).not.toContain('<Errors>');
     }
   });
 

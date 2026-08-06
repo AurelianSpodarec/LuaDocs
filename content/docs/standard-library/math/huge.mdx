@@ -38,9 +38,13 @@ different float that behaves nothing like it.
 
 It is a float under the library's
 [subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) as well, and one
-with no integer counterpart. A context that requires an exact integer refuses
-it rather than converting it: [`math.tointeger()`](/docs/standard-library/math/tointeger)
-answers `nil`, and a call that wants an integer position or count raises.
+with no integer counterpart. Where Lua tells an integer apart from a float, a context that
+requires an exact integer refuses it rather than converting it:
+[`math.tointeger()`](/docs/standard-library/math/tointeger) answers `nil`, and a call that
+wants an integer position or count raises. Where Lua does not draw that distinction there is
+nothing to refuse — every number is a float, no call asks whether one has an exact integer
+form, and a value this size is coerced to whatever the conversion produces rather than
+rejected.
 
 ## Where a computation reaches it
 
@@ -114,14 +118,17 @@ result is produced is what keeps the report near the cause.
 <Gotcha title="A few ordinary operations turn it into something worse">
 An infinite value is at least loud. Multiplying it by zero, subtracting it from itself,
 dividing it by itself or taking it modulo a number gives a not-a-number value instead, and
-that one is quiet: it fails every ordering comparison and every equality test, so a guard
+that one is quiet: it fails every ordering comparison and every `==` test, so a guard
 phrased as "if the number is too big" simply does not fire. Where both are possible, test with
 `~=` against the value itself, which catches the not-a-number case and nothing else.
 </Gotcha>
 
 <Gotcha title="It cannot stand in for an integer bound">
-It has no exact integer value, so it cannot be used as a string position, a repeat count or a
-bitwise operand — each of those raises rather than clamping to the largest integer.
+It has no exact integer value, so it is not something a string position, a repeat count or a
+bitwise operand can be given. Where Lua tells an integer apart from a float, such a call
+refuses it outright rather than clamping to the largest integer; where Lua does not, nothing
+checks for an exact integer at all, and the call works from whatever converting the value
+produced — quietly, and still not from the largest integer.
 [`math.maxinteger`](/docs/standard-library/math/maxinteger) is the bound to reach for where an
 integer is what is wanted; this one is for comparing floats.
 </Gotcha>
