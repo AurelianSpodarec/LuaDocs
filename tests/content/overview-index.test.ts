@@ -18,9 +18,16 @@ import { listContentFiles, PLACEHOLDER } from '@/content-tree/scaffold';
  */
 const DEST = 'content/docs';
 
-/** `/docs/standard-library/string/gsub` → `gsub`, for links inside `<dir>`. */
+/**
+ * `/docs/standard-library/string/gsub` → `gsub`, for links inside `<dir>`.
+ *
+ * The class has to admit `_`: `globals` holds `_g.mdx` and `_version.mdx`, and a class
+ * without it matched no character at all after the slash, so both siblings read as
+ * unlinked however carefully the index linked them. The failure was on the *overview*
+ * rather than on the entries, which is what made it worth a comment.
+ */
 function linkedSlugs(body: string, dir: string): Set<string> {
-  const pattern = new RegExp(`/docs/${dir}/([a-z0-9-]+)`, 'g');
+  const pattern = new RegExp(`/docs/${dir}/([a-z0-9_-]+)`, 'g');
   return new Set([...body.matchAll(pattern)].map((match) => match[1]));
 }
 

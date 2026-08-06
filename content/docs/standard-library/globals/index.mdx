@@ -1,8 +1,147 @@
 ---
 title: Globals
-description: ""
+description: The names Lua puts in front of you with no library table in the way — type checks and conversions, table traversal, metatables, error handling, loading code, output, and the collector.
+lua-compat: globals.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.2
 ---
 
-{/* Not yet written. */}
+Every library in Lua's standard library but two keeps its functions inside a table named after
+it — `string.format()`, `table.sort()`, `math.floor()` — or reaches them as methods on the
+objects it hands out. Those two are what this section is made of: the global names the *basic*
+library installs, and the one the *package* library installs beside its own table,
+[`require()`](/docs/standard-library/globals/require). Nothing
+here carries a prefix. The name you call is the whole of the name.
+
+There is no single subject underneath that. Some of these are services the language itself
+leans on, wearing a function's clothes — the manual's own two examples are
+[`type()`](/docs/standard-library/globals/type) and
+[`getmetatable()`](/docs/standard-library/globals/getmetatable) — and the rest run from asking
+what a value is, through walking a table, surviving a failure, compiling source that only
+arrives once the program is already running, writing a line of output, and reaching the
+garbage collector.
+
+None of these names is a keyword. Each is an ordinary global variable, which is to say a field
+of the table Lua calls the global environment, and [`_G`](/docs/standard-library/globals/_g) is
+that same table under a name of its own. The rest of the standard library is loaded into it
+too, which is why `string` and `math` are globals at all — and why an assignment near the top
+of a file can take one of these away from every function that has not already kept hold of it.
+
+<RunnableExample code={`local raw_readings = {"12", "7", "banana"}\n\nlocal function total_of(readings)\n  local total = 0\n  for position, text in ipairs(readings) do\n    local reading = tonumber(text)\n    if not reading then\n      error("entry " .. position .. " is not a number", 0)\n    end\n    total = total + reading\n  end\n  return total\nend\n\nlocal ok, problem = pcall(total_of, raw_readings)\nprint(ok, type(problem))\nprint(problem)\nprint(total_of({"12", "7"}))\n-- Expected output:\n-- false\tstring\n-- entry 3 is not a number\n-- 19`} />
+
+Six of these names appear in that one small function, and not one of them is written with a
+table in front of it. [`pcall()`](/docs/standard-library/globals/pcall) is also doing the thing
+much of the rest of the section is arranged around: the failure raised inside `total_of` never
+reaches the top of the program, and what arrives in its place is an ordinary value the caller
+can look at and decide about.
+
+<Note>
+These are library functions rather than language syntax. A host program that embeds Lua decides
+which of the standard libraries to open, and every manual warns that leaving this one out means
+checking carefully whether the parts of it your code depends on have to be supplied some other
+way. Nothing in the language guarantees that a name here is present the way it guarantees that
+`for` is.
+</Note>
+
+Which names this section holds has moved in both directions — a couple arrived later than the
+rest, and five left for good. Each entry's own version support says where its line falls, and
+the sidebar dims what your selected version does not have.
+
+## Asking what a value is, and turning it into another
+
+The first questions anyone asks of a value: what kind of thing is it, how would it read as
+text, and is there a number hiding in it.
+
+- [`type()`](/docs/standard-library/globals/type) — the basic kind of a value, named as one of eight strings
+- [`tostring()`](/docs/standard-library/globals/tostring) — any value written out as text, with the value's own metatable given the chance to say how
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — a value read as a number, in Lua's own notation or as digits in a base you name, and `nil` when it spells none
+
+## Walking a table, and a call's arguments
+
+Getting at what you were handed one piece at a time: every key a table holds, the numbered
+positions of a list, the single step underneath the first of those, and the extra arguments of
+the call you are standing in.
+
+- [`pairs()`](/docs/standard-library/globals/pairs) — a generic `for` set up to visit every key a table holds
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — a generic `for` set up to walk positions from `1` up to the first absent one
+- [`next()`](/docs/standard-library/globals/next) — one step of a table's traversal on its own, handing back a following key and the value under it
+- [`select()`](/docs/standard-library/globals/select) — the arguments a call was handed from a given position onwards, or how many of them arrived
+
+## Metatables, and reaching past them
+
+A metatable is what lets a table answer an operation for itself. Two of these attach one and
+read it back; the four beside them perform an operation with the single metamethod that would
+otherwise have answered it left out of the way.
+
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — a metatable attached to a table, replaced, or taken away, with the table handed back
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable) — the metatable a value carries, or the stand-in a `__metatable` field offers in its place
+- [`rawget()`](/docs/standard-library/globals/rawget) — what a table really holds under a key, with `__index` left out of it
+- [`rawset()`](/docs/standard-library/globals/rawset) — a value put straight into a table, with `__newindex` left out of it
+- [`rawlen()`](/docs/standard-library/globals/rawlen) — the length of a table or a string, with `__len` left out of it, on the lines that have it
+- [`rawequal()`](/docs/standard-library/globals/rawequal) — two values compared the way `==` would with no `__eq` in the way
+
+## When a call fails
+
+Two ways to say that something has gone wrong, and two ways to make a call that might go wrong
+and keep hold of the program either way.
+
+- [`error()`](/docs/standard-library/globals/error) — an error raised carrying a value of your own, and a say in which line is blamed for it
+- [`assert()`](/docs/standard-library/globals/assert) — an error raised when a value turns out to be `nil` or `false`, and every argument handed straight back when it does not
+- [`pcall()`](/docs/standard-library/globals/pcall) — a call made so that a failure inside it comes back as a status rather than taking the program with it
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — the same protection with a handler of your own, which runs while the failing stack is still standing
+
+## Bringing in more code
+
+Source that is not part of the file being run — compiled and handed back for later, whether it
+is supplied to the call or read out of a file; run on the spot; or looked for by name and
+remembered once it has been found.
+
+- [`load()`](/docs/standard-library/globals/load) — Lua source turned into a function without a line of it being run
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — the same, with the source read out of a file
+- [`dofile()`](/docs/standard-library/globals/dofile) — a file compiled and run in one step, with any failure left to reach the caller
+- [`require()`](/docs/standard-library/globals/require) — a module found by name and loaded, with what it produced kept for every later call
+
+## Writing something out
+
+Two that put text in front of a person rather than handing a value back to the program.
+
+- [`print()`](/docs/standard-library/globals/print) — values written to standard output as text, the quick way to see what one is
+- [`warn()`](/docs/standard-library/globals/warn) — a warning emitted for a person to read, which does not interrupt the program the way an error does and can be switched off, on the lines that have it
+
+## Memory and the garbage collector
+
+Lua reclaims what a program can no longer reach, without being asked to, and one global reaches
+the machinery that does it.
+
+- [`collectgarbage()`](/docs/standard-library/globals/collectgarbage) — the collector's controls behind one call: run a cycle, stop and restart it, ask how much memory is in use, or change how it works
+
+## Constants
+
+Two values rather than two calls — read as variables, never called.
+
+- [`_G`](/docs/standard-library/globals/_g) — the global environment as a table you can index, so a global name can be computed rather than written out
+- [`_VERSION`](/docs/standard-library/globals/_version) — a string naming the line of Lua the code is running under
+
+## Functions best written another way
+
+Five the section has carried at one time or another and newer Lua no longer does. They are
+listed because reading old code means meeting them; each entry says what to write in its place,
+and how exact the swap is.
+
+- [`unpack()`](/docs/standard-library/globals/unpack) — a run of a list's elements handed back as separate values, which newer Lua keeps under the name `table.unpack()`
+- [`loadstring()`](/docs/standard-library/globals/loadstring) — Lua source in a string compiled into a function, which `load()` takes over once it reads a string
+- [`setfenv()`](/docs/standard-library/globals/setfenv) — the table an already-built function resolves its global names through, replaced; newer Lua chooses that table where the code is written or loaded instead
+- [`getfenv()`](/docs/standard-library/globals/getfenv) — the same table read back, which nothing asks of an existing function now: the answer is the table you kept when you loaded the chunk
+- [`module()`](/docs/standard-library/globals/module) — a file turned into a module by installing a table and redirecting its globals into it, where the pattern now is a file that builds an ordinary table and returns it
+
+## See also
+
+- [The standard library](/docs/standard-library) — the rest of it, where the functions sit inside a library's own table
+- [Global variables](/docs/language/variables-and-scope/global-variables) — what makes these names variables rather than keywords
+- [The global environment](/docs/language/environments/the-global-environment) — the table they are all stored in
+- [Generic `for`](/docs/language/statements/generic-for) — the loop `pairs()` and `ipairs()` are built to feed
+- [Varargs](/docs/language/expressions/varargs) — the `...` that `select()` reads
+- [Error handling](/docs/language/error-handling) — what an error is, underneath `error()` and the protected calls
+- [Metatables](/docs/language/metatables) — what a metatable does, and what the raw calls here are stepping around
+- [Garbage collection](/docs/language/garbage-collection) — what `collectgarbage()` is an interface to
+- [`package`](/docs/standard-library/package) — the library `require()` is the front door of

@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Adds `rawlen`, drops `getfenv` and `setfenv`, and moves `unpack` into the table library, where it is called `table.unpack`.",
+    "5.3": "Drops the deprecated `loadstring` and `module`.",
+    "5.4": "Adds `warn`."
+  }
+}

@@ -100,6 +100,7 @@ import globalsUnpack from './data/globals.unpack.json';
 import globalsLoadstring from './data/globals.loadstring.json';
 import globalsModule from './data/globals.module.json';
 import globalsRequire from './data/globals.require.json';
+import globalsLibrary from './data/globals.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -465,6 +466,16 @@ const raw: Record<string, unknown> = {
   // version has. What did *not* change is the storage rule: 5.1's manual says "any value"
   // where 5.2's says "any non-nil value", and both implementations test `!lua_isnil`.
   'globals.require': globalsRequire,
+  // The section's own node, on the shape `string.library` set and `table.library` and
+  // `math.library` followed: the section's existence and its *membership*, never the union
+  // of its members' behaviour. Derived from the member datasets and then checked against the
+  // manuals independently, by listing every `pdf-` anchor carrying no library prefix in each
+  // of the five. Two things about it are worth recording. The 5.2 note says `unpack` was
+  // *moved* rather than dropped, because 5.2 §8.2 says exactly that and a reader who has
+  // just read "drops" would go looking for a replacement that is sitting under a prefix.
+  // And there is no 5.5 note: nothing joins or leaves the section there, even though several
+  // members change what they accept.
+  'globals.library': globalsLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
