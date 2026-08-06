@@ -56,6 +56,10 @@ import mathRandom from './data/math.random.json';
 import mathRandomseed from './data/math.randomseed.json';
 import mathUlt from './data/math.ult.json';
 import mathType from './data/math.type.json';
+import mathPi from './data/math.pi.json';
+import mathHuge from './data/math.huge.json';
+import mathMaxinteger from './data/math.maxinteger.json';
+import mathMininteger from './data/math.mininteger.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -166,6 +170,19 @@ const raw: Record<string, unknown> = {
   // vocabulary for a value that is still `nil`, not a change of behaviour.
   'math.ult': mathUlt,
   'math.type': mathType,
+  // The library's four constants, and the first entries of the constant fork. Their
+  // nodes are availability and nothing else, in both directions. `pi` and `huge` are
+  // present from 5.1 and hold the same value on every line — `huge`'s manual passage is
+  // reworded twice (HUGE_VAL gains the word "float", "larger than or equal to" becomes
+  // "greater than") and neither rewording changes what the value does, so neither is a
+  // `changed_in`. `maxinteger` and `mininteger` are pure arrivals with the integer
+  // subtype; a reader on 5.1 or 5.2 is told the entry is not there at all, which is what
+  // makes ADR 0009's numeric disclosure unnecessary on a constant that has no `<Return>`
+  // to hang it from.
+  'math.pi': mathPi,
+  'math.huge': mathHuge,
+  'math.maxinteger': mathMaxinteger,
+  'math.mininteger': mathMininteger,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

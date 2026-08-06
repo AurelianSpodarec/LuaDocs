@@ -43,8 +43,23 @@ const functions = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') ===
  */
 const constructs = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') === 'construct');
 
-/** Every entry that documents something, of either fork. */
-const entries = [...functions, ...constructs];
+/**
+ * The constant fork — `math.pi`, `math.huge`, the two integer bounds, and later
+ * `_VERSION`. `page-structure.md` gives it the shared skeleton with **Value** replacing
+ * Parameters and Return values, and the prototype finding that constants "collapse
+ * optional sections" is what settles the rest: there is no call to quote, so no Syntax,
+ * and nothing to raise, so no Errors. `## Value` is a real markdown heading rather than a
+ * component because the right rail is built from H2s and a constant's value is a
+ * paragraph, not a list of rows.
+ *
+ * Asserting its *absence* of Syntax matters as much as its Value: the fork is one an
+ * author reaches by copying a function entry, and a Syntax block quoting `math.pi` would
+ * be invented notation for a call that does not exist.
+ */
+const constants = written.filter((e) => fieldOf(e.frontmatter, 'entry-type') === 'constant');
+
+/** Every entry that documents something, of any fork. */
+const entries = [...functions, ...constructs, ...constants];
 
 /** Every entry's expected source URL, keyed the way `listContentFiles` reports paths. */
 const expectedSource = new Map<string, string>();
@@ -67,6 +82,7 @@ describe('the anatomy of a written entry', () => {
     // Every other assertion below used to filter to `function`, which left the fork
     // this slice invented completely unguarded.
     expect(constructs.length).toBeGreaterThan(0);
+    expect(constants.length).toBeGreaterThan(0);
   });
 
   it('gives every function entry a Syntax section', () => {
@@ -96,7 +112,25 @@ describe('the anatomy of a written entry', () => {
     }
   });
 
-  it('links every entry of either fork to a registered compat node', () => {
+  it('gives every constant entry a Value section, and no Syntax', () => {
+    for (const entry of constants) {
+      expect(entry.body, entry.rel).toContain('## Value');
+      // A constant has no call to quote. The section that would hold one is where the
+      // function shape leaks into this fork, so it is asserted absent rather than left
+      // to review.
+      expect(entry.body, entry.rel).not.toContain('## Syntax');
+      expect(entry.body, entry.rel).not.toContain('<Parameters>');
+      expect(entry.body, entry.rel).not.toContain('<Returns>');
+    }
+  });
+
+  it('ends every constant entry with a See also section', () => {
+    for (const entry of constants) {
+      expect(entry.body, entry.rel).toContain('## See also');
+    }
+  });
+
+  it('links every entry of any fork to a registered compat node', () => {
     // Pilot finding #7: Patterns was authored from a stub whose frontmatter had no
     // `lua-compat` key, and nothing would have said so — the entry would simply have
     // rendered no support strip, no change note and no matrix, silently claiming to

@@ -1,8 +1,137 @@
 ---
 title: math.huge
-description: ""
+description: A float greater than every finite number, and where a float computation lands when it overflows.
+lua-compat: math.huge
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.huge
 ---
 
-{/* Not yet written. */}
+A float that compares greater than every finite number, with `-math.huge` below every finite
+number. It is both a bound to compare against and the value a float computation arrives at
+when its result is too large to hold.
+
+<RunnableExample code={`local overnight_temperatures = {3.5, -1.25, 2, 0.75}\nlocal lowest_temperature = math.huge\nfor reading_index = 1, #overnight_temperatures do\n  if overnight_temperatures[reading_index] < lowest_temperature then\n    lowest_temperature = overnight_temperatures[reading_index]\n  end\nend\nprint(lowest_temperature)\n-- Expected output: -1.25`} />
+
+## Value
+
+A float. It compares greater than every finite number and equal to itself, and its negation
+compares below every finite number. It is not a marker the language invented for the
+`math` library — it is the same value a float computation produces on overflowing, so a
+result computed from ordinary data can equal it without anything ever having read this
+constant.
+
+One kind of value escapes the comparison entirely. A not-a-number value is neither below,
+equal to, nor above this constant: comparing one against `math.huge` with `<`, `>` or `==`
+answers `false` whichever way round the two are written. Only `~=` answers `true`, which makes
+inequality the one comparison that finds such a value at all.
+
+## Description
+
+Most arithmetic carries it along: adding a finite number, multiplying by a positive one,
+rounding it with [`math.floor()`](/docs/standard-library/math/floor) or taking its square root
+all give it back unchanged. Some arithmetic does not. Multiplying it by zero, subtracting it
+from itself, dividing it by itself and taking it modulo a number each produce a not-a-number
+value; dividing a finite number by it produces zero; raising it to the power zero produces one.
+So it does not travel through a calculation as a permanent mark that something went out of
+range — it is a float, and a handful of unremarkable-looking operations replace it with a
+different float that behaves nothing like it.
+
+It is a float under the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) as well, and one
+with no integer counterpart. A context that requires an exact integer refuses
+it rather than converting it: [`math.tointeger()`](/docs/standard-library/math/tointeger)
+answers `nil`, and a call that wants an integer position or count raises.
+
+## Where a computation reaches it
+
+A float has a largest finite value, and a computation that goes past it does not raise — it
+lands here, quietly. `2 ^ 1024` is enough to get there, so is multiplying two large enough
+finite numbers, and [`math.exp()`](/docs/standard-library/math/exp) gets there a little past an
+argument of `709`. A result overflowing in the negative direction lands on `-math.huge` the
+same way, and [`math.log()`](/docs/standard-library/math/log) reaches it from a different
+direction on an argument of zero.
+
+Integer arithmetic does not arrive here: an integer result that goes past the largest integer
+wraps around instead, which is what [`math.maxinteger`](/docs/standard-library/math/maxinteger)
+is about. The two operators that always answer with a float, `/` and `^`, are float arithmetic
+whatever their operands were — which is why `1 / 0` lands here rather than raising the way
+`1 // 0` does.
+
+## Using it as a starting value
+
+The idiom the constant earns its place with: seed a running minimum with `math.huge` so that
+the first candidate is guaranteed to beat it, and a running maximum with `-math.huge`. It
+works because no finite reading can fail the comparison, which a hand-picked seed like
+`999999` cannot promise. [`math.min()`](/docs/standard-library/math/min) and
+[`math.max()`](/docs/standard-library/math/max) do the same job in one call where every value
+is already to hand; the seed is for the case where they arrive one at a time.
+
+The second use is as a stand-in for the absence of a limit. A ceiling read from configuration
+that falls back to `math.huge` lets the comparison below it be written once, with no branch for
+the unlimited case.
+
+Like the library's other constants, this one is
+[an ordinary field of the `math` table](/docs/standard-library/math/pi#an-ordinary-field-of-the-math-table)
+and can be assigned over.
+
+## Examples
+
+### Standing in for an absent limit
+
+<RunnableExample code={`local upload_settings = { retries = 3 }\nlocal size_limit_bytes = upload_settings.max_size_bytes or math.huge\nprint(4200 <= size_limit_bytes)\n-- Expected output: true`} />
+
+The setting is missing, so the limit becomes a value nothing finite can exceed and the check
+passes. The alternative — testing for `nil` at every comparison — spreads the same decision
+over every line that uses the limit.
+
+### A computation that overflowed
+
+<RunnableExample code={`print(2 ^ 1024 == math.huge)\nprint(10 ^ 400 == math.huge)\nprint(1 < math.huge)\n-- Expected output:\n-- true\n-- true\n-- true`} />
+
+Neither power raises and neither returns `nil`. Comparing a result against this constant is
+how code finds out that a value went out of range, at the point it happened rather than three
+functions later.
+
+### A not-a-number value walks past the guard
+
+<RunnableExample code={`local not_a_number = 0 / 0\nprint(not_a_number < math.huge)\nprint(not_a_number > math.huge)\nprint(not_a_number ~= not_a_number)\n-- Expected output:\n-- false\n-- false\n-- true`} />
+
+A guard written as `if value < math.huge then` treats a not-a-number value as though it had
+failed the range check, and one written as `if value > math.huge then` never fires for it. The
+third line is the test that does work, and it is the only comparison a not-a-number value
+answers `true` to — including against itself.
+
+## Gotchas
+
+<Gotcha title="It is a result, not an error">
+Nothing raises when a float computation overflows and nothing returns `nil`; the value simply
+becomes this one and the program carries on. It then flows through sums, averages and
+comparisons looking like an ordinary number, and surfaces as nonsense somewhere with no
+connection to where the range was left behind. Comparing against this constant at the point a
+result is produced is what keeps the report near the cause.
+</Gotcha>
+
+<Gotcha title="A few ordinary operations turn it into something worse">
+An infinite value is at least loud. Multiplying it by zero, subtracting it from itself,
+dividing it by itself or taking it modulo a number gives a not-a-number value instead, and
+that one is quiet: it fails every ordering comparison and every equality test, so a guard
+phrased as "if the number is too big" simply does not fire. Where both are possible, test with
+`~=` against the value itself, which catches the not-a-number case and nothing else.
+</Gotcha>
+
+<Gotcha title="It cannot stand in for an integer bound">
+It has no exact integer value, so it cannot be used as a string position, a repeat count or a
+bitwise operand — each of those raises rather than clamping to the largest integer.
+[`math.maxinteger`](/docs/standard-library/math/maxinteger) is the bound to reach for where an
+integer is what is wanted; this one is for comparing floats.
+</Gotcha>
+
+## See also
+
+- [`math.maxinteger`](/docs/standard-library/math/maxinteger) — the largest integer, which this constant is above
+- [`math.min()`](/docs/standard-library/math/min) — the same running-minimum job in one call
+- [`math.max()`](/docs/standard-library/math/max) — and the running maximum, where `-math.huge` would otherwise be the seed
+- [`math.exp()`](/docs/standard-library/math/exp) — a function whose result reaches this value on a large enough argument
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — the call that answers whether a float has an integer form, which this one does not
+- [`math.pi`](/docs/standard-library/math/pi) — the library's other float constant
+- [Numbers](/docs/language/values-and-types/number) — the float range this value sits past the end of

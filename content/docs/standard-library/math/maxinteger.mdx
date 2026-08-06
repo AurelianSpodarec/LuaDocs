@@ -1,8 +1,126 @@
 ---
 title: math.maxinteger
-description: ""
+description: The largest value an integer can hold, and the edge that counting wraps around at.
+lua-compat: math.maxinteger
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.maxinteger
 ---
 
-{/* Not yet written. */}
+The largest integer there is. Counting past it neither raises nor widens the number: it wraps
+around to [`math.mininteger`](/docs/standard-library/math/mininteger), and this constant is how
+code that has to care finds the edge before it gets there.
+
+<RunnableExample code={`print(math.maxinteger + 1 == math.mininteger)\n-- Expected output: true`} />
+
+## Value
+
+An integer, and the largest one an integer can hold. How large that is depends on how Lua was
+built rather than on the language: a standard build uses 64-bit integers, which puts the value
+at `9223372036854775807`, and a build configured for narrower integers puts it lower. Reading
+it from here rather than writing the digits out is what makes code independent of that choice.
+
+## Description
+
+An integer occupies a fixed width, so the range has an end, and arithmetic that would pass the
+end wraps around rather than growing into a float or raising. `math.maxinteger + 1` is
+[`math.mininteger`](/docs/standard-library/math/mininteger); `math.maxinteger * 2` and
+`math.maxinteger + math.maxinteger` are both `-2`. Nothing announces that this has happened —
+the result is an ordinary integer of the wrong sign, and it goes on being used.
+
+That is what the constant is for: a bound to test against *before* the operation rather than
+after it. `count > math.maxinteger - increment` asks whether adding `increment` would pass the
+end, and the subtraction it asks with stays inside the range as long as `increment` is not
+itself negative; a *subtraction* wants the same guard written against
+[`math.mininteger`](/docs/standard-library/math/mininteger) instead. Testing afterwards does
+not work at all, because there is no wrong answer to recognise: every value inside the range is
+a value a correct computation might have produced.
+
+Reaching for a float instead does not solve it. A float goes far higher, but it stops being
+able to name every integer long before it gets there, so a count carried as a float silently
+stops counting. What that costs at this end of the range is the subject below.
+
+## Converting it to a float loses it
+
+An integer with no exact float takes the nearest representable value above or below, which is
+the rule the manual states for the conversion, and for this value it lands above. So
+`math.maxinteger + 0.0` is a *larger* number than `math.maxinteger`, and
+`math.maxinteger < math.maxinteger + 0.0` is true. Converting back finds nothing there:
+[`math.tointeger()`](/docs/standard-library/math/tointeger) answers `nil` for it, because the
+float names a number one past the end of the integer range.
+
+The same rounding collapses neighbours together: `math.maxinteger` and `math.maxinteger - 1`
+convert to the same float, so a count that passes through a float near this end of the range
+can no longer be told from the ones beside it. Lua compares an integer against a float by their
+mathematical values, so no comparison is at fault here; what was lost was lost in the
+conversion, before any comparison ran.
+
+[`math.mininteger`](/docs/standard-library/math/mininteger) has no such trouble, because its
+magnitude is a power of two and a float names it exactly.
+
+Like the library's other constants, this one is
+[an ordinary field of the `math` table](/docs/standard-library/math/pi#an-ordinary-field-of-the-math-table)
+and can be assigned over.
+
+## Its place among the other bounds
+
+[`math.huge`](/docs/standard-library/math/huge) is above it, so a float sentinel still works as
+an upper bound over integer data — but only where the bound may be a float. Where the value
+has to stay an integer, because it will end up as a count or a position, this constant is the
+stand-in for "no limit" that `math.huge` cannot be.
+
+It is also the largest value `<` will call positive, and the midpoint of unsigned order:
+[`math.ult()`](/docs/standard-library/math/ult) reads the same bits with the top one counted as
+value rather than as sign, and every pattern above this constant in that reading is one `<`
+calls negative.
+
+## Examples
+
+### Adding without going over
+
+<RunnableExample code={`local views_so_far = math.maxinteger - 2\nlocal extra_views = 5\nlocal total_views\nif extra_views > math.maxinteger - views_so_far then\n  total_views = math.maxinteger\nelse\n  total_views = views_so_far + extra_views\nend\nprint(total_views == math.maxinteger)\n-- Expected output: true`} />
+
+A saturating add: the total stops at the top instead of wrapping to a large negative number.
+The test is written as a subtraction from the bound rather than as `views_so_far + extra_views
+> math.maxinteger`, which two integers can never make true — that sum would have wrapped round
+to a negative number before the comparison ever saw it.
+
+### It does not survive a trip through a float
+
+<RunnableExample code={`print(math.maxinteger + 0.0 == math.maxinteger)\nprint(math.maxinteger < math.maxinteger + 0.0)\nprint(math.tointeger(math.maxinteger + 0.0))\nprint(math.mininteger + 0.0 == math.mininteger)\n-- Expected output:\n-- false\n-- true\n-- nil\n-- true`} />
+
+Adding `0.0` converts the integer to a float, and the conversion rounds up past the end of the
+integer range. The last line is the contrast: the other end of the range converts exactly, so
+the loss here is about this particular value and not about floats in general.
+
+### An unlimited ceiling that is still an integer
+
+<RunnableExample code={`local retention_settings = { max_records = math.maxinteger }\nlocal record_count = 148\nprint(record_count < retention_settings.max_records)\nprint(math.type(retention_settings.max_records))\n-- Expected output:\n-- true\n-- integer`} />
+
+[`math.huge`](/docs/standard-library/math/huge) is the usual stand-in for an absent limit, and
+it is the wrong one when the limit is going to be used as a count or a position later — a float
+with no integer form raises there. This constant fills the same role and stays an integer.
+
+## Gotchas
+
+<Gotcha title="Passing the top wraps rather than failing">
+There is no overflow error and no promotion to a float. A running total that goes one past this
+value becomes the most negative integer there is, and every later comparison, average and sort
+works from that. Guard the operand before the arithmetic, not the result after it.
+</Gotcha>
+
+<Gotcha title="The digits are a property of the build, not of Lua">
+`9223372036854775807` is what a standard build gives, and code that writes it out reads as
+though the number were fixed by the language. It is not: a build with narrower integers has a
+smaller bound, and the hand-written constant then sits outside the range it was supposed to
+describe. Reading the value from here costs nothing and cannot go stale.
+</Gotcha>
+
+## See also
+
+- [`math.mininteger`](/docs/standard-library/math/mininteger) — the other end of the range, and where adding one past this lands
+- [`math.huge`](/docs/standard-library/math/huge) — the float bound above every integer, and the seed a running minimum wants
+- [`math.tointeger()`](/docs/standard-library/math/tointeger) — asking whether a float has an exact integer form, which a float near this bound does not
+- [`math.type()`](/docs/standard-library/math/type) — telling an integer from a float, which matters most at this end of the range
+- [`math.ult()`](/docs/standard-library/math/ult) — comparing the same bits as unsigned, where this value is the midpoint
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — the wrapping this constant marks the edge of
+- [Numbers](/docs/language/values-and-types/number) — the integer and float ranges, and how Lua converts between them

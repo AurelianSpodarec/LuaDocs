@@ -1,8 +1,127 @@
 ---
 title: math.mininteger
-description: ""
+description: The smallest value an integer can hold — one step further from zero than the largest.
+lua-compat: math.mininteger
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.mininteger
 ---
 
-{/* Not yet written. */}
+The smallest integer there is. It is not the negation of
+[`math.maxinteger`](/docs/standard-library/math/maxinteger) but one step further from zero,
+which leaves it as the one integer with no positive counterpart.
+
+<RunnableExample code={`local daily_signups = {12, 47, 8, 33}\nlocal highest_signups = math.mininteger\nfor day_index = 1, #daily_signups do\n  if daily_signups[day_index] > highest_signups then\n    highest_signups = daily_signups[day_index]\n  end\nend\nprint(highest_signups)\n-- Expected output: 47`} />
+
+## Value
+
+An integer, and the smallest one an integer can hold. Its magnitude depends on the build in the
+same way [`math.maxinteger`](/docs/standard-library/math/maxinteger)'s does: a standard build
+uses 64-bit integers, putting the value at `-9223372036854775808`.
+
+The range is not symmetrical about zero. There is one more value below zero than above it, so
+this constant is `-math.maxinteger - 1`, and negating it wraps straight back onto itself.
+
+## Description
+
+An integer occupies a fixed width, so the range has a bottom as well as a top, and arithmetic
+that would pass the bottom wraps around rather than raising: `math.mininteger - 1` is
+[`math.maxinteger`](/docs/standard-library/math/maxinteger). Nothing signals it, and the result
+is an ordinary positive integer that later code has no way to recognise as wrong.
+
+The asymmetry is the part that catches people out, because it breaks a rule that holds for
+every other negative integer: that negating one gives a positive one back. Negation is
+subtraction from zero and wraps like any other arithmetic, so `-math.mininteger` is
+`math.mininteger` again — the positive value it ought to give is one past the top of the range.
+`math.abs()` inherits that exactly, and the case is
+[written out on that entry](/docs/standard-library/math/abs): the absolute value of this
+constant is itself, and it is negative.
+
+Two things follow for code. Code that negates a value read from outside — a delta, a balance
+adjustment, a sort key being reversed — has one input for which the negation is a no-op, and it
+is the input least likely to have been tried. And code that treats the result of `math.abs()`
+as a magnitude — a size to allocate, a distance to compare, a count to loop over — has one
+input for which the result is below zero.
+
+Where the value can be held as a float instead, neither problem arises: a float has no wrapping
+edge to fall off, and this particular value converts to a float exactly, which
+[`math.maxinteger`](/docs/standard-library/math/maxinteger) does not.
+
+## Writing the value by hand
+
+`-9223372036854775808` does not name this integer. The minus sign is applied to the numeral
+after it is read, and the numeral on its own is one past the largest integer, so it is read as a
+float and the negation gives a float. The hexadecimal numeral `0x8000000000000000` does name
+the integer: a hexadecimal numeral with neither a radix point nor an exponent is read as an
+integer, and one that does not fit wraps round until it does.
+
+Neither spelling is worth using. Both bake in the width the build happens to have, and this
+constant names the value whatever that width is.
+
+Like the library's other constants, this one is
+[an ordinary field of the `math` table](/docs/standard-library/math/pi#an-ordinary-field-of-the-math-table)
+and can be assigned over.
+
+## Examples
+
+### One step further than the largest
+
+<RunnableExample code={`print(math.mininteger == -math.maxinteger - 1)\nprint(math.mininteger + math.maxinteger == -1)\nprint(math.mininteger - 1 == math.maxinteger)\n-- Expected output:\n-- true\n-- true\n-- true`} />
+
+The first two lines are the asymmetry stated twice: one further from zero at the bottom, so
+the two ends sum to `-1` rather than to zero. The third is the bottom of the range wrapping
+round to the top.
+
+### Negation leaves it alone
+
+<RunnableExample code={`print(-math.mininteger == math.mininteger)\nprint(math.abs(math.mininteger) == math.mininteger)\n-- Expected output:\n-- true\n-- true`} />
+
+Both operations are asking for a positive value the range does not contain, so both wrap back
+to where they started. It is the only integer whose absolute value comes out below zero.
+
+### Guarding a negation
+
+<RunnableExample code={`local balance_adjustments = {40, -12, math.mininteger}\nfor adjustment_index = 1, #balance_adjustments do\n  local adjustment = balance_adjustments[adjustment_index]\n  if adjustment == math.mininteger then\n    print("cannot be reversed")\n  else\n    print(-adjustment)\n  end\nend\n-- Expected output:\n-- -40\n-- 12\n-- cannot be reversed`} />
+
+The check is a comparison against the constant, done before the negation rather than on its
+result — there is nothing about the result that says the negation failed.
+
+### The decimal numeral is a different value
+
+<RunnableExample code={`print(math.type(-9223372036854775808))\nprint(math.type(0x8000000000000000))\nprint(0x8000000000000000 == math.mininteger)\n-- Expected output:\n-- float\n-- integer\n-- true`} />
+
+Two ways of writing what looks like the same number, and only one of them is an integer. The
+constant avoids the question, and avoids depending on the width as well.
+
+## Gotchas
+
+<Gotcha title="Negating it, or taking its absolute value, leaves it negative">
+The range has no positive counterpart for this value, and integer arithmetic wraps rather than
+raising, so both operations hand it straight back. Code that leans on a negation or on
+[`math.abs()`](/docs/standard-library/math/abs) to produce something at or above zero has to
+rule this value out first, or hold the number as a float, where the edge does not exist.
+</Gotcha>
+
+<Gotcha title="Subtracting past the bottom wraps to the top">
+`math.mininteger - 1` is the *largest* integer, not an error and not a float. A running total
+that dips below the bottom of the range comes back as a large positive number, and every later
+comparison, average and sort works from that. Guard the operand before the subtraction, not the
+result after it.
+</Gotcha>
+
+<Gotcha title="It seeds a running maximum, not a running minimum">
+Nothing in a set of integers is below this value, so a minimum-tracking loop seeded with it
+never updates and answers with the seed. The minimum wants the other end —
+[`math.maxinteger`](/docs/standard-library/math/maxinteger), or
+[`math.huge`](/docs/standard-library/math/huge) where the values are floats. Getting the two
+the wrong way round produces an answer rather than a failure, which is what makes it worth
+checking.
+</Gotcha>
+
+## See also
+
+- [`math.maxinteger`](/docs/standard-library/math/maxinteger) — the other end of the range, one closer to zero than this one
+- [`math.abs()`](/docs/standard-library/math/abs) — where this value's one exception to absolute value is written out
+- [`math.huge`](/docs/standard-library/math/huge) — negated, the float below every integer, and the maximum-tracking seed to use where the values are floats
+- [`math.ult()`](/docs/standard-library/math/ult) — reading the same bits as unsigned, where this value sits just above the midpoint
+- [Arithmetic operators](/docs/language/expressions/arithmetic-operators) — unary minus, and the wrapping this constant is the edge of
+- [Numbers](/docs/language/values-and-types/number) — the integer range, and how a numeral is read into it

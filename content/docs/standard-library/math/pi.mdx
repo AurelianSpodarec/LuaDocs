@@ -1,8 +1,114 @@
 ---
 title: math.pi
-description: ""
+description: The closest float there is to the ratio of a circle's circumference to its diameter.
+lua-compat: math.pi
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.pi
 ---
 
-{/* Not yet written. */}
+The ratio of a circle's circumference to its diameter, held as closely as a float can hold it.
+It is what the circle formulas are built from, and what sets the scale of the radians the
+library's angles are measured in.
+
+<RunnableExample code={`local wheel_radius_metres = 0.35\nprint(string.format("%.3f", 2 * math.pi * wheel_radius_metres))\n-- Expected output: 2.199`} />
+
+## Value
+
+A float — the nearest one to π. π has no exact decimal expansion and no exact float, so what
+is stored here is the closest float there is to it, correct to around fifteen decimal digits
+and approximate beyond that. There is no more precise form of it to be had — a float is as
+close as Lua gets to the number.
+
+## Description
+
+Radians are the unit the library's angles are measured in, and this constant is what sets
+their scale: a half turn is `math.pi` radians, a full turn is `2 * math.pi`, and a right angle
+is `math.pi / 2`. That makes it the value that appears wherever an angle is written down
+rather than measured — an offset of a quarter turn, a phase, a wave repeating every
+`2 * math.pi`. [`math.rad()`](/docs/standard-library/math/rad) and
+[`math.deg()`](/docs/standard-library/math/deg) convert between radians and degrees, and both
+are computed from this same number, so an angle converted from `180` degrees and the constant
+itself are the same float.
+
+The other place it turns up is the circle formulas — `2 * math.pi * radius` for a
+circumference, `math.pi * radius ^ 2` for an area — which is where most code meets it first.
+
+The library has one other float constant, [`math.huge`](/docs/standard-library/math/huge), and
+no constant for *e*; [`math.exp(1)`](/docs/standard-library/math/exp) stands in for that one.
+
+## Why exact identities do not come out exact
+
+Because the stored value is near π rather than equal to it, an identity that holds for π holds
+only approximately for this constant, and how visibly it fails depends on the curve it is fed
+to. `math.cos(math.pi)` is exactly `-1`: the cosine curve is flat at a half turn, so the tiny
+error in the argument is lost in the rounding of the answer. `math.sin(math.pi)` is not zero —
+the sine curve is at its steepest there, so the same tiny error survives into the result as a
+small non-zero number. Neither function is at fault; the argument was slightly off before
+either was called.
+
+The consequence is a working rule for code built on this constant. Compare an angle against a
+tolerance rather than with `==`, and where a turn is being divided up, keep the fraction and
+multiply once — `2 * math.pi * (step_index / step_count)` — rather than accumulating a step
+angle in a running total, which adds a fresh rounding error at every iteration.
+
+## An ordinary field of the `math` table
+
+The library sets its constants as plain fields of the `math` table as it loads, alongside its
+functions. Nothing guards them, and no manual passage says otherwise: `math.pi = 3` is an
+ordinary assignment, it succeeds silently, and from then on every read of `math.pi` anywhere in
+the program gives `3`. The same is true of
+[`math.huge`](/docs/standard-library/math/huge),
+[`math.maxinteger`](/docs/standard-library/math/maxinteger) and
+[`math.mininteger`](/docs/standard-library/math/mininteger), and of the library's functions.
+
+Rounding the constant into a variable — `local circle_ratio = 3.14` — is the commoner version
+of the same mistake, and it throws away a dozen correct digits for nothing.
+
+## Examples
+
+### The area a radius covers
+
+<RunnableExample code={`local pizza_diameter_cm = 32\nlocal pizza_area_cm2 = math.pi * (pizza_diameter_cm / 2) ^ 2\nprint(string.format("%.1f", pizza_area_cm2))\n-- Expected output: 804.2`} />
+
+Halving the diameter first is the whole of the arithmetic; the constant does the rest. A
+formula written against the diameter directly needs a quarter of it, which is the shape most
+circle-area mistakes take.
+
+### Half a turn, on two different curves
+
+<RunnableExample code={`print(math.cos(math.pi) == -1)\nprint(math.sin(math.pi) == 0)\nprint(math.abs(math.sin(math.pi)) < 0.000001)\n-- Expected output:\n-- true\n-- false\n-- true`} />
+
+The same argument, exact on one curve and not on the other. The third line is how the second
+one should have been asked: near enough to zero, rather than equal to it.
+
+### Degrees and radians meet at the same float
+
+<RunnableExample code={`print(math.rad(180) == math.pi)\nprint(string.format("%.0f", math.deg(math.pi)))\n-- Expected output:\n-- true\n-- 180`} />
+
+Converting `180` degrees lands on exactly this constant, and converting the constant lands
+back on `180`. Both conversions are built from the same number, so the pair agrees where a
+hand-written `angle * 3.14159 / 180` would not.
+
+## Gotchas
+
+<Gotcha title="Comparing an angle against it with `==` rarely holds">
+An angle that arrived by arithmetic — a sum of steps, a conversion, the result of
+[`math.atan()`](/docs/standard-library/math/atan) — is a float carrying its own rounding, and
+landing on the same float as this constant is a coincidence rather than the rule. Compare the
+difference against a tolerance instead, and pick the tolerance to suit the magnitudes in hand.
+</Gotcha>
+
+<Gotcha title="It is a value, not a keyword">
+Because it is an ordinary table field, `math.pi` can be assigned over from anywhere in the
+program, with no error and no warning when it is. Code that reads it afterwards quietly
+computes circles from whatever the last assignment left behind.
+</Gotcha>
+
+## See also
+
+- [`math.rad()`](/docs/standard-library/math/rad) — turning degrees into the radians this constant scales
+- [`math.deg()`](/docs/standard-library/math/deg) — the conversion back the other way
+- [`math.cos()`](/docs/standard-library/math/cos) — one of the six functions that measure their angles in these units
+- [`math.huge`](/docs/standard-library/math/huge) — the library's other float constant
+- [`math.exp()`](/docs/standard-library/math/exp) — the call that stands in for the constant for *e* the library does not have
+- [Numbers](/docs/language/values-and-types/number) — why a float cannot hold π exactly
