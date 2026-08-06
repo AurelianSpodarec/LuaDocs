@@ -35,7 +35,7 @@ goes straight through and nothing needs parsing.
 
 The other common use is branching — running one piece of code on one line of the language and
 another piece elsewhere — and that is where care is needed. A comparison against a written-out
-string pins the program to exactly one line: it fails on the next release of the language, and
+string pins the program to exactly one line: it fails on the next line of the language, and
 it fails in the direction that is hardest to spot, because the branch quietly takes the wrong
 side rather than raising. Where a branch really is needed, parse the two numbers out and compare
 them as numbers, so that *newer than* is a question the code can ask.

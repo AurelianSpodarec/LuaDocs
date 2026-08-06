@@ -20,7 +20,7 @@ collectgarbage([opt [, arg]])
 
 <Parameters>
   <Param name="opt">Which of the collector's operations to ask for, as a string. Left out, a full collection cycle is run.</Param>
-  <Param name="arg">The number the chosen operation needs, where it needs one. `"step"` reads it as a step size. `"param"` reads it as the name of a collector parameter, and takes one more argument after it — an integer between `0` and `100000` — giving that parameter a new value.</Param>
+  <Param name="arg">The number the chosen operation needs, where it needs one. `"step"` reads it as a step size. `"param"` reads it as the name of a collector parameter, and may be followed by one more argument — an integer between `0` and `100000` — giving that parameter a new value; left out, the parameter is read and left as it was.</Param>
 </Parameters>
 
 <Returns>
@@ -37,7 +37,7 @@ collectgarbage([opt [, arg]])
 - Raises when `opt` is a string that names none of the options.
 - Raises when `opt` is a value that cannot be read as a string — a boolean, a table or a function is refused before any option is looked up. A number is read as its digits first, and then refused as an unrecognised option.
 - Raises when `"param"` is not followed by a string naming one of the collector's parameters.
-- <Since v="5.3" /> Raises when a numeric `arg` carries a fraction rather than an exact whole-number value. `collectgarbage("step", 1.5)` is refused; `collectgarbage("step", 2.0)` is not.
+- <Since v="5.3" /> Raises when an option that reads `arg` as a number is handed one carrying a fraction rather than an exact whole-number value. `collectgarbage("step", 1.5)` is refused; `collectgarbage("step", 2.0)` is not.
 
 </Errors>
 

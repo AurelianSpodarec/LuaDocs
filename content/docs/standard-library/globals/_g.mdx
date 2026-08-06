@@ -21,9 +21,10 @@ and writes them as fields of it, so `print` and `_G.print` are two spellings of 
 standard libraries are loaded into it too, which is why `string`, `table` and `math` are
 globals at all.
 
-It is a table like any other. It can be passed to a function, iterated, given a metatable, and
-written into with [`rawset()`](/docs/standard-library/globals/rawset); nothing about it is
-special except what is kept in it.
+It behaves like any other table: it can be passed to a function, iterated, given a metatable,
+and written into with [`rawset()`](/docs/standard-library/globals/rawset). What is not ordinary
+about it is its standing rather than its behaviour — Lua keeps it in a place of its own, so it
+stays reachable for as long as the state does and is never collected.
 
 ## Description
 
@@ -38,9 +39,11 @@ when the source is written. A field access does not: `_G[name]` takes the name a
 program can look a global up from a string it computed, a configuration file or a command line.
 
 Reading a global that was never set answers `nil`, exactly as reading an absent field of any
-table does. There is no separate notion of a global being *declared*, so a misspelled global is
-not an error — it is a read of `nil` — and putting a metatable on this table is the usual way of
-turning that back into an error.
+table does, so a misspelled name is a read of `nil` rather than a complaint. Putting a metatable
+on this table is one way of turning that back into an error, and it is the one that works on the
+table itself; see
+[global declarations](/docs/language/statements/global-declarations) for the language's own way
+of requiring a name to be declared before it is used.
 
 ## Changing the variable changes nothing
 
