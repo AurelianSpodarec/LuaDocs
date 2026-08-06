@@ -32,15 +32,17 @@ as they found it.
 All of the above holds for a list whose positions run from `1` with no gaps. Store a `nil` in
 the middle of one and its length stops having a single answer, and every function whose
 default position is measured with `#` inherits that ambiguity. Where values may be missing,
-[`table.pack()`](/docs/standard-library/table/pack) and the explicit count it records are the
-way to keep track of how many there were.
+how many of them there were has to be kept somewhere other than in the list's own shape —
+[`table.pack()`](/docs/standard-library/table/pack) records a count for you on the lines that
+have it, and where it is out of reach the count is a field you keep yourself.
 </Note>
 
-Whether these functions reach a table's elements through its metamethods or go straight past
-them is not one rule for the whole library, and neither is which of them exist: this library's
-membership is the part of the standard library that has changed most. Each entry's own version
-support says which Lua lines carry it, and the sidebar dims the ones your selected version
-does not have.
+Every function here that reaches into a table reaches in the same way as every other one, and
+that way changed once, for the whole library at once: these calls used to go straight past a
+table's metamethods and now go through them. What has moved far more than that is which
+functions exist at all — this library's membership is the part of the standard library that
+has changed most. Each entry's own version support says where both lines fall for it, and the
+sidebar dims the entries your selected version does not have.
 
 ## Making a list and adding to it
 
@@ -63,9 +65,9 @@ Changing the arrangement of what a list already holds — in place, or into a se
 Three ways to get at what a list holds: one element, a run of them as separate values, or a
 run of them joined into a string.
 
-- [`table.remove()`](/docs/standard-library/table/remove) — one element taken out, with the gap closed behind it
+- [`table.remove()`](/docs/standard-library/table/remove) — one element taken out and handed back, with the gap closed behind it
 - [`table.unpack()`](/docs/standard-library/table/unpack) — a run handed back as separate values, for passing on as arguments
-- [`table.concat()`](/docs/standard-library/table/concat) — a run written out as one string, with a separator between
+- [`table.concat()`](/docs/standard-library/table/concat) — a run written out as one string, with whatever separator you give between
 
 ## Functions best written another way
 
@@ -76,7 +78,7 @@ place, and how exact the swap is.
 - [`table.getn()`](/docs/standard-library/table/getn) — a list's length, which `#` answers identically
 - [`table.foreach()`](/docs/standard-library/table/foreach) — a function called for every key, which a `for` over `pairs()` replaces
 - [`table.foreachi()`](/docs/standard-library/table/foreachi) — the same for numbered positions, where `ipairs()` differs in one way worth knowing
-- [`table.maxn()`](/docs/standard-library/table/maxn) — the largest number used as a key, which nothing else asks and you write out yourself
+- [`table.maxn()`](/docs/standard-library/table/maxn) — the largest positive number used as a key, which nothing else asks and you write out yourself
 
 ## See also
 

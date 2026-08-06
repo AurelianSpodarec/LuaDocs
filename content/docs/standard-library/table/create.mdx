@@ -36,7 +36,7 @@ table.create(nseq [, nrec])
 
 <Errors>
 
-- Raises when `nseq` is missing, or when either count is not a number usable as a whole number.
+- Raises when `nseq` is missing, or when either count is a value Lua cannot read as a whole number. A number with a fraction raises; a string spelling a whole number does not, and is read as the number it spells.
 - Raises when either count is negative. A negative is not read as `0`.
 - Raises when a count is larger than the space Lua is willing to set aside.
 
@@ -62,9 +62,15 @@ position inside the space set aside reads as `nil` — because it holds nothing,
 position past the end. Space and contents are different things, and this call only ever
 touches the first.
 
-That is what makes it a performance decision and nothing else. Swapping `table.create(20)` for
-`{}` cannot change what a program computes or what it prints; it can only change how many
-times Lua reallocates on the way there. Where the size is not known ahead of the loop, a
+That is what makes it a performance decision. Swapping `table.create(20)` for `{}` cannot
+change any answer Lua guarantees. Two it *can* change are ones Lua never promised: the order
+[`pairs()`](/docs/standard-library/globals/pairs) hands keys back in, and which border `#`
+reports for a list with a gap in it. Neither follows from what a table holds — both follow
+from where it holds it, and setting space aside is exactly a decision about where. Code that
+depended on either was already depending on something unspecified; nothing that reads a list
+from `1` to its length, or a record by name, can tell the two tables apart.
+
+Where the size is not known ahead of the loop, a
 [table constructor](/docs/language/expressions/table-constructors) is the same table without
 the guess.
 
@@ -78,8 +84,9 @@ caller already had.
 <RunnableExample code={`local monthly_totals = {}\n-- table.create(12) hands back a table indistinguishable from this one\nprint(#monthly_totals)\nprint(next(monthly_totals))\nprint(monthly_totals[1])\n-- Expected output:\n-- 0\n-- nil\n-- nil`} />
 
 Room for twelve elements and twelve elements are not the same thing. Nothing counts, nothing
-iterates, and nothing reads back — the space is invisible from Lua, which is precisely why
-adding the call to working code is safe.
+iterates, and nothing reads back: the contents are the same contents, which is what makes
+adding the call to working code a change of speed rather than of meaning. The space itself is
+not quite invisible, though — see the last Gotcha below for the two things it can move.
 
 ### Setting room aside for named fields instead
 
@@ -109,6 +116,18 @@ that lists them.
 `nrec` says *how many* other elements are coming, never *what* they are.
 `table.create(0, 5)` sets room aside for five fields; it does not store `5`, and it does not
 store five of anything. Neither count ever appears in the table.
+</Gotcha>
+
+<Gotcha title="Two unspecified things it can still move">
+Setting space aside decides *where* a table keeps a key, and two answers Lua has never
+guaranteed are read off that: the order [`pairs()`](/docs/standard-library/globals/pairs)
+walks keys in, and which border `#` reports for a list with a hole in it. Fill the positions
+`1` and `3` of a table with room reserved for three and `#` is `3`; fill the same two
+positions of a table that had none reserved and `#` is `1`. Both answers are legitimate — a
+list with a hole has [more than one border](/docs/language/expressions/length-operator) and
+the walk order is [not specified](/docs/standard-library/globals/next) either way — so this
+breaks nothing that was not already leaning on an unspecified answer. It is still the one way
+the call is not purely a matter of speed.
 </Gotcha>
 
 ## See also
