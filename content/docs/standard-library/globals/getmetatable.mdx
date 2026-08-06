@@ -1,8 +1,182 @@
 ---
 title: getmetatable()
-description: ""
+description: Read back the metatable attached to a value, or the stand-in its metatable offers instead.
+lua-compat: globals.getmetatable
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-getmetatable
 ---
 
-{/* Not yet written. */}
+Hands back the metatable attached to a value, or `nil` when the value has none. It takes any
+value at all, not only a table — and where the metatable holds a `__metatable` field, what
+comes back is that field's value rather than the metatable itself.
+
+<RunnableExample code={`local defaults = { __index = { theme = "dark" } }\nlocal settings = setmetatable({}, defaults)\n\nprint(getmetatable(settings) == defaults)\nprint(getmetatable({}))\nprint(settings.theme)\n-- Expected output:\n-- true\n-- nil\n-- dark`} />
+
+## Syntax
+
+```lua
+getmetatable(object)
+```
+
+<Parameters>
+  <Param name="object">The value to look at. Any value is accepted, `nil` included — a value with no metatable is answered rather than refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The value's metatable, or — where that metatable holds a `__metatable` field — whatever that field holds. `nil` when the value has no metatable at all.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `nil`; nothing at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+A metatable is an ordinary table attached to a value, whose fields decide how that value
+behaves under certain operations — indexing a key it does not hold, adding it to something,
+writing it out as text. Which fields do what is the subject of
+the [metatables guide](/docs/guides/how-metatables-work); what a metatable can take over in
+general is described under
+[`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change). This call
+is the way to get one back.
+
+The answer comes in one of three shapes. A value with no metatable answers `nil`. A value
+whose metatable holds a `__metatable` field answers with what that field holds, which is the
+next section. Everything else answers with the metatable, and it is the metatable itself — the
+same table, not a copy of it, so the fields a program reads out of it are the live ones and
+writing into it changes how the value behaves from that point on.
+
+Reading the metatable is a plain read. No metamethod runs to produce the answer, not even one
+belonging to the metatable's own metatable, and the `__metatable` field is looked for in the
+metatable's own storage the way [`rawget()`](/docs/standard-library/globals/rawget) would look
+for it. Asking a value for its metatable therefore runs none of anybody's code and changes
+nothing, whatever has been attached to it.
+
+## Which values have a metatable to read
+
+Every value in Lua can have a metatable, and this call takes every value, so the interesting
+question is which ones have one to hand back.
+
+Tables and full userdata carry their own. Two tables may be given the same metatable and
+usually are — that is how a set of values comes to share behaviour — but each of them carries
+its own attachment to it, and giving one a different metatable leaves the other where it was.
+[`setmetatable()`](/docs/standard-library/globals/setmetatable) is what attaches one, and it
+takes a table and nothing else.
+
+Every other type has a single metatable for the whole type: one for all numbers, one for all
+strings, and so on down the list. There is no per-value attachment to make there and no way to
+make one — [`setmetatable()`](/docs/standard-library/globals/setmetatable) refuses anything that
+is not a table, and what
+[`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) and the C API reach is the
+type's one metatable rather than a single value's. Giving `1` a metatable that way gives it to
+`99` too.
+
+A value starts out with no metatable, and the string type is the manual's own exception. The
+string library installs one for it whose `__index` is the `string` table, which is what makes
+`("cocoa"):upper()` work — the method call finds nothing on the string, follows `__index` to the
+library, and lands on `string.upper`. So `getmetatable("")` answers with a real table while
+`getmetatable(42)` answers `nil`, and every string in the program answers with that same one
+table.
+
+## When a metatable is protected
+
+A metatable holding a field named `__metatable` is *protected*, and the field's presence
+changes both halves of the pair — this call and
+[`setmetatable()`](/docs/standard-library/globals/setmetatable) — in different ways.
+
+On this side, the field is a stand-in. Where it is present, this call hands back whatever it
+holds and never reaches the metatable behind it, so a library can offer a caller a description,
+a name, a token, or a table with nothing in it, and keep its real fields to itself. Nothing is
+raised: the call answers, and the answer is simply not the metatable.
+
+On the other side, the field is a lock. Calling `setmetatable()` on a table whose current
+metatable holds one raises rather than replacing anything, and that is true of removing the
+metatable as well. Its own entry covers
+[what that means for the call](/docs/standard-library/globals/setmetatable#when-the-metatable-cannot-be-changed).
+
+Two things follow from the field being an ordinary field with an ordinary value. It can hold
+anything a table field can hold, `false` included — and `false` is the only value this call can
+hand back that makes `if getmetatable(value) then` skip while something is in fact attached.
+And the protection is a courtesy rather than a wall: this call and `setmetatable()` are what
+enforce it, and the debug library goes around both, so
+[`debug.getmetatable()`](/docs/standard-library/debug/getmetatable) hands back the real
+metatable regardless and [`debug.setmetatable()`](/docs/standard-library/debug/setmetatable)
+replaces it. Protection keeps a metatable out of the way of ordinary code; it does not keep it
+out of reach.
+
+## Examples
+
+### Telling a value that has a metatable from one that has not
+
+<RunnableExample code={`local recipe_metatable = { __index = { servings = 4 } }\nlocal brownies = setmetatable({ name = "brownies" }, recipe_metatable)\nlocal shopping_note = { name = "buy cocoa" }\n\nprint(getmetatable(brownies) ~= nil)\nprint(getmetatable(shopping_note) ~= nil)\nprint(getmetatable(42) ~= nil)\nprint(getmetatable("a label") ~= nil)\n-- Expected output:\n-- true\n-- false\n-- false\n-- true`} />
+
+The last two lines are the ones worth reading twice. A number has nothing attached to it and a
+string does, because the string library put it there — so this is a poor test for *is this one
+of my objects*. Comparing against a particular metatable, two examples further down, is the test
+that works.
+
+### Every string answers with the same metatable
+
+<RunnableExample code={`local first_label = "cocoa"\nlocal second_label = "flour"\n\nprint(getmetatable(first_label) == getmetatable(second_label))\nprint(getmetatable(first_label).__index == string)\nprint(("cocoa"):upper())\n-- Expected output:\n-- true\n-- true\n-- COCOA`} />
+
+One metatable serves the whole type, and its `__index` is the `string` library table. The third
+line is that arrangement being used: method syntax on a string is an ordinary indexing miss
+followed by an ordinary `__index` lookup.
+
+### Asking whether a value is one of yours
+
+<RunnableExample code={`local Account = {}\nAccount.__index = Account\n\nlocal function open_account(opening_balance)\n  return setmetatable({ balance = opening_balance }, Account)\nend\n\nlocal function is_account(value)\n  return getmetatable(value) == Account\nend\n\nprint(is_account(open_account(120)))\nprint(is_account({ balance = 120 }))\nprint(is_account("120"))\n-- Expected output:\n-- true\n-- false\n-- false`} />
+
+Comparing against a particular metatable is the recognisable form of the question. It needs no
+guard for values of other types: a string answers with the string metatable and a number
+answers `nil`, and neither is `Account`.
+
+### A protected metatable answers with its stand-in
+
+<RunnableExample code={`local sealed = setmetatable({ id = 7 }, { __metatable = "sealed" })\n\nprint(getmetatable(sealed))\nlocal replaced = pcall(setmetatable, sealed, {})\nprint(replaced)\nprint(sealed.id)\n-- Expected output:\n-- sealed\n-- false\n-- 7`} />
+
+The read answers with the field's value and raises nothing; the write raises, which is why it
+is wrapped in [`pcall()`](/docs/standard-library/globals/pcall) to keep the example running.
+The table itself is untouched by any of this — its own fields are read and written as usual.
+
+## Gotchas
+
+<Gotcha title="What comes back need not be a metatable">
+Where a `__metatable` field is in play the answer is that field's value, which can be a string,
+a number, a table with nothing useful in it, or `false`. Code that indexes the result — reading
+`__index` off it, or looking for a marker field — is written against something the value's
+author is free to substitute. `nil` is the one answer that always means what it looks like: no
+metatable is attached, because a field with a value of `nil` is a field a table does not hold.
+</Gotcha>
+
+<Gotcha title="The metatable that comes back is shared, and it is live">
+This call hands over the metatable rather than a copy, and one metatable usually serves many
+values. Writing into the result therefore changes every value using it, at once and from then
+on — and for a string, the one metatable it answers with serves every string in the program.
+
+<RunnableExample code={`local shared_metatable = { __index = { colour = "green" } }\nlocal first_marker = setmetatable({}, shared_metatable)\nlocal second_marker = setmetatable({}, shared_metatable)\n\ngetmetatable(first_marker).__index = { colour = "red" }\nprint(first_marker.colour)\nprint(second_marker.colour)\n-- Expected output:\n-- red\n-- red`} />
+
+Only the first marker was reached for, and both changed. To change one value's behaviour on its
+own, give that value a metatable of its own with
+[`setmetatable()`](/docs/standard-library/globals/setmetatable).
+</Gotcha>
+
+<Gotcha title="A metatable is not a type, and not a class">
+Two values can share a metatable and hold nothing else in common, and two values built from the
+same code can end up with different metatables. So this call answers *what behaviour has been
+attached here*, which is a narrower question than what a value is.
+[`type()`](/docs/standard-library/globals/type) is the one that answers the broad question, and
+it consults no metatable at all.
+</Gotcha>
+
+## See also
+
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — attaching, replacing and removing the metatable this call reads
+- [`rawget()`](/docs/standard-library/globals/rawget) — reading a field with no `__index` consulted
+- [`type()`](/docs/standard-library/globals/type) — the name of a value's type, which no metatable can change
+- [`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change) — what a metatable can take over in general
+- [`debug.getmetatable()`](/docs/standard-library/debug/getmetatable) — the reading that a `__metatable` field does not stand in front of
+- [`__metatable`](/docs/language/metatables/metatable) — the field itself
+- [How metatables really work](/docs/guides/how-metatables-work) — what the other fields do

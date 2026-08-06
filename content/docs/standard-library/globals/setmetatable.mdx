@@ -1,8 +1,173 @@
 ---
 title: setmetatable()
-description: ""
+description: Attach a metatable to a table, replace the one it has, or take it away — and get the table back.
+lua-compat: globals.setmetatable
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-setmetatable
 ---
 
-{/* Not yet written. */}
+Attaches a metatable to a table, and hands the same table back. Passing `nil` in place of a
+metatable removes the one the table has. It works on tables and on nothing else — a value of
+another type can have a metatable, but not one this call can attach.
+
+<RunnableExample code={`local order_defaults = { shipping = "standard", gift_wrap = false }\nlocal weekend_order = setmetatable({ shipping = "express" }, { __index = order_defaults })\n\nprint(weekend_order.shipping)\nprint(weekend_order.gift_wrap)\nprint(rawget(weekend_order, "gift_wrap"))\n-- Expected output:\n-- express\n-- false\n-- nil`} />
+
+## Syntax
+
+```lua
+setmetatable(table, metatable)
+```
+
+<Parameters>
+  <Param name="table">The table to attach to. It has to be a real table; a value of any other type is refused, whatever behaviour it may already have.</Param>
+  <Param name="metatable">The table to attach, or `nil` to remove whatever is attached now. Both arguments have to be there — see the Errors list.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The same table that was handed in — the first argument, not the metatable and not a copy.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table.
+- Raises when the second argument is neither a table nor `nil`.
+- Raises when the call is missing its second argument. An argument of `nil` means *remove the metatable* and is carried out; no argument at all is a mistake and is refused.
+- Raises when the metatable the table already has holds a `__metatable` field. Replacing that metatable and removing it are refused alike, and the table is left as it was.
+
+</Errors>
+
+## Description
+
+A metatable is an ordinary table whose fields decide how the value it is attached to behaves
+under certain operations — indexing, arithmetic, comparison, being written out as text. This
+call is how one gets attached.
+What the fields do is the subject of the
+[metatables guide](/docs/guides/how-metatables-work); what a metatable can take over in general
+is described under
+[`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change).
+
+Attaching replaces rather than merges. A table has one metatable or none, so a second call
+discards whatever the first attached, and every field of the old one goes with it. Building on
+an existing metatable means writing into it — reached with
+[`getmetatable()`](/docs/standard-library/globals/getmetatable) where it is not protected, and
+bearing in mind that it may well be attached to other tables too — rather than handing a second
+one over here.
+
+Both arguments are required, and this is where the call is stricter than it looks. A second
+argument of `nil` is a request to remove the metatable and is carried out; leaving the argument
+off altogether is refused. The difference matters because the two are usually
+interchangeable — a variable that turned out empty reads as `nil` where an omitted argument
+would too, and here the empty variable quietly removes a metatable while the omission raises.
+
+The restriction to tables is the manual's own: a metatable can be attached to a value of
+another type, but not from here. Numbers, strings, booleans and functions each have one
+metatable for the whole type rather than one per value, and reaching those takes
+[`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) or the C API.
+[`getmetatable()`](/docs/standard-library/globals/getmetatable#which-values-have-a-metatable-to-read)
+describes how the types differ; this call is only ever about a table.
+
+## Why it hands the table back
+
+The return value is the first argument itself — the same table, not a copy of it and not the
+metatable, carrying whatever this call just did to it. That makes the call an expression rather
+than a statement, and one shape follows from it more than any other:
+
+```lua
+return setmetatable({ balance = opening_balance }, Account)
+```
+
+A table is built and given its behaviour in a single expression, with no local to hold it in
+between and no second statement to forget. Constructors are written this way throughout Lua, and
+a chain of calls that each return their argument reads the same way.
+
+The value is the table, not the metatable, so the result is what a caller wants to keep. A
+constructor that returned the metatable would hand every caller the shared one.
+
+## When the metatable cannot be changed
+
+A metatable holding a field named `__metatable` is *protected*, and this call refuses to touch
+a table whose metatable holds one. Replacing that metatable raises; so does removing it with
+`nil`; the table's own contents are left alone in both cases, and go on being read and written
+as usual.
+
+Which metatable is checked is the one already attached, not the one being handed over. So
+attaching a metatable that carries a `__metatable` field is an ordinary, successful call — that
+is how protection gets put in place — and it is the *next* call of this function on the same
+table that raises.
+What that field does to reading is on the other side of the pair, under
+[`getmetatable()`](/docs/standard-library/globals/getmetatable#when-a-metatable-is-protected),
+which owns the rest of the rule, including the reasons a protected metatable is a courtesy
+rather than a wall.
+
+## Examples
+
+### Building a table and giving it behaviour in one expression
+
+<RunnableExample code={`local Playlist = {}\nPlaylist.__index = Playlist\n\nfunction Playlist.new(title)\n  return setmetatable({ title = title, tracks = {} }, Playlist)\nend\n\nfunction Playlist:add(track)\n  self.tracks[#self.tracks + 1] = track\n  return self\nend\n\nlocal favourites = Playlist.new("Favourites")\nfavourites:add("Cocoa Butter"):add("Flour Power")\n\nprint(favourites.title)\nprint(#favourites.tracks)\nprint(favourites.tracks[2])\n-- Expected output:\n-- Favourites\n-- 2\n-- Flour Power`} />
+
+`Playlist.__index = Playlist` is the line that makes the methods reachable: a lookup of `add` on
+the new table finds nothing, follows `__index`, and lands on the function. The call returning its
+first argument is what lets the constructor be a single `return`.
+
+### Replacing a metatable, and taking it away
+
+<RunnableExample code={`local weather = setmetatable({}, { __index = function() return "unknown" end })\nprint(weather.tuesday)\n\nsetmetatable(weather, { __index = function() return "no reading" end })\nprint(weather.tuesday)\n\nsetmetatable(weather, nil)\nprint(weather.tuesday)\nprint(getmetatable(weather))\n-- Expected output:\n-- unknown\n-- no reading\n-- nil\n-- nil`} />
+
+The second call replaces the first metatable outright, and the third removes what is left.
+Afterwards the table answers for itself, so a missing key is a missing key again.
+
+### One metatable, many tables
+
+<RunnableExample code={`local Temperature = { __tostring = function(reading) return reading.degrees .. " degrees" end }\nlocal morning = setmetatable({ degrees = 12 }, Temperature)\nlocal evening = setmetatable({ degrees = 8 }, Temperature)\n\nprint(tostring(morning))\nprint(tostring(evening))\nprint(getmetatable(morning) == getmetatable(evening))\n-- Expected output:\n-- 12 degrees\n-- 8 degrees\n-- true`} />
+
+Nothing is copied. Both tables point at the one metatable, which is what makes shared behaviour
+cheap — and what makes a later edit to `Temperature` reach every reading already built.
+
+### Sealing a metatable off
+
+<RunnableExample code={`local ledger = setmetatable({ entries = 3 }, { __metatable = "sealed" })\n\nprint(getmetatable(ledger))\nlocal replaced = pcall(setmetatable, ledger, { __index = {} })\nlocal removed = pcall(setmetatable, ledger, nil)\nprint(replaced)\nprint(removed)\n-- Expected output:\n-- sealed\n-- false\n-- false`} />
+
+The first call attached a metatable carrying the field and succeeded. Both calls after it
+raise — replacing and removing alike — which is why they are wrapped in
+[`pcall()`](/docs/standard-library/globals/pcall). The read answers with the field's value and
+raises nothing at all.
+
+## Gotchas
+
+<Gotcha title="No second argument is not the same as nil">
+Nearly every argument that may be `nil` may also be left off. Not this one: an explicit `nil`
+removes the metatable, and an omitted argument raises.
+
+<RunnableExample code={`local basket = {}\nlocal with_nothing = pcall(setmetatable, basket)\nlocal with_nil = pcall(setmetatable, basket, nil)\n\nprint(with_nothing)\nprint(with_nil)\n-- Expected output:\n-- false\n-- true`} />
+
+The trap is a helper that passes a metatable through from its own caller. When that value
+arrives as `nil`, the call succeeds and strips the table instead of leaving it alone — which is
+the failure that does not announce itself.
+</Gotcha>
+
+<Gotcha title="A second call replaces everything the first one attached">
+There is one metatable per table, so handing over a new one discards the old one whole. A
+metatable meant to add `__tostring` to a table that already had `__index` takes the `__index`
+away with it, and the loss shows up later as an ordinary missing field rather than as an error
+here. To add a field, write it into the metatable already attached; to build one metatable out
+of another, copy the fields across before attaching it.
+</Gotcha>
+
+<Gotcha title="A finalizer has to be in the metatable before it is attached">
+Whether a table will be finalized when it is collected is settled at this call: the metatable
+handed over has to carry `__gc` already. Writing the field into a metatable that is already
+attached leaves the table unmarked, and the field sitting there afterwards does not change that.
+The repair is to call this function again with the same metatable, which puts the table through
+the check a second time. See [`__gc`](/docs/language/metatables/gc) for what the field itself
+does.
+</Gotcha>
+
+## See also
+
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable) — reading back what this call attached
+- [`rawset()`](/docs/standard-library/globals/rawset) — writing a field with no `__newindex` consulted
+- [`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change) — what a metatable can take over in general
+- [`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) — attaching a metatable to a value of any type
+- [`__index`](/docs/language/metatables/index-metamethod) — the field behind the defaults and method lookups above
+- [`__metatable`](/docs/language/metatables/metatable) — the field that seals a metatable off
+- [How metatables really work](/docs/guides/how-metatables-work) — what the other fields do

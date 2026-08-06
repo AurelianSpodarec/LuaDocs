@@ -79,6 +79,8 @@ import globalsRawequal from './data/globals.rawequal.json';
 import globalsRawget from './data/globals.rawget.json';
 import globalsRawset from './data/globals.rawset.json';
 import globalsRawlen from './data/globals.rawlen.json';
+import globalsGetmetatable from './data/globals.getmetatable.json';
+import globalsSetmetatable from './data/globals.setmetatable.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -297,6 +299,21 @@ const raw: Record<string, unknown> = {
   // these four). What it accepts never changed: every version that has it says the value
   // must be a table or a string.
   'globals.rawlen': globalsRawlen,
+  // The metatable pair. Neither function has moved: `luaB_getmetatable` is byte-identical
+  // in all five versions and at every release tag, and `luaB_setmetatable` differs only in
+  // which argument-check macro it spells and whether the branch carries a hint — the manual
+  // passages likewise say the same thing in three arrangements. So `getmetatable` is
+  // availability and nothing else, and no matrix renders on its page.
+  //
+  // `setmetatable` records one change, and the manual files it under garbage collection
+  // rather than beside the function: from 5.2 a table is *marked for finalization* by this
+  // call, if and only if the metatable it is handed already holds `__gc`. Before that only
+  // full userdata could be finalized, and only through the C API. It is recorded here rather
+  // than left to the `__gc` entry because it is observable by calling `setmetatable` — the
+  // moment of the call is what decides — and because the field arriving late in a metatable
+  // that is already attached is a silent failure with nothing to catch it.
+  'globals.getmetatable': globalsGetmetatable,
+  'globals.setmetatable': globalsSetmetatable,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
