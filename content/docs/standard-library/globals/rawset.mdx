@@ -1,8 +1,126 @@
 ---
 title: rawset()
-description: ""
+description: Store a value in a table under a key, with no assignment metamethod consulted.
+lua-compat: globals.rawset
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-rawset
 ---
 
-{/* Not yet written. */}
+Stores a value in a table's own storage under a key. Where `account[field] = value` may hand
+the assignment to a `__newindex` metamethod — which can log it, refuse it, or send it
+somewhere else entirely — this call writes into the table and asks nobody. The table itself
+comes back, so the call can stand where a value is wanted.
+
+<RunnableExample code={`local audit_trail = {}\nlocal account = setmetatable({}, {\n  __newindex = function(target, field_name, value)\n    audit_trail[#audit_trail + 1] = field_name\n    rawset(target, field_name, value)\n  end,\n})\n\naccount.balance = 120\naccount.owner = "ada"\nprint(table.concat(audit_trail, ", "))\nprint(account.balance)\n-- Expected output:\n-- balance, owner\n-- 120`} />
+
+## Syntax
+
+```lua
+rawset(table, index, value)
+```
+
+<Parameters>
+  <Param name="table">The table to write into. It has to be a real table; a value that merely behaves like one is refused.</Param>
+  <Param name="index">The key to store under. Most values will do, but two are refused outright — see the errors below.</Param>
+  <Param name="value">What to store. Any value at all, `nil` included, which takes the key out of the table's own storage.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The same table that was handed in, so the call can be used where a value is expected.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table.
+- Raises when the call carries fewer than three arguments. Storing `nil` is done by passing `nil` as the third one, not by leaving it out.
+- Raises when the key is `nil`. Nothing can be stored under it, and the call says so rather than doing nothing quietly.
+- Raises when the key is a not-a-number value. Such a value is not equal even to itself, so nothing stored under it could ever be found again.
+
+</Errors>
+
+## Description
+
+The value is written into the table's own storage: the same place
+[`rawget()`](/docs/standard-library/globals/rawget) reads from, and the entries
+[`next()`](/docs/standard-library/globals/next) walks. Storing `nil` is how a key is taken
+back out — afterwards the table holds nothing there, which is what "absent" means for a
+table.
+
+Ordinary assignment does more than that. When the table has nothing under the key already,
+the assignment turns to the metatable, and a `__newindex` waiting there takes over: it may
+write the value somewhere else, count it, validate it, or refuse it. So the two forms can
+only part company in one situation — the key is absent from the table's own storage *and* a
+`__newindex` is in place. Where the table already holds the key, an ordinary assignment
+overwrites it directly and is a raw store already.
+
+Being the one form a `__newindex` cannot intercept is what this call is for, and it has two
+distinct uses. The first is inside the metamethod itself: a `__newindex` that logs an
+assignment and then wants it to happen has to store the value with this call, because writing
+`target[field] = value` would arrive back at the same metamethod, and again, without end. The
+second is from outside — seeding a guarded table before its guard should apply, or repairing
+one afterwards.
+
+What "raw" covers, and what it deliberately does not, is described under
+[`rawget()`](/docs/standard-library/globals/rawget#what-raw-access-means).
+
+## Examples
+
+### Writing past a metatable that refuses
+
+<RunnableExample code={`local read_only = setmetatable({}, {\n  __newindex = function() error("this table is read-only", 2) end,\n})\n\nlocal stored = pcall(function() read_only.colour = "teal" end)\nprint(stored)\nprint(read_only.colour)\nrawset(read_only, "colour", "teal")\nprint(read_only.colour)\n-- Expected output:\n-- false\n-- nil\n-- teal`} />
+
+The ordinary assignment reached the metamethod and raised; nothing was stored. The raw one
+went straight into the table, and the value is there afterwards for every kind of read. A
+guard written this way keeps honest code out, not determined code.
+
+### Seeding a table before its guard applies
+
+<RunnableExample code={`local settings = setmetatable({}, {\n  __newindex = function() error("settings are locked after start-up", 2) end,\n})\n\nlocal starting_values = { theme = "dark", autosave = true }\nfor setting_name, value in pairs(starting_values) do\n  rawset(settings, setting_name, value)\nend\n\nprint(settings.theme)\nprint(settings.autosave)\n-- Expected output:\n-- dark\n-- true`} />
+
+The metatable is in place from the moment it is attached, so filling the table afterwards has
+to be done raw. Nothing about the guard is relaxed while this runs — it is simply not on the
+path this call takes.
+
+### The table comes back out
+
+<RunnableExample code={`local page_counts = {}\nlocal same_table = rawset(page_counts, "dune", 412)\n\nprint(rawequal(page_counts, same_table))\nprint(page_counts.dune)\n-- Expected output:\n-- true\n-- 412`} />
+
+What comes back is the table that was handed in, not a copy and not the value stored. That is
+what lets the call sit inside a larger expression, and it is also why nothing here needs to
+be assigned back: the table was changed where it stood.
+
+## Gotchas
+
+<Gotcha title="A __newindex only sees keys the table does not already hold">
+Assignment consults the metatable when the table has nothing under the key — and not
+otherwise. So a table that already holds `theme` takes `settings.theme = "light"` directly,
+metamethod and all, and a guard written to refuse changes never hears about it. Guards of
+that kind keep their data in a second table and leave the guarded one empty, which is exactly
+the arrangement that makes this call necessary inside the metamethod.
+</Gotcha>
+
+<Gotcha title="Two keys are refused rather than ignored">
+`nil` and a not-a-number value both raise here, and they raise for the same reason ordinary
+assignment does: neither can name a place in a table. Code that builds keys by computing them
+— parsing a numeral that came back empty, dividing two counts that were both zero — reaches
+this call with one of them eventually, and finds out by having the program stop. Check the key
+before storing, or store under a name you chose rather than one you derived.
+</Gotcha>
+
+<Gotcha title="Storing nil is a removal, not a slot">
+`rawset(basket, "cocoa", nil)` leaves the table holding nothing under `cocoa`, which is
+indistinguishable from never having stored it: a raw read answers `nil`, a traversal skips it,
+and an ordinary lookup goes back to consulting `__index`. Done in the middle of a list it
+leaves a hole, and the length operator's answer stops being the count anyone expects — so
+taking an element out of a list is
+[`table.remove()`](/docs/standard-library/table/remove)'s job rather than this call's.
+</Gotcha>
+
+## See also
+
+- [`rawget()`](/docs/standard-library/globals/rawget) — the read that goes around `__index`, and what raw access means
+- [`rawlen()`](/docs/standard-library/globals/rawlen) — measuring a table without asking its metatable
+- [`rawequal()`](/docs/standard-library/globals/rawequal) — comparing two values without asking either metatable
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — attaching the metatable this call declines to consult
+- [`table.remove()`](/docs/standard-library/table/remove) — taking an element out of a list without leaving a hole
+- [How metatables really work](/docs/guides/how-metatables-work) — what `__newindex` does when it is consulted

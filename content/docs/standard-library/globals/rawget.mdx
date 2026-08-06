@@ -1,8 +1,159 @@
 ---
 title: rawget()
-description: ""
+description: Read what a table holds under a key, with no indexing metamethod consulted.
+lua-compat: globals.rawget
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-rawget
 ---
 
-{/* Not yet written. */}
+Reads what a table holds under a key, and stops there. Where `settings[key]` hands the
+question on to an `__index` metamethod whenever the table itself has nothing under that key,
+this call answers out of the table's own storage and asks nobody.
+
+<RunnableExample code={`local defaults = { theme = "dark", font_size = 14 }\nlocal settings = setmetatable({ font_size = 18 }, { __index = defaults })\nprint(settings.theme)\nprint(rawget(settings, "theme"))\nprint(rawget(settings, "font_size"))\n-- Expected output:\n-- dark\n-- nil\n-- 18`} />
+
+## Syntax
+
+```lua
+rawget(table, index)
+```
+
+<Parameters>
+  <Param name="table">The table to read from. It has to be a real table; a value that merely behaves like one is refused.</Param>
+  <Param name="index">The key to read under. Any value is accepted here, `nil` and a not-a-number value included — neither can be a key a table holds, so both find nothing.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">What the table holds under that key, or `nil` when it holds nothing there.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table.
+- Raises when the call is missing its second argument. A key of `nil` is a value and is answered with `nil`; no key at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+A table's own storage is the set of keys it holds itself — the ones an assignment put there,
+the ones a constructor filled in, the ones a traversal with
+[`next()`](/docs/standard-library/globals/next) visits. This call reads one of them and
+reports what is there, or `nil` when nothing is.
+
+Ordinary indexing asks a second question after that one. When a table holds nothing under
+the key, the lookup turns to the table's metatable and, if an `__index` is waiting there,
+lets it answer instead — from another table, or by running a function. So the two forms can
+only part company in one situation: the key is absent from the table's own storage *and* an
+`__index` is in place to answer for it. Where the table holds the key itself, `settings[key]`
+and `rawget(settings, key)` produce the same value, because the metamethod is never reached.
+
+That makes this the call for the question *what does this table hold*, as against *what does
+this table answer*. Three jobs follow from it. Telling a table's own entries from the ones it
+inherits from a prototype or a defaults table. Reading a field of a table from inside that
+same table's `__index` metamethod, where ordinary indexing would arrive back at the
+metamethod it is already running. And checking whether a computed value has already been
+stored, without the act of checking computing it.
+
+## What raw access means
+
+Four calls in this section perform one operation each the way Lua performs it when no
+metatable is involved at all: this one, [`rawset()`](/docs/standard-library/globals/rawset),
+[`rawequal()`](/docs/standard-library/globals/rawequal) and
+[`rawlen()`](/docs/standard-library/globals/rawlen). Each is the plain version of something
+the language also offers as an operator or a syntax, and each has one metatable field it
+declines to consult:
+
+| Raw call | The plain form of | The field it does not consult |
+|---|---|---|
+| `rawget(t, key)` | `t[key]` | `__index` |
+| `rawset(t, key, value)` | `t[key] = value` | `__newindex` |
+| `rawequal(left, right)` | `left == right` | `__eq` |
+| `rawlen(v)` | `#v` | `__len` |
+
+The middle column is a correspondence rather than a substitution. Swapping one for the other
+changes what is accepted as well as what is answered: `rawget()` and `rawset()` insist on a
+real table where indexing accepts anything an `__index` can answer for, and `rawlen()` takes
+only a table or a string where `#` takes any value with a `__len`. `rawequal()` is the
+exception — it accepts whatever `==` accepts, and for most of the values it is handed there
+is no metamethod to skip in the first place, which its own entry explains.
+
+*Raw* describes one operation, not the value it is performed on. The metatable stays where it
+is, nothing about it is discarded, and every other operation on the same value goes on
+consulting it as usual. Nor does raw access reach further than the single step it performs:
+the value `rawget()` hands back is an ordinary value, and indexing *that* is ordinary
+indexing again.
+
+The distinction turns up outside these four as well, in calls that never say the word.
+[`ipairs()`](/docs/standard-library/globals/ipairs#what-a-metatable-can-change) looks each
+position up rather than reading it raw, so a metamethod can supply positions the list does not
+hold. [`table.insert()`](/docs/standard-library/table/insert) and its siblings reach a list's
+elements the same way. [`next()`](/docs/standard-library/globals/next), on the other hand,
+walks the entries a table holds itself and consults nothing. Each of those entries says where
+it stands.
+
+What a metatable can do to an operation in the first place is described under
+[`tostring()`](/docs/standard-library/globals/tostring#what-a-metatable-can-change), and the
+[metatables guide](/docs/guides/how-metatables-work) covers the rest of the fields. These four
+are the way back out.
+
+## Examples
+
+### Telling a table's own entries from inherited ones
+
+<RunnableExample code={`local base_recipe = { flour = 200, sugar = 50, cocoa = 0 }\nlocal brownie = setmetatable({ sugar = 120, cocoa = 30 }, { __index = base_recipe })\n\nfor _position, ingredient in ipairs({ "flour", "sugar", "cocoa" }) do\n  print(ingredient .. ": own " .. tostring(rawget(brownie, ingredient)) .. ", looked up " .. brownie[ingredient])\nend\n-- Expected output:\n-- flour: own nil, looked up 200\n-- sugar: own 120, looked up 120\n-- cocoa: own 30, looked up 30`} />
+
+Only `flour` comes from the base recipe, and the raw read is what says so. The other two
+answer the same either way, because the brownie holds them itself and the lookup never
+reaches the metatable.
+
+### Not running the code an ordinary lookup would run
+
+<RunnableExample code={`local lookups = 0\nlocal station_codes = setmetatable({}, {\n  __index = function(_target, station_name)\n    lookups = lookups + 1\n    return station_name:upper()\n  end,\n})\n\nprint(station_codes.rossio)\nprint(rawget(station_codes, "rossio"))\nprint(lookups)\n-- Expected output:\n-- ROSSIO\n-- nil\n-- 1`} />
+
+The metamethod ran once, for the ordinary lookup. The raw read produced `nil` and left the
+counter alone — which matters when the metamethod is expensive, keeps a cache warm, or logs
+what it was asked for.
+
+### Checking whether a value has already been worked out
+
+<RunnableExample code={`local order_totals = setmetatable({}, {\n  __index = function(target, order_number)\n    local computed = order_number * 10\n    rawset(target, order_number, computed)\n    return computed\n  end,\n})\n\nprint(rawget(order_totals, 7))\nprint(order_totals[7])\nprint(rawget(order_totals, 7))\n-- Expected output:\n-- nil\n-- 70\n-- 70`} />
+
+This is the shape a memo table takes: the metamethod works the answer out once and stores it,
+and the raw read is how you ask whether that has happened yet. Written with ordinary indexing
+the question would answer itself by doing the work.
+
+## Gotchas
+
+<Gotcha title="Nothing stored is not the same as nothing to say">
+A `nil` from this call reports on the table's own storage, and says nothing about what
+`settings[key]` would produce. Used as a presence test on a table backed by defaults, it
+reports every inherited key as missing. The test that matches ordinary indexing is
+`settings[key] ~= nil`; this one answers a narrower question on purpose.
+</Gotcha>
+
+<Gotcha title="It insists on a real table, and an empty one is still real">
+A value that only behaves like a table — a userdata handed over by a library, say — can be
+indexed perfectly well and is refused here, because the first argument has to be a table.
+A helper written with this call therefore stops working the moment a caller passes one, and
+it stops by raising rather than by answering wrongly. The quieter half of the same trap is a
+proxy built *as* an empty table: that one is accepted, and answers `nil` for everything the
+metatable was standing by to supply.
+</Gotcha>
+
+<Gotcha title="A key of nil is answered, not refused">
+`rawget(settings, nil)` returns `nil` rather than raising, because no table holds a key of
+`nil` and finding nothing is a perfectly good answer. That makes a lookup written from a
+variable that turned out empty come back looking like an ordinary miss. Assignment is the
+strict one: [`rawset()`](/docs/standard-library/globals/rawset) refuses a key of `nil`
+outright.
+</Gotcha>
+
+## See also
+
+- [`rawset()`](/docs/standard-library/globals/rawset) — the assignment that goes around `__newindex` the same way
+- [`rawlen()`](/docs/standard-library/globals/rawlen) — measuring a table without asking its metatable
+- [`rawequal()`](/docs/standard-library/globals/rawequal) — comparing two values without asking either metatable
+- [`next()`](/docs/standard-library/globals/next) — stepping through the entries a table holds itself
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable) — reaching the metatable this call declines to consult
+- [How metatables really work](/docs/guides/how-metatables-work) — what `__index` does when it is consulted

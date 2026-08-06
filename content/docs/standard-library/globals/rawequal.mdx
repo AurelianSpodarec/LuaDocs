@@ -1,8 +1,132 @@
 ---
 title: rawequal()
-description: ""
+description: Compare two values the way == would with no __eq metamethod in the way.
+lua-compat: globals.rawequal
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-rawequal
 ---
 
-{/* Not yet written. */}
+Answers whether two values are equal, without letting an `__eq` metamethod decide for them.
+That metamethod only ever has a say over two tables or two full userdata, so for a number, a
+string, a boolean or `nil` this call and `==` are the same question asked twice.
+
+<RunnableExample code={`local money_mt = { __eq = function(left, right) return left.cents == right.cents end }\nlocal price = setmetatable({ cents = 250 }, money_mt)\nlocal budget = setmetatable({ cents = 250 }, money_mt)\n\nprint(price == budget)\nprint(rawequal(price, budget))\nprint(rawequal(price, price))\n-- Expected output:\n-- true\n-- false\n-- true`} />
+
+## Syntax
+
+```lua
+rawequal(v1, v2)
+```
+
+<Parameters>
+  <Param name="v1">The first value. Any value at all, `nil` included.</Param>
+  <Param name="v2">The second value, on the same terms.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true` when the two are equal without any metamethod being consulted, `false` otherwise.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the call carries fewer than two arguments. An argument of `nil` is a value and is compared; a missing one is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+Two values of different types are unequal, and no conversion is attempted: `"12"` and `12`
+are a string and a number, so the answer is `false`. Within a type, the comparison is the one
+the language performs on its own. Numbers are equal when they stand for the same
+mathematical value. Strings are equal when they hold the same bytes. A table, a userdata or a
+coroutine is equal to itself and to nothing else — two of them built the same way, holding
+the same things, are still two. Functions work the same way with one reservation the language
+keeps for itself: two written separately with no detectable difference between them may or
+may not be reported as one.
+
+All of that is what `==` does too. The one thing this call leaves out is the metamethod, and
+that narrows the difference between the two forms a long way, because `__eq` is reached only
+when both values are tables, or both are full userdata, and they are not already the same
+value. On anything else there is no metamethod in the picture to skip.
+
+## Where this differs from ordinary equality
+
+Put the two side by side and only one situation separates them: a pair of tables, or a pair
+of full userdata, that are not the same value, where a metatable offers an `__eq`. There
+`==` calls the metamethod and reports what it decided, and this call reports that the two are
+not the same value — which is the question it was asked.
+
+Everywhere else the two agree, and they agree by construction rather than by luck. On a
+number, a string, a boolean, `nil`, a function or a coroutine, no `__eq` is ever consulted, so
+*raw* equality and ordinary equality are one and the same thing. Reaching for this call to
+compare two prices or two names buys nothing and suggests to a reader that something subtle
+is going on.
+
+The disagreement also runs one way only. A metamethod is consulted only for values that are
+*not* already equal, so whenever this call answers `true`, `==` answers `true` as well; it is
+the reverse that can part company. That makes this the test for *is this the very same
+value*, on data whose `==` has been given a meaning of its own — checking that a record came
+back out of a cache rather than an equal-looking copy of it, or that a value about to be
+stored is not the one already there.
+
+What "raw" covers across the four calls that offer it is described under
+[`rawget()`](/docs/standard-library/globals/rawget#what-raw-access-means).
+
+## Examples
+
+### On values that are not tables, this is `==`
+
+<RunnableExample code={`local station_name = "Rossio"\nlocal rebuilt_name = "Ros" .. "sio"\n\nprint(rawequal(station_name, rebuilt_name))\nprint(station_name == rebuilt_name)\nprint(rawequal(12, 12))\nprint(rawequal("12", 12))\n-- Expected output:\n-- true\n-- true\n-- true\n-- false`} />
+
+Two strings assembled differently are the same string, and the raw comparison says so exactly
+as `==` does. The last line is the type rule: a string and a number are never equal, and
+neither form converts one into the other to check.
+
+### Two tables holding the same things are still two tables
+
+<RunnableExample code={`local first_basket = { "cocoa", "flour" }\nlocal second_basket = { "cocoa", "flour" }\n\nprint(rawequal(first_basket, second_basket))\nprint(rawequal(first_basket, first_basket))\nprint(first_basket == second_basket)\n-- Expected output:\n-- false\n-- true\n-- false`} />
+
+With no `__eq` anywhere, the two forms answer identically, and both answer *identity*: a
+table is equal to itself and to nothing else. Comparing contents is a job for code you write,
+and there is no built-in call that does it.
+
+### Comparing without running the comparison somebody else wrote
+
+<RunnableExample code={`local strict_mt = { __eq = function() error("these records must not be compared", 2) end }\nlocal left_record = setmetatable({ reference = "AB-1" }, strict_mt)\nlocal right_record = setmetatable({ reference = "AB-1" }, strict_mt)\n\nlocal compared = pcall(function() return left_record == right_record end)\nprint(compared)\nprint(rawequal(left_record, right_record))\nprint(rawequal(left_record, left_record))\n-- Expected output:\n-- false\n-- false\n-- true`} />
+
+An `__eq` is ordinary code and can do whatever code does: run slowly, keep state, or raise.
+The raw comparison cannot be reached by any of it, which is what makes it usable in a place
+that must not fail — inside the metamethod itself, for one.
+
+## Gotchas
+
+<Gotcha title="On most values it is a longer way to write ==">
+The difference only exists for a pair of tables or a pair of full userdata carrying an `__eq`.
+Written over numbers, strings or booleans this call answers what `==` answers, so the reader
+is left looking for a subtlety that is not there. Reach for it where the values compared are
+tables whose equality somebody has redefined, and use `==` everywhere else.
+</Gotcha>
+
+<Gotcha title="It compares the two values, not what is inside them">
+Nothing here looks at a table's contents, at any depth. Two tables that hold equal things are
+unequal, and that is the answer both this call and `==` give unless an `__eq` says otherwise —
+so a test written this way over freshly built tables reports `false` every time, correctly and
+uselessly. Comparing structure means walking it, with
+[`pairs()`](/docs/standard-library/globals/pairs) and a function of your own.
+</Gotcha>
+
+<Gotcha title="A false answer does not mean the two are different">
+Where an `__eq` is in play, `==` and this call are asking different questions, and the raw one
+answers `false` for two values the rest of the program treats as equal. Used by mistake as a
+general equality test on such data — in a lookup, a filter, a de-duplication pass — it quietly
+finds nothing, because it was answering *is this the same value* all along.
+</Gotcha>
+
+## See also
+
+- [`rawget()`](/docs/standard-library/globals/rawget) — the read that goes around `__index`, and what raw access means
+- [`rawset()`](/docs/standard-library/globals/rawset) — the assignment that goes around `__newindex`
+- [`rawlen()`](/docs/standard-library/globals/rawlen) — measuring a value without asking its metatable
+- [`type()`](/docs/standard-library/globals/type) — naming what a value is, which decides whether `__eq` is reachable at all
+- [Relational operators](/docs/language/expressions/relational-operators) — what `==` does when the metamethod is left in
+- [How metatables really work](/docs/guides/how-metatables-work) — what `__eq` does when it is consulted

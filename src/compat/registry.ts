@@ -75,6 +75,10 @@ import globalsTonumber from './data/globals.tonumber.json';
 import globalsPairs from './data/globals.pairs.json';
 import globalsIpairs from './data/globals.ipairs.json';
 import globalsNext from './data/globals.next.json';
+import globalsRawequal from './data/globals.rawequal.json';
+import globalsRawget from './data/globals.rawget.json';
+import globalsRawset from './data/globals.rawset.json';
+import globalsRawlen from './data/globals.rawlen.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -271,6 +275,28 @@ const raw: Record<string, unknown> = {
   'globals.pairs': globalsPairs,
   'globals.ipairs': globalsIpairs,
   'globals.next': globalsNext,
+  // The four ways to reach a value without its metatable getting a say. Three of them are
+  // present from 5.1 and have not moved since: `luaB_rawequal`, `luaB_rawget` and
+  // `luaB_rawset` are the same handful of lines in every version, at the release tag as
+  // well as at the line's final release. Their manual passages *are* reworded at 5.3 —
+  // "without invoking any metamethod" becomes the name of the one metamethod each actually
+  // bypasses, and 5.4 says "metavalue" where 5.3 said "metamethod" — but the code they
+  // describe is unchanged, so none of it is a `changed_in`, on the ruling `math.huge` set
+  // for reworded passages.
+  //
+  // `rawset`'s passage gains a second refused key at 5.2 ("different from nil" becomes
+  // "different from nil and NaN"), and that is the same shape: `ltable.c` raises for a
+  // not-a-number key in 5.1 too, so 5.2 documented a rule that was already there. Recorded
+  // in the entry's Errors list undated, per ADR 0010 rule 3.
+  'globals.rawequal': globalsRawequal,
+  'globals.rawget': globalsRawget,
+  'globals.rawset': globalsRawset,
+  // The one arrival. `rawlen` is absent from the 5.1 manual and from 5.1's `lbaselib.c`,
+  // and enters with 5.2 alongside the C API's `lua_rawlen` (renamed there from
+  // `lua_objlen`, which is the only mention any Incompatibilities chapter makes of any of
+  // these four). What it accepts never changed: every version that has it says the value
+  // must be a table or a string.
+  'globals.rawlen': globalsRawlen,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

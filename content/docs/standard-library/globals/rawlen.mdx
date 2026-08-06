@@ -1,8 +1,124 @@
 ---
 title: rawlen()
-description: ""
+description: Measure a table or a string without letting a __len metamethod answer instead.
+lua-compat: globals.rawlen
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-rawlen
 ---
 
-{/* Not yet written. */}
+Measures a table or a string the way `#` does, with one difference: a `__len` metamethod
+offering a length of its own is not consulted. A string is accepted here as well as a table,
+where [`rawget()`](/docs/standard-library/globals/rawget) and
+[`rawset()`](/docs/standard-library/globals/rawset) want a table and nothing else — though on
+a string the two forms cannot disagree, because the length of a string is never a metatable's
+to decide.
+
+<RunnableExample code={`local waiting_line = setmetatable({ "ada", "grace" }, { __len = function() return 10 end })\n\nprint(#waiting_line)\nprint(rawlen(waiting_line))\nprint(rawlen("cocoa"))\n-- Expected output:\n-- 10\n-- 2\n-- 5`} />
+
+## Syntax
+
+```lua
+rawlen(v)
+```
+
+<Parameters>
+  <Param name="v">The table or string to measure. Nothing else is accepted, however well it may answer `#`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">The number of bytes in a string, or a border of a table.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the argument is neither a table nor a string.
+- Raises when called with no argument at all.
+
+</Errors>
+
+## Description
+
+For a string the answer is its number of bytes, which is what `#` reports as well. A string's
+length is fixed by its contents and no metamethod is ever consulted for it, so on strings the
+two forms are two spellings of one measurement.
+
+For a table the answer is a border: a position holding something with nothing after it, or
+`0` when the first position is empty. On a list whose elements run from `1` upwards with
+nothing missing there is exactly one such position and it is the count everyone expects. On a
+list with a gap in it there is more than one, and which one comes back is not promised — the
+[length operator](/docs/language/expressions/length-operator) carries the same looseness, and
+going raw does not remove it.
+
+The difference between this call and `#` is therefore a narrow one, and it appears in a
+single case: a table carrying a `__len`. There `#` calls the metamethod and reports the length
+it decided on, and this call reports the border the table's own contents give. A padded list,
+a fixed-size buffer, a proxy that reports the length of something it wraps — each one answers
+two different questions, and this is how the second is asked.
+
+What "raw" covers across the four calls that offer it is described under
+[`rawget()`](/docs/standard-library/globals/rawget#what-raw-access-means). The gap here is in
+what is accepted as well as in what is answered: `#` measures any value with a `__len`, and
+this call refuses anything that is not a table or a string.
+
+## Examples
+
+### A padded list reports one length and holds another
+
+<RunnableExample code={`local rainfall = setmetatable({ 12, 8, 5 }, {\n  __len = function() return 12 end,\n  __index = function() return 0 end,\n})\n\nprint(#rainfall)\nprint(rawlen(rainfall))\nprint(rainfall[9])\n-- Expected output:\n-- 12\n-- 3\n-- 0`} />
+
+A year of rainfall with three months recorded so far. The metatable makes it read as twelve
+months of data, with the unrecorded ones answering `0`; the raw measurement says how many
+were actually written down. Both numbers are useful, and only one of them is `#`.
+
+### What a proxy really holds
+
+<RunnableExample code={`local sensor_readings = { 21, 22, 23 }\nlocal sensor_view = setmetatable({}, {\n  __index = sensor_readings,\n  __len = function() return #sensor_readings end,\n})\n\nprint(#sensor_view)\nprint(rawlen(sensor_view))\nprint(sensor_view[2])\n-- Expected output:\n-- 3\n-- 0\n-- 22`} />
+
+The view is an empty table that behaves like a three-element list. Ordinary indexing and `#`
+are both answered by the metatable, and the raw measurement is what shows there is nothing
+inside — which is the check for *is this the data or a stand-in for it*.
+
+### A string is counted in bytes, and no metatable changes that
+
+<RunnableExample code={`local subject_line = "invoice 2024-03"\n\nprint(rawlen(subject_line))\nprint(#subject_line)\n-- Expected output:\n-- 15\n-- 15`} />
+
+On a string the two forms agree, and there is no arrangement of metatables that makes them
+disagree: the length operator goes to a metamethod only for values that are not strings. What
+is counted is bytes rather than characters, so text held as UTF-8 measures longer than it
+reads — [`utf8.len()`](/docs/standard-library/utf8/len) is the call that counts characters.
+
+## Gotchas
+
+<Gotcha title="It accepts less than # does">
+The length operator works on any value with a `__len`, including a userdata standing in for a
+collection. This call takes a table or a string and refuses everything else, so swapping one
+for the other in existing code can turn a working measurement into a raised error. That is
+the deliberate half of the trade: `#` asks the value how long it is, and this asks how much is
+actually there.
+</Gotcha>
+
+<Gotcha title="A gap makes the answer a choice, raw or not">
+Going around the metamethod does not make the measurement of a table exact. Where elements
+sit at `1` upwards with nothing missing there is one answer and it is the obvious one; put a
+`nil` in the middle and there is more than one border, and nothing promises which comes back.
+Lists that may hold `nil` want a count carried alongside them —
+[`table.pack()`](/docs/standard-library/table/pack) produces one — rather than any
+measurement taken after the fact.
+</Gotcha>
+
+<Gotcha title="Named fields are not counted">
+A table holding three elements and a `servings` field measures `3`, because a border is about
+positions and nothing else. `#` reports the same on a table with no `__len`, so this is not a
+difference between the two forms — but it does mean neither answers *how many entries does
+this table have*. That question is a walk with
+[`pairs()`](/docs/standard-library/globals/pairs) and a counter.
+</Gotcha>
+
+## See also
+
+- [`rawget()`](/docs/standard-library/globals/rawget) — the read that goes around `__index`, and what raw access means
+- [`rawset()`](/docs/standard-library/globals/rawset) — the assignment that goes around `__newindex`
+- [`rawequal()`](/docs/standard-library/globals/rawequal) — comparing two values without asking either metatable
+- [`string.len()`](/docs/standard-library/string/len) — the same byte count for strings, written as a call
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — counting a list by walking it rather than measuring it
+- [The length operator](/docs/language/expressions/length-operator) — the form that does consult `__len`
