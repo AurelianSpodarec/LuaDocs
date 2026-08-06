@@ -14,17 +14,39 @@ always a float.
 
 ## Syntax
 
+<Only before="5.2">
+
+```lua
+math.log(x)
+```
+
+</Only>
+
+<Only since="5.2">
+
 ```lua
 math.log(x [, base])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="x">The number to take the logarithm of.</Param>
-  <Param name="base">The base to take it in. Left out, the base is *e*, which is what makes the one-argument call the natural logarithm.</Param>
+  <Only before="5.2">
+    <Param name="x">The number to take the logarithm of.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="x">The number to take the logarithm of.</Param>
+    <Param name="base">The base to take it in. Left out, the base is *e*, which is what makes the one-argument call the natural logarithm.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="float">The power that `base` must be raised to in order to give `x`. Always a float, whatever the arguments were.</Return>
+  <Only before="5.2">
+    <Return type="float">The power that *e* must be raised to in order to give `x` — the natural logarithm. Always a float, whatever the argument was.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="float">The power that `base` must be raised to in order to give `x`. Always a float, whatever the arguments were.</Return>
+  </Only>
 </Returns>
 
 <Errors>

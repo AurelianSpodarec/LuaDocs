@@ -28,7 +28,12 @@ math.random([m [, n]])
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">A float below one when the call carries no arguments. A whole number otherwise — from inside the range the arguments describe, or from across the whole integer range for the single `0` that describes none.</Return>
+  <Only before="5.4">
+    <Return type="integer or float">A float below one when the call carries no arguments. A whole number otherwise, from inside the range the arguments describe.</Return>
+  </Only>
+  <Only since="5.4">
+    <Return type="integer or float">A float below one when the call carries no arguments. A whole number otherwise — from inside the range the arguments describe, or from across the whole integer range for the single `0` that describes none.</Return>
+  </Only>
 </Returns>
 
 <Errors>

@@ -23,7 +23,12 @@ math.max(x, ···)
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">Whichever argument compared largest, handed back exactly as it was passed.</Return>
+  <Only before="5.3">
+    <Return type="integer or float">The largest of the values. Every argument is read as a number before anything is compared, so what comes back is that number rather than the argument itself.</Return>
+  </Only>
+  <Only since="5.3">
+    <Return type="integer or float">Whichever argument compared largest, handed back exactly as it was passed.</Return>
+  </Only>
 </Returns>
 
 <Errors>

@@ -25,7 +25,12 @@ math.fmod(x, y)
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">What is left of `x` after taking away every whole `y` that fits between it and zero. An integer when both arguments are integers, a float when either is a float.</Return>
+  <Only before="5.3">
+    <Return type="float">What is left of `x` after taking away every whole `y` that fits between it and zero.</Return>
+  </Only>
+  <Only since="5.3">
+    <Return type="integer or float">What is left of `x` after taking away every whole `y` that fits between it and zero. An integer when both arguments are integers, a float when either is a float.</Return>
+  </Only>
 </Returns>
 
 <Errors>

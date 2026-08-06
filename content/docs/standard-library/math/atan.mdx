@@ -14,17 +14,39 @@ angle of the direction they describe, anywhere in the full circle. The result is
 
 ## Syntax
 
+<Only before="5.3">
+
+```lua
+math.atan(y)
+```
+
+</Only>
+
+<Only since="5.3">
+
 ```lua
 math.atan(y [, x])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="y">The rise — the numerator of the slope. With no second argument, the whole slope.</Param>
-  <Param name="x">The run — the denominator of the slope. Optional, and `1` when it is left out, which is what makes a lone `y` behave as a slope in its own right.</Param>
+  <Only before="5.3">
+    <Param name="y">The slope — the rise divided by the run, worked out before the call.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="y">The rise — the numerator of the slope. With no second argument, the whole slope.</Param>
+    <Param name="x">The run — the denominator of the slope. Optional, and `1` when it is left out, which is what makes a lone `y` behave as a slope in its own right.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="float">The angle in radians whose tangent is `y` divided by `x`, placed in the quadrant the signs of the two arguments point to. Always a float, whatever the arguments were.</Return>
+  <Only before="5.3">
+    <Return type="float">The angle in radians whose tangent is `y`, within a quarter turn either side of zero. Always a float, whatever the argument was.</Return>
+  </Only>
+  <Only since="5.3">
+    <Return type="float">The angle in radians whose tangent is `y` divided by `x`, placed in the quadrant the signs of the two arguments point to. Always a float, whatever the arguments were.</Return>
+  </Only>
 </Returns>
 
 <Errors>
