@@ -1,8 +1,150 @@
 ---
 title: ipairs()
-description: ""
+description: Set up a generic for that walks a list from position 1 up to the first empty one.
+lua-compat: globals.ipairs
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-ipairs
 ---
 
-{/* Not yet written. */}
+Sets up a loop over the numbered positions of a list: `1`, then `2`, and on upwards, stopping
+the first time a position comes back with nothing. Each turn hands over the position and what
+is stored there, in ascending order — which is the thing a walk over
+[every key](/docs/standard-library/globals/pairs) does not promise.
+
+<RunnableExample code={`local reading_list = {"dune", "solaris", "ubik"}\nfor position, title in ipairs(reading_list) do\n  print(position .. ". " .. title)\nend\n-- Expected output:\n-- 1. dune\n-- 2. solaris\n-- 3. ubik`} />
+
+## Syntax
+
+```lua
+ipairs(t)
+```
+
+<Parameters>
+  <Param name="t">The list to walk. Positions are looked up on it the way `t[1]` and `t[2]` would be.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function">The iteration function, which the loop calls once per position.</Return>
+  <Return type="any">The state: what that function is handed back on every step, which is `t` itself.</Return>
+  <Return type="integer">`0` — the position before the first one, so that the opening step asks for `1`.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all.
+- Raises when the value cannot be indexed — a number or a boolean, say. The complaint may come from this call or from the walk's first step, and either way the body does not run. A value that can be indexed and answers with nothing is walked as an empty list rather than refused.
+
+</Errors>
+
+## Description
+
+The walk counts rather than traverses. It asks for position `1`, then `2`, then `3`, and
+carries on until a lookup answers with nothing — at which point it stops, without having
+asked how long the list is. That single rule is most of this entry, and everything surprising
+about the call follows from it.
+
+Each turn assigns two loop variables, the position and what is stored at it, and the position
+is the loop's control value. `break` ends the walk where it stands, the way it ends any loop,
+and the position that stopped it is kept in a variable rather than carried out of the call.
+
+Named fields stored alongside the elements take no part. A table holding three elements and a
+`servings` field is walked as three entries, and the field is passed over —
+[`pairs()`](/docs/standard-library/globals/pairs) is the call that visits both, at the cost of
+the order.
+
+## Where the walk stops
+
+The stopping rule is *the first position whose lookup answers with nothing*, and it is
+deliberately not the [length operator](/docs/language/expressions/length-operator)'s answer.
+The two coincide on a list whose elements sit at `1` upwards with nothing missing, which is
+most lists, and that is why the difference goes unnoticed until it matters.
+
+On a list with a gap in it they need not agree. The length operator reports a border — a
+position holding something with nothing after it, or `0` when the first position is empty —
+and on a gapped list that is free to land at or beyond the gap. Where it lands at the gap,
+the walk stops in the same place and the
+two are indistinguishable. Where it lands beyond one, the walk stops first and the positions
+past the gap are never reached. So a gap alone does not settle which happens, and code that
+has to reach every slot up to a known count uses a
+[numeric `for`](/docs/language/statements/numeric-for) with that count rather than either of
+them.
+
+The counting starts at `1`, so anything stored at `0` or at a negative position is out of
+reach, and a list whose first element sits at `2` is walked as though it were empty.
+
+## What a metatable can change
+
+Positions are *looked up* rather than read out of the table's own storage, so an `__index`
+metamethod is consulted for any position the value does not hold itself. A list backed by
+defaults therefore keeps walking past its own last element, and a proxy holding nothing at
+all can be walked as though it held everything the metamethod supplies. That is also what
+lets the call accept a value that is not a table, so long as indexing it works.
+
+The stopping rule is unchanged by any of this: the walk ends at the first position where the
+lookup — metamethod and all — answers with nothing.
+
+Nothing takes the call over wholesale. A metamethod named `__ipairs` once stood beside
+[`__pairs`](/docs/standard-library/globals/pairs#what-a-metatable-can-change) and could do
+exactly that; it is no longer consulted, and a value that offered its own walk that way gets
+the ordinary one instead. The version support below records when that changed.
+
+## Examples
+
+### A gap ends the walk early
+
+<RunnableExample code={`local delivery_slots = {"09:00", "11:00", nil, "16:00"}\nlocal slots_walked = 0\nfor _position, slot_time in ipairs(delivery_slots) do\n  slots_walked = slots_walked + 1\n  print(slot_time)\nend\nprint(slots_walked)\n-- Expected output:\n-- 09:00\n-- 11:00\n-- 2`} />
+
+Four slots were written down and two are reached. The walk asks for position `3`, gets
+nothing back, and stops — the `16:00` sitting at position `4` is never looked at. A list a
+`nil` has left a hole in is the shape this call quietly gets wrong for you.
+
+### Adding up what a list holds
+
+<RunnableExample code={`local invoice_lines = {12.5, 4.25, 30}\nlocal invoice_total = 0\nfor _position, amount in ipairs(invoice_lines) do\n  invoice_total = invoice_total + amount\nend\nprint(invoice_total)\n-- Expected output: 46.75`} />
+
+The position is bound and unused, which is ordinary: the loop needs somewhere to put it, and
+naming it with a leading underscore says it was not wanted. Only the values are read here, in
+the order they were written.
+
+### Stopping at the first position that matches
+
+<RunnableExample code={`local station_names = {"Rossio", "Cais do Sodre", "Baixa-Chiado"}\nlocal found_at = nil\nfor position, station_name in ipairs(station_names) do\n  if station_name == "Cais do Sodre" then\n    found_at = position\n    break\n  end\nend\nprint(found_at)\n-- Expected output: 2`} />
+
+`break` leaves the loop with the answer already in a variable of its own, so a search can
+carry out as many values as it likes — the position, the element, or both. The third station
+is never compared.
+
+## Gotchas
+
+<Gotcha title="It stops at the first empty position, not at the end of the list">
+The walk asks positions one at a time and quits the moment one is empty, so a list with a
+hole in it is walked only as far as the hole. Nothing raises and nothing is reported: the
+loop simply ends early, and the elements after the hole go unprocessed. Where a list may have
+holes, count the elements separately — [`table.pack()`](/docs/standard-library/table/pack)
+carries a count beside the values — and walk that count with a
+[numeric `for`](/docs/language/statements/numeric-for).
+</Gotcha>
+
+<Gotcha title="The counting starts at 1">
+Positions below `1` are out of reach. A list built from data that numbers itself from zero
+loses its first element to a walk written this way, and a table whose only elements sit at
+`2` and above is walked as though it were empty — no error, no output, nothing to notice.
+Renumber the data on the way in, or index it with a
+[numeric `for`](/docs/language/statements/numeric-for) over the range it actually uses.
+</Gotcha>
+
+<Gotcha title="A metatable can keep the walk going past the last element">
+Positions are looked up, so a `__index` supplying values for positions the table does not
+hold keeps the walk going — potentially without end, if the metamethod answers for every
+position it is asked about. A table used as a store of defaults behind another is the common
+way to arrive here by accident, and the walk that was meant to visit three elements visits
+whatever the defaults can answer for.
+</Gotcha>
+
+## See also
+
+- [`pairs()`](/docs/standard-library/globals/pairs) — every key, named or numbered, in an order nothing promises
+- [`next()`](/docs/standard-library/globals/next) — the traversal `pairs()` is built on, and its order and modification rules
+- [The generic `for`](/docs/language/statements/generic-for) — the statement this call is built for
+- [The numeric `for`](/docs/language/statements/numeric-for) — the faithful walk when a list may have holes in it
+- [The length operator](/docs/language/expressions/length-operator) — the border this call deliberately does not consult

@@ -72,6 +72,9 @@ import mathLibrary from './data/math.library.json';
 import globalsType from './data/globals.type.json';
 import globalsTostring from './data/globals.tostring.json';
 import globalsTonumber from './data/globals.tonumber.json';
+import globalsPairs from './data/globals.pairs.json';
+import globalsIpairs from './data/globals.ipairs.json';
+import globalsNext from './data/globals.next.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -248,6 +251,26 @@ const raw: Record<string, unknown> = {
   // may be an integer after, and ADR 0009 gives that one site-wide disclosure driven by the
   // `<Return type>` field.
   'globals.tonumber': globalsTonumber,
+  // The iteration three. `next` is the primitive and has not moved a line since 5.1 — the
+  // 5.4 manual restates its modification rule as advice rather than as undefined behaviour,
+  // which is a change of tone about the same prohibition, so its node is availability and
+  // nothing else. The other two carry the section's messiest version story, and it is a
+  // story about *metamethods* rather than about symbols: `__pairs` arrives at 5.2 and is
+  // still consulted on the newest line, while `__ipairs` arrives beside it and is gone two
+  // versions later. Neither is a `version_added`/`version_removed` matter — `pairs` and
+  // `ipairs` themselves are present throughout — so both are `changed_in` notes on the
+  // entry where the metamethod is observable. `version_restored` is for a symbol that
+  // leaves and comes back, which `math.frexp` needed and nothing here does.
+  //
+  // Both entries also record 5.3 loosening what the *call* accepts. `pairs` and `ipairs`
+  // used to refuse a non-table on the spot and now hand back a walk for anything, leaving
+  // the complaint to the walk's first step. No manual says so in any version; it is read
+  // off `lbaselib.c` on ADR 0010 rule 3 and confirmed on a 5.3 build and on the site's 5.4
+  // runtime, and it is recorded because the alternative is telling a reader that
+  // `pcall(pairs, value)` is a type test, which it stopped being.
+  'globals.pairs': globalsPairs,
+  'globals.ipairs': globalsIpairs,
+  'globals.next': globalsNext,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

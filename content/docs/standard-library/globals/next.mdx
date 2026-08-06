@@ -1,8 +1,157 @@
 ---
 title: next()
-description: ""
+description: Step a table's traversal along by one, handing back the following key and its value.
+lua-compat: globals.next
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-next
 ---
 
-{/* Not yet written. */}
+Steps a traversal along by one. Handed a table and the key the previous step stopped at, it
+answers with the following key and the value stored under it; handed a table and nothing
+else, it answers with a first key. Once the keys run out it answers `nil`, which is what
+makes `next(some_table) == nil` a direct way to ask whether a table holds anything at all.
+
+<RunnableExample code={`local shipping_address = {}\nprint(next(shipping_address) == nil)\nshipping_address.city = "Lisbon"\nprint(next(shipping_address) == nil)\n-- Expected output:\n-- true\n-- false`} />
+
+## Syntax
+
+```lua
+next(table [, index])
+```
+
+<Parameters>
+  <Param name="table">The table to step through.</Param>
+  <Param name="index">A key the table holds, naming where the previous step stopped. Left out — or given as `nil` — it asks for a first key instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The following key, of whatever type the table stores it as. Once every key has been handed over, a single `nil` with no second value beside it.</Return>
+  <Return type="any">The value stored under that key.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the first argument is not a table, including when it is left out. Anything passed after `index` is ignored rather than rejected.
+- Raises when `index` is a value the table does not hold as a key. Clearing a key during a traversal is allowed and does not make it unusable as the place to step from, which is what lets a traversal delete as it goes.
+
+</Errors>
+
+## Description
+
+A key doubles as a position. Hand one back in and the answer is whatever comes after it,
+so a whole traversal is this call repeated with its own previous answer, and the loop ends
+when the answer is `nil`. Handing in `nil` means *start*, which is why `next(some_table)`
+with a single argument opens a traversal and why `nil` is the value
+[`pairs()`](/docs/standard-library/globals/pairs) supplies as the starting position.
+
+The end of a traversal is one `nil` and nothing else — no second value follows it. That
+makes the emptiness test above exact and cheap: it takes one step rather than a walk, and it
+answers for a table of named fields, which the
+[length operator](/docs/language/expressions/length-operator) does not.
+
+Only keys that have a value take part. Storing `nil` under a key removes the key rather than
+storing an empty value there, so a traversal has nothing to visit for it, and a key that was
+never set and one that was set to nothing are indistinguishable afterwards.
+
+The keys are the table's own. This call reads them rather than looking them up, so a table
+standing in for another gives up only what it holds itself, and a value reached through an
+indexing metamethod is never visited because no key of this table holds it.
+
+[`pairs()`](/docs/standard-library/globals/pairs) is this call packaged for a generic `for`,
+and it is what most code should reach for. Writing
+`for key, value in next, settings do` drives the same loop directly, which is worth knowing
+where a table's metatable has taken `pairs()` over and the underlying traversal is what is
+wanted.
+
+## The order is not specified
+
+Every key that has a value is reached exactly once, and nothing at all is promised about the
+sequence they arrive in. It is not the order they were written in, and it is not numeric
+order for the keys that happen to be numbers: a table holding `1`, `2` and `3` may hand them
+back in any arrangement.
+
+Nothing promises the sequence holds steady between one Lua and the next either, or between
+two builds of the same one — the same four names, traversed on two runtimes, come out in two
+different orders. So an order that looks reliable in testing is a coincidence being relied
+on, and code that reads one out of a traversal is code that will surprise somebody.
+
+Two things to write instead. To visit numbered positions in ascending order, use a
+[numeric `for`](/docs/language/statements/numeric-for) or
+[`ipairs()`](/docs/standard-library/globals/ipairs), both of which fix the order because they
+count rather than traverse. To report on a table's keys in an order of your own, collect the
+keys first, sort them with [`table.sort()`](/docs/standard-library/table/sort), and walk the
+sorted list.
+
+## Changing the table while traversing it
+
+Two rules, and they split along a line that is easy to miss because both look like ordinary
+assignment.
+
+*Changing what an existing key holds is allowed*, and so is clearing one — storing `nil`
+under a key the table already has. A traversal that deletes as it goes is the licensed case,
+and it is why the key that has just been cleared still works as the place to step from.
+
+*Storing under a key the table does not already hold is not allowed.* Do it during a
+traversal and what the rest of that traversal does is no longer defined: it may skip keys,
+reach the same key twice, or stop early, and which of those happens is not something to
+reason about or report. The fix is two passes — collect the keys to add in a list as the
+traversal runs, and store them once it has finished.
+
+## Examples
+
+### Totalling a table by hand
+
+<RunnableExample code={`local stock_levels = {cocoa = 2, flour = 5, sugar = 1}\nlocal total_units = 0\nlocal item_name, quantity = next(stock_levels)\nwhile item_name ~= nil do\n  total_units = total_units + quantity\n  item_name, quantity = next(stock_levels, item_name)\nend\nprint(total_units)\n-- Expected output: 8`} />
+
+The loop's shape is the whole contract: open with one argument, carry on with two, stop when
+the key comes back `nil`. A total is the right thing to compute here, because adding the
+values up gives the same answer whichever order they arrive in.
+
+### Clearing entries as the traversal runs
+
+<RunnableExample code={`local session_tokens = {alice = "expired", bruno = "valid", chen = "expired"}\nlocal cleared_count = 0\nlocal account, state = next(session_tokens)\nwhile account ~= nil do\n  if state == "expired" then\n    session_tokens[account] = nil\n    cleared_count = cleared_count + 1\n  end\n  account, state = next(session_tokens, account)\nend\nlocal surviving_account = next(session_tokens)\nprint(cleared_count)\nprint(surviving_account)\n-- Expected output:\n-- 2\n-- bruno`} />
+
+Each key is cleared and then handed straight back in as the place to step from, which is the
+one modification a traversal explicitly permits. The last line reads out the single key left,
+and it is only printable because one key is left — with two, the output would depend on an
+order nothing promises.
+
+### Driving a generic `for` with it
+
+<RunnableExample code={`local server_config = {host = "example.org", port = 8080, secure = true}\nlocal setting_count = 0\nfor setting_name in next, server_config do\n  setting_count = setting_count + 1\nend\nprint(setting_count)\n-- Expected output: 3`} />
+
+`next, server_config` is an iteration function and a state, which is what a generic `for`
+wants; the starting position is left out and reads as `nil`. This is what
+[`pairs()`](/docs/standard-library/globals/pairs) hands over, written out by hand.
+
+## Gotchas
+
+<Gotcha title="It is not a way to ask whether a key exists">
+Stepping from a value the table has never held as a key raises rather than answering `nil`,
+so `next(inventory, "gone")` is an error and not a test. The question is asked directly —
+`inventory.gone ~= nil` — and this call is for moving through keys that are already known to
+be there.
+</Gotcha>
+
+<Gotcha title="`next(list)` is not the first element">
+Handed a list, this call answers with *a* key, not with position `1`. Nothing fixes which,
+and a run that keeps producing `1` is producing it by accident. Where the first element is
+what is wanted, `list[1]` asks for it; where the numbered positions are wanted in order,
+[`ipairs()`](/docs/standard-library/globals/ipairs) walks them.
+</Gotcha>
+
+<Gotcha title="Filling in what a table is missing, from inside the walk">
+The natural way to give a settings table its defaults is to walk it and store whatever is
+absent — and storing under a key the table does not hold is exactly the change a traversal
+forbids, so the loop may then skip entries or revisit them. It goes wrong quietly, because a
+small table often survives it. Collect the keys to add while walking and store them
+afterwards.
+</Gotcha>
+
+## See also
+
+- [`pairs()`](/docs/standard-library/globals/pairs) — this traversal packaged for a generic `for`, and the metamethod that can replace it
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — the numbered positions, in order
+- [The generic `for`](/docs/language/statements/generic-for) — the statement both are written for
+- [`table.sort()`](/docs/standard-library/table/sort) — putting collected keys into an order of your own
+- [The length operator](/docs/language/expressions/length-operator) — the other way to ask about a table's size, and a different question

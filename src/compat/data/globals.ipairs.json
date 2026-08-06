@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Consults an `__ipairs` metamethod and hands back what that answers, so a value can offer an ordered walk of its own; 5.1 always walks the table's own positions.",
+    "5.3": "Looks each position up through the table's metamethods rather than reading it raw, so an `__index` can supply positions the table does not hold itself and the walk carries on past them. The call also stops insisting on a table: it hands back a walk for any value and leaves an indexing failure to the walk's first step, where 5.1 and 5.2 refuse a non-table at the call itself.",
+    "5.4": "Ignores `__ipairs`; a value that offered its own ordered walk that way gets the ordinary position-by-position one instead."
+  }
+}

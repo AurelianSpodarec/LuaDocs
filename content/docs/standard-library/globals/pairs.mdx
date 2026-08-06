@@ -1,8 +1,155 @@
 ---
 title: pairs()
-description: ""
+description: Set up a generic for that visits every key a table holds.
+lua-compat: globals.pairs
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-pairs
 ---
 
-{/* Not yet written. */}
+Sets up a loop over every key a table holds. It is what goes in a generic `for` when the
+question is *all of it* — named fields and numbered positions alike, each visited once, in an
+order nobody promises. A value whose metatable supplies `__pairs` answers this call for
+itself and can offer a traversal of its own instead.
+
+<RunnableExample code={`local stock_levels = {cocoa = 2, flour = 5, sugar = 1}\nlocal total_units = 0\nfor item_name, quantity in pairs(stock_levels) do\n  total_units = total_units + quantity\nend\nprint(total_units)\n-- Expected output: 8`} />
+
+## Syntax
+
+```lua
+pairs(t)
+```
+
+<Parameters>
+  <Param name="t">The table to walk. A value of another kind is accepted when its metatable supplies a `__pairs` field to answer for it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function">The iteration function — [`next()`](/docs/standard-library/globals/next), unless `__pairs` supplied one of its own.</Return>
+  <Return type="any">The state: what the iteration function is handed back on every step, which for a plain table is the table itself.</Return>
+  <Return type="nil">Where to start. A traversal begins before the first key, and `nil` is what says so.</Return>
+  <Return type="nil">The loop's closing value, which a plain table has nothing to put in.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all.
+- Raises when the argument is not a table and its metatable supplies no `__pairs`. The complaint may come from this call or from the loop's first step, and either way the body does not run.
+- <Since v="5.2" /> Raises when `__pairs` holds something that cannot be called.
+
+</Errors>
+
+## Description
+
+What comes back is machinery, and reading it is unusual: a generic `for` takes the values
+apart, calls the first of them with the second and the running position on every turn, and
+assigns the results to the loop variables. Written out,
+`for key, value in pairs(settings) do` says *ask `settings` for a traversal and run this body
+once per key*, and the pieces above are how it says it.
+
+Left to walk a table itself — that is, wherever `__pairs` does not step in — it visits every
+key that has a value exactly once. A table makes no distinction between a named field and a
+numbered position, both being keys, so a table holding two elements and two settings is
+walked as four entries, and there is nothing in the loop to tell which is which but the key
+itself.
+
+That walk is [`next()`](/docs/standard-library/globals/next)'s, and two of that entry's rules
+govern any loop running on it. The order the keys arrive in
+[is not specified](/docs/standard-library/globals/next#the-order-is-not-specified) — not
+insertion order, not numeric order for the keys that are numbers, and not steady between one
+Lua and another. And
+[what may be changed while the walk runs](/docs/standard-library/globals/next#changing-the-table-while-traversing-it)
+is narrower than it looks: an existing key's value may be changed or cleared, and storing
+under a key the table does not already hold leaves the rest of the walk undefined.
+
+Where only the numbered positions matter, and in order,
+[`ipairs()`](/docs/standard-library/globals/ipairs) is the call for it — a shorter walk with
+a settled sequence, and one that stops at the first position answering with nothing rather
+than carrying on through the table.
+
+## What a metatable can change
+
+*`__pairs`* is the hook. When the value's metatable holds one, it is called with the value as
+its only argument and its results are handed back as this call's own, so the loop that
+follows runs on whatever traversal the metamethod described. That is what lets a value
+present something other than its own storage: a view that walks in a settled order, a
+read-only wrapper, a proxy over data that is not a table at all.
+
+Whatever the metamethod answers is passed through as it stands. One that hands back only an
+iteration function still drives a loop, because the missing state and starting position read
+as `nil` — which is all a self-contained closure needs.
+
+Indexing metamethods have no say in the traversal this call sets up on its own. That
+traversal reads the keys the table itself holds, so a default reached through `__index` is
+not among them and neither is a key that only a `__newindex` would have created. The
+counterpart is
+[`ipairs()`](/docs/standard-library/globals/ipairs#what-a-metatable-can-change), which does
+look positions up rather than reading them, and the difference between the two is worth
+holding on to.
+
+## Examples
+
+### Counting keys, and why the length operator disagrees
+
+<RunnableExample code={`local recipe = {"cocoa", "flour", servings = 4, oven_celsius = 180}\nlocal key_count = 0\nfor recipe_key in pairs(recipe) do\n  key_count = key_count + 1\nend\nprint(key_count)\nprint(#recipe)\n-- Expected output:\n-- 4\n-- 2`} />
+
+Four keys: positions `1` and `2`, and the names `servings` and `oven_celsius`. The
+[length operator](/docs/language/expressions/length-operator) reports `2` because it measures
+the numbered run and stops where that runs out, which is a different question with a
+different answer whenever a table carries both kinds of key.
+
+### Reporting in an order of your own
+
+<RunnableExample code={`local rainfall_by_city = {lisbon = 27, porto = 41, faro = 12}\nlocal city_names = {}\nfor city_name in pairs(rainfall_by_city) do\n  city_names[#city_names + 1] = city_name\nend\ntable.sort(city_names)\nfor _position, city_name in ipairs(city_names) do\n  print(city_name .. ": " .. rainfall_by_city[city_name])\nend\n-- Expected output:\n-- faro: 12\n-- lisbon: 27\n-- porto: 41`} />
+
+Two passes, because one cannot do it: the first collects the keys, and the second walks them
+after sorting. This is the shape any report over a table takes, and writing it is the
+admission that the order the first loop produced was never going to be the one wanted.
+
+### A value that answers for its own traversal
+
+<RunnableExample code={`local temperature_log = setmetatable({}, {\n  __pairs = function()\n    local readings = { {"06:00", 11}, {"12:00", 19}, {"18:00", 14} }\n    local position = 0\n    return function()\n      position = position + 1\n      local reading = readings[position]\n      if reading ~= nil then\n        return reading[1], reading[2]\n      end\n    end\n  end,\n})\n\nfor clock_time, celsius in pairs(temperature_log) do\n  print(clock_time .. " " .. celsius)\nend\n-- Expected output:\n-- 06:00 11\n-- 12:00 19\n-- 18:00 14`} />
+
+The table itself is empty and the readings live in the metamethod, so every pair the loop
+sees was made up on the spot. The metamethod hands back one value rather than three, which is
+enough here because the closure carries its own position. Note what this buys: the traversal
+arrives in a fixed order, which no walk over a table's own keys can offer.
+
+## Gotchas
+
+<Gotcha title="The order is not yours to choose">
+The keys arrive in whatever order the traversal produces, which is not the order they were
+written in and is not numeric order for the ones that are numbers. A report assembled by
+appending in walk order therefore comes out arranged by nothing in particular, and it can
+come out differently on a colleague's machine. Collect the keys, sort them, then walk the
+sorted list — the second example above is the whole recipe. The rule and what it does and
+does not promise are on
+[`next()`](/docs/standard-library/globals/next#the-order-is-not-specified).
+</Gotcha>
+
+<Gotcha title="This counts keys; `#` measures the numbered run">
+Counting the turns of a loop written here and reading `#some_table` are different questions.
+They answer with the same number on a table whose keys are exactly `1` upwards with nothing
+missing, and there is no reason for them to agree on anything else.
+Add one named field and they part company; leave a gap in the numbering and the
+[length operator](/docs/language/expressions/length-operator) stops being a count at all.
+Where a size has to be dependable, keep it beside the data —
+[`table.pack()`](/docs/standard-library/table/pack) does exactly that.
+</Gotcha>
+
+<Gotcha title="A key added inside the loop is the change that is not allowed">
+Changing what a key holds is fine, and so is clearing one. Storing under a key the table did
+not already have is not, and the rest of that loop is then undefined — it may skip entries or
+revisit them, and a small table often survives it, which is what makes the mistake quiet. The
+shape that walks into it most often is filling in missing defaults while walking. Collect
+what needs adding and store it after the loop; the rule is written out on
+[`next()`](/docs/standard-library/globals/next#changing-the-table-while-traversing-it).
+</Gotcha>
+
+## See also
+
+- [`next()`](/docs/standard-library/globals/next) — the traversal underneath, where the order and modification rules are written out
+- [`ipairs()`](/docs/standard-library/globals/ipairs) — the numbered positions only, in order
+- [The generic `for`](/docs/language/statements/generic-for) — the statement this call is built for
+- [`table.sort()`](/docs/standard-library/table/sort) — putting collected keys into an order of your own
+- [The length operator](/docs/language/expressions/length-operator) — the numbered run, which is a different question from every key
+- [How metatables really work](/docs/guides/how-metatables-work) — where `__pairs` sits among the rest

@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Consults a `__pairs` metamethod and hands back what that answers, so a value can offer a traversal of its own and a value that is not a table can be walked at all; 5.1 always walks the table's own keys and accepts nothing but a table.",
+    "5.3": "Accepts any value without complaint and leaves the check to the walk's first step; 5.1 and 5.2 refuse a non-table at the call itself, so `pcall(pairs, 42)` reports a failure there instead of succeeding.",
+    "5.5": "Hands back a fourth value, the loop's closing value, and reads four results from `__pairs` rather than three; earlier versions hand back three and read three, so a metamethod's fourth result is ignored."
+  }
+}
