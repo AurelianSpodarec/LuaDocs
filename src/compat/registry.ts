@@ -40,6 +40,12 @@ import mathFloor from './data/math.floor.json';
 import mathFmod from './data/math.fmod.json';
 import mathModf from './data/math.modf.json';
 import mathSqrt from './data/math.sqrt.json';
+import mathSin from './data/math.sin.json';
+import mathCos from './data/math.cos.json';
+import mathTan from './data/math.tan.json';
+import mathAsin from './data/math.asin.json';
+import mathAcos from './data/math.acos.json';
+import mathAtan from './data/math.atan.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -109,6 +115,17 @@ const raw: Record<string, unknown> = {
   'math.fmod': mathFmod,
   'math.modf': mathModf,
   'math.sqrt': mathSqrt,
+  // The trigonometric six are thinner still: every one of them is present from 5.1 and
+  // hands back a float in every version, and their manual passages are word-for-word
+  // identical across all five. Only `atan` changed — it absorbed the second argument
+  // `atan2` used to carry, which is a behaviour change with no error attached to it: an
+  // older Lua accepts the same call and quietly ignores the argument.
+  'math.sin': mathSin,
+  'math.cos': mathCos,
+  'math.tan': mathTan,
+  'math.asin': mathAsin,
+  'math.acos': mathAcos,
+  'math.atan': mathAtan,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

@@ -1,8 +1,132 @@
 ---
 title: math.tan()
-description: ""
+description: Take the tangent of an angle measured in radians.
+lua-compat: math.tan
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.tan
 ---
 
-{/* Not yet written. */}
+Hands back the tangent of an angle — its sine divided by its cosine, which is the slope a
+line at that angle climbs at. The angle is read as a measurement in *radians*, and unlike a
+sine or a cosine the answer has no bounds at all.
+
+<RunnableExample code={`local slope_of_thirty = math.tan(math.rad(30))\nprint(slope_of_thirty)\n-- Expected output: 0.57735026918963`} />
+
+## Syntax
+
+```lua
+math.tan(x)
+```
+
+<Parameters>
+  <Param name="x">The angle to take the tangent of, in radians.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The tangent of `x`. Always a float, whatever `x` was, and of any size.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The argument is an angle in radians, so a degree measure has to go through
+[`math.rad()`](/docs/standard-library/math/rad) first. A degree measure passed straight in
+is answered, not rejected — it is simply the tangent of a different angle.
+
+The value is a *rise over a run*: the tangent of an angle is how far a line at that angle
+climbs for every unit it travels sideways. That makes it the function for turning an
+observed angle into a distance, and it is why its result is unbounded where a sine and a
+cosine are penned between minus one and one. As the angle approaches a quarter turn the run
+shrinks toward nothing and the slope grows without limit.
+
+It also repeats twice as often as its neighbours: adding half a turn flips the signs of both
+the sine and the cosine, which leaves their ratio alone. So a tangent cannot distinguish an
+angle from the same angle turned back on itself — pointing up-and-right gives the same
+tangent as pointing down-and-left.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
+The tidy values are inexact for the reason
+[set out on `math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact).
+
+## Where the tangent has no value
+
+At a quarter turn, and at every half turn from there, the cosine is zero and the tangent has
+no value at all. Nothing in this function says so: there is no error there, and no separate
+failure result either. The reason is worth knowing, because it is not that the case has been
+handled.
+
+A quarter turn is `math.pi / 2`, and no float is exactly that: pi cannot be held in a float,
+so `math.pi / 2` is merely very close. The cosine there is therefore very small rather than
+zero, the ratio still exists, and what comes back is an enormous but perfectly ordinary finite
+number — around ten to the sixteenth. Its digits are noise. They record how far the nearest
+float happens to sit from the real quarter turn, so they differ between one Lua build and
+another, and no calculation should depend on them.
+
+The practical consequence is that guarding this call is pointless: there is no argument for
+which it misbehaves in a way a check could catch, only a band of arguments whose answers are
+too large to be meaningful. Where a slope is being turned back into an angle, going the other
+way with [`math.atan()`](/docs/standard-library/math/atan) avoids the region entirely — every
+slope has an angle, even though not every angle has a slope.
+
+## Examples
+
+### The height of something you can only measure the angle of
+
+<RunnableExample code={`local distance_to_tree = 25\nlocal elevation_angle = math.rad(32)\nprint(string.format("%.2f", distance_to_tree * math.tan(elevation_angle)))\n-- Expected output: 15.62`} />
+
+Pace out the distance, measure the angle up to the top, and the tangent turns the pair into
+a height. This is the calculation the function is most often reached for.
+
+### The slope runs away near a quarter turn
+
+<RunnableExample code={`for degrees = 80, 89, 3 do\n  print(string.format("%d degrees -> %.3f", degrees, math.tan(math.rad(degrees))))\nend\n-- Expected output:\n-- 80 degrees -> 5.671\n-- 83 degrees -> 8.144\n-- 86 degrees -> 14.301\n-- 89 degrees -> 57.290`} />
+
+Nine degrees of angle multiply the slope by ten. Any code that scales something by a tangent
+needs a ceiling on the angle, because the growth arrives faster than a reader expects.
+
+### A quarter turn answers anyway, and answers finitely
+
+<RunnableExample code={`local quarter_turn = math.rad(90)\nlocal steepest_slope = math.tan(quarter_turn)\nprint(steepest_slope > 1e15)\nprint(steepest_slope < math.huge)\n-- Expected output:\n-- true\n-- true`} />
+
+Enormous, and not an infinity — so nothing downstream will notice it as a special value the
+way it would notice one. The number itself is not printed here on purpose: its digits are an
+artefact of the build.
+
+## Gotchas
+
+<Gotcha title="The argument is in radians, and a degree measure is silently wrong">
+`math.tan(45)` is not one. It is the tangent of forty-five radians, and it comes back as an
+ordinary number with nothing to mark it as unintended. Convert with
+[`math.rad()`](/docs/standard-library/math/rad) where the degree measure enters, since the
+result of getting this wrong is a plausible-looking answer rather than a failure.
+</Gotcha>
+
+<Gotcha title="Near a quarter turn the answer is huge, finite, and meaningless">
+There is no error to catch and no infinity to test for: the call returns a normal float
+around ten to the sixteenth, which then multiplies its way through whatever it touches. Code
+that computes a length from an angle read off a sensor will happily produce a distance of
+astronomical size from an angle a fraction away from vertical. Bound the angle before the
+call, not the result after it.
+</Gotcha>
+
+<Gotcha title="A tangent cannot tell a direction from its opposite">
+Adding half a turn leaves the tangent unchanged, so up-and-right and down-and-left are
+indistinguishable once reduced to a slope. Recovering the angle from a slope with a
+single-argument [`math.atan()`](/docs/standard-library/math/atan) inherits the ambiguity;
+passing the rise and the run as two arguments instead keeps their signs and resolves it.
+</Gotcha>
+
+## See also
+
+- [`math.atan()`](/docs/standard-library/math/atan) — going the other way, from a slope back to an angle
+- [`math.sin()`](/docs/standard-library/math/sin) — the numerator of this ratio, and where the exactness rule is written out
+- [`math.cos()`](/docs/standard-library/math/cos) — the denominator, and what is nearly zero where this has no value
+- [`math.rad()`](/docs/standard-library/math/rad) — turning a degree measure into the radians this function expects
+- [`math.huge`](/docs/standard-library/math/huge) — the infinity an angle near a quarter turn never reaches

@@ -1,8 +1,122 @@
 ---
 title: math.sin()
-description: ""
+description: Take the sine of an angle measured in radians.
+lua-compat: math.sin
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.sin
 ---
 
-{/* Not yet written. */}
+Hands back the sine of an angle. The angle is read as a measurement in *radians*, never in
+degrees, and the answer is a float somewhere between minus one and one.
+
+<RunnableExample code={`local sine_of_thirty = math.sin(math.rad(30))\nprint(sine_of_thirty)\n-- Expected output: 0.5`} />
+
+## Syntax
+
+```lua
+math.sin(x)
+```
+
+<Parameters>
+  <Param name="x">The angle to take the sine of, in radians.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The sine of `x`, between `-1` and `1`. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The unit is the fact worth reading twice: the argument is an angle in radians, so a number
+of degrees has to be converted before it arrives. A full turn is `2 * math.pi` radians
+rather than `360`, and [`math.rad()`](/docs/standard-library/math/rad) is the conversion.
+Passing `30` where thirty *degrees* was meant is not an error and produces a perfectly
+ordinary answer for an angle nobody intended.
+
+Every finite angle is accepted; there is no range to stay inside. The sine repeats every
+full turn, so a growing angle keeps producing usable values rather than running out, which
+is what makes this the natural way to drive anything that cycles. Geometrically it is the
+height of a point on a circle of radius one after turning through the angle, which is why
+multiplying it by a radius gives a vertical offset directly.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach
+it: `math.sin(0)` is a float that happens to have no fraction on it, not an integer.
+
+The journey back — an angle out of a sine — is
+[`math.asin()`](/docs/standard-library/math/asin); where both the height and the width of a
+direction are known, [`math.atan()`](/docs/standard-library/math/atan) with two arguments is
+the better tool.
+
+## Why the familiar values are not exact
+
+The angles with tidy sines on paper — half a turn, a quarter turn, a third of one — are all
+built out of pi, and pi is not a number a float can hold. `math.pi` is the nearest float to
+it, close but not equal, so the sine of `math.pi` is the sine of something a hair away from
+half a turn: a very small number rather than zero. The same goes for
+[`math.cos()`](/docs/standard-library/math/cos) at a quarter turn, and for every other
+"exact" value in the table a trigonometry lesson hands out.
+
+Nothing has gone wrong and there is no setting that fixes it. What it means in practice is
+that a result of one of these functions must not be compared with `==` against a value
+worked out on paper. Compare against a tolerance instead — ask whether the difference is
+small rather than whether it is zero — or, better, arrange the code so the question does not
+arise: a decision like "is this pointing straight up" is more robustly asked of the inputs
+than of the sine that came out of them.
+
+## Examples
+
+### The height of a point on a wheel
+
+<RunnableExample code={`local wheel_radius = 12\nlocal spoke_angle = math.rad(40)\nprint(string.format("%.3f", wheel_radius * math.sin(spoke_angle)))\n-- Expected output: 7.713`} />
+
+The sine gives the height for a radius of one, so the radius scales it. The horizontal
+offset is the same calculation with [`math.cos()`](/docs/standard-library/math/cos).
+
+### Placing things evenly around a circle
+
+<RunnableExample code={`local seat_count = 6\nlocal table_radius = 90\nfor seat_index = 1, seat_count do\n  local angle = 2 * math.pi * (seat_index - 1) / seat_count\n  print(string.format("seat %d sits %.1f above centre", seat_index, table_radius * math.sin(angle)))\nend\n-- Expected output:\n-- seat 1 sits 0.0 above centre\n-- seat 2 sits 77.9 above centre\n-- seat 3 sits 77.9 above centre\n-- seat 4 sits 0.0 above centre\n-- seat 5 sits -77.9 above centre\n-- seat 6 sits -77.9 above centre`} />
+
+Splitting a full turn into equal shares and taking the sine of each is the whole of "arrange
+these evenly in a ring". Working in radians throughout saves a conversion on every step.
+
+### The sine of half a turn is not exactly zero
+
+<RunnableExample code={`local sine_at_half_turn = math.sin(math.pi)\nprint(sine_at_half_turn == 0)\nprint(sine_at_half_turn < 1e-15)\n-- Expected output:\n-- false\n-- true`} />
+
+It is not zero, and it is tiny. Both lines matter: the first is the comparison to stop
+writing, the second is the shape of the one to write instead.
+
+## Gotchas
+
+<Gotcha title="The argument is in radians, and a degree measure is silently wrong">
+`math.sin(90)` does not describe a quarter turn. It is the sine of ninety radians, a little
+over fourteen full turns, and it answers with a number in range and no complaint at all.
+Nothing distinguishes this from a correct call except the result being wrong, so it survives
+review and surfaces as something drawn in the wrong place. Wrap a degree measure in
+[`math.rad()`](/docs/standard-library/math/rad) where it enters the calculation, not further
+down.
+</Gotcha>
+
+<Gotcha title="Comparing a sine against a value from the textbook fails">
+`math.sin(math.pi) == 0` is `false`, and so is every other equality written against a value
+that is exact only in the mathematics. The result is off by a fraction too small to see and
+far too large for `==` to overlook. Compare the difference against a tolerance chosen for the
+problem, and treat any code branching on a sine being exactly some number as a bug waiting
+for the right input.
+</Gotcha>
+
+## See also
+
+- [`math.cos()`](/docs/standard-library/math/cos) — the same turn measured across instead of up
+- [`math.tan()`](/docs/standard-library/math/tan) — the ratio of the two
+- [`math.asin()`](/docs/standard-library/math/asin) — going the other way, from a sine back to an angle
+- [`math.rad()`](/docs/standard-library/math/rad) — turning a degree measure into the radians this function expects
+- [`math.pi`](/docs/standard-library/math/pi) — the constant a full turn is built from

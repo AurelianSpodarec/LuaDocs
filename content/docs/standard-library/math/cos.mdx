@@ -1,8 +1,114 @@
 ---
 title: math.cos()
-description: ""
+description: Take the cosine of an angle measured in radians.
+lua-compat: math.cos
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.cos
 ---
 
-{/* Not yet written. */}
+Hands back the cosine of an angle. The angle is read as a measurement in *radians*, never in
+degrees, and the answer is a float somewhere between minus one and one.
+
+<RunnableExample code={`local cosine_of_sixty = math.cos(math.rad(60))\nprint(cosine_of_sixty)\n-- Expected output: 0.5`} />
+
+## Syntax
+
+```lua
+math.cos(x)
+```
+
+<Parameters>
+  <Param name="x">The angle to take the cosine of, in radians.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The cosine of `x`, between `-1` and `1`. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The argument is an angle in radians, so a number of degrees must be converted on the way in
+with [`math.rad()`](/docs/standard-library/math/rad). A full turn is `2 * math.pi` radians,
+not `360`, and a degree measure passed straight through is not an error — it is a different
+angle, answered correctly and uselessly.
+
+Where [`math.sin()`](/docs/standard-library/math/sin) measures how far a turn has taken you
+up, this measures how far it has taken you across: on a circle of radius one, the cosine is
+the horizontal offset. That is why the pair are almost always written together, and why
+multiplying both by a radius turns an angle into a position.
+
+Two properties follow from that and are worth having to hand. The cosine starts at one
+rather than at zero, so an angle of nothing gives a full-strength result — which is what makes
+it the natural weight for "how much of this points the same way as that". And it ignores the
+sign of its argument: turning thirty degrees one way and thirty the other gives the same
+cosine, where the sines are opposites.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
+
+The tidy values are not exact here either, for the reason
+[set out on `math.sin()`](/docs/standard-library/math/sin#why-the-familiar-values-are-not-exact):
+a quarter turn is `math.pi / 2`, `math.pi` is not exactly pi, and the cosine there comes out
+as a very small number rather than as zero. Going the other way — an angle back out of a
+cosine — is [`math.acos()`](/docs/standard-library/math/acos).
+
+## Examples
+
+### How far a ramp reaches along the ground
+
+<RunnableExample code={`local ramp_length = 4.6\nlocal ramp_angle = math.rad(18)\nprint(string.format("%.3f", ramp_length * math.cos(ramp_angle)))\n-- Expected output: 4.375`} />
+
+The ramp is 4.6 long but only covers 4.375 of floor, because part of its length went into
+the climb. [`math.sin()`](/docs/standard-library/math/sin) with the same two values gives
+the height it climbed.
+
+### Comparing two headings without working out the angle
+
+<RunnableExample code={`local first_heading = { 3, 4 }\nlocal second_heading = { 5, 12 }\nlocal dot_product = first_heading[1] * second_heading[1] + first_heading[2] * second_heading[2]\nlocal first_length = math.sqrt(first_heading[1] ^ 2 + first_heading[2] ^ 2)\nlocal second_length = math.sqrt(second_heading[1] ^ 2 + second_heading[2] ^ 2)\nlocal agreement = dot_product / (first_length * second_length)\nlocal agreement_threshold = math.cos(math.rad(20))\nprint(string.format("%.4f", agreement))\nprint(agreement > agreement_threshold)\n-- Expected output:\n-- 0.9692\n-- true`} />
+
+That ratio *is* the cosine of the angle between the two headings. Turning the threshold into
+a cosine once and comparing against it is cheaper and steadier than turning the measurement
+into an angle on every check — and it sidesteps the rounding trap that
+[`math.acos()`](/docs/standard-library/math/acos) has to guard against. Note that the
+comparison points the other way from the question: "within twenty degrees" becomes "cosine
+above `agreement_threshold`", because a wider angle means a *smaller* cosine.
+
+### The sign of the angle makes no difference
+
+<RunnableExample code={`local camera_tilt = math.rad(35)\nprint(math.cos(-camera_tilt) == math.cos(camera_tilt))\nprint(math.sin(-camera_tilt) == math.sin(camera_tilt))\n-- Expected output:\n-- true\n-- false`} />
+
+Tilting one way and the other gives the same cosine and opposite sines. Useful, and a trap:
+a cosine on its own cannot say which side of straight ahead something is.
+
+## Gotchas
+
+<Gotcha title="The argument is in radians, and a degree measure is silently wrong">
+`math.cos(60)` is not the cosine of sixty degrees. It is the cosine of sixty radians, which
+is some other angle entirely, and the call answers with a number in the usual range and
+nothing to suggest anything is amiss. Convert with
+[`math.rad()`](/docs/standard-library/math/rad) at the point a degree measure enters the
+calculation.
+</Gotcha>
+
+<Gotcha title="A cosine cannot tell left from right">
+Because the sign of the angle is discarded, two directions mirrored across the axis produce
+identical cosines, and code that decides "which way do I turn" from a cosine alone will pick
+the same way for both. Where the answer must be signed, take it from
+[`math.atan()`](/docs/standard-library/math/atan) with two arguments, which keeps the signs
+of both components and places the result in the right quadrant.
+</Gotcha>
+
+## See also
+
+- [`math.sin()`](/docs/standard-library/math/sin) — the same turn measured up instead of across, and where the exactness rule is written out
+- [`math.acos()`](/docs/standard-library/math/acos) — going the other way, from a cosine back to an angle
+- [`math.tan()`](/docs/standard-library/math/tan) — the sine divided by this
+- [`math.rad()`](/docs/standard-library/math/rad) — turning a degree measure into the radians this function expects
+- [`math.pi`](/docs/standard-library/math/pi) — the constant a full turn is built from

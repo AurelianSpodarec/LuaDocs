@@ -1,8 +1,150 @@
 ---
 title: math.atan()
-description: ""
+description: Recover an angle in radians from a slope, or from a rise and a run.
+lua-compat: math.atan
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.atan
 ---
 
-{/* Not yet written. */}
+Undoes a tangent: given a slope, hands back the angle that climbs at it. Given a rise *and* a
+run as two arguments, it does better than that — it keeps the sign of each and returns the
+angle of the direction they describe, anywhere in the full circle. The result is in *radians*.
+
+<RunnableExample code={`local roof_slope = 0.5\nprint(string.format("%.2f degrees", math.deg(math.atan(roof_slope))))\n-- Expected output: 26.57 degrees`} />
+
+## Syntax
+
+```lua
+math.atan(y [, x])
+```
+
+<Parameters>
+  <Param name="y">The rise — the numerator of the slope. With no second argument, the whole slope.</Param>
+  <Param name="x">The run — the denominator of the slope. Optional, and `1` when it is left out, which is what makes a lone `y` behave as a slope in its own right.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The angle in radians whose tangent is `y` divided by `x`, placed in the quadrant the signs of the two arguments point to. Always a float, whatever the arguments were.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `y` is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `x` is given and is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The result is an angle in radians, so [`math.deg()`](/docs/standard-library/math/deg) is what
+makes it readable to anyone thinking in degrees. Unlike its two sibling inverses this one
+accepts any number at all: every real slope belongs to some angle, so there is no range to
+stay inside and no out-of-range answer to guard against.
+
+With one argument the call is the plain inverse of
+[`math.tan()`](/docs/standard-library/math/tan), and its answer stays within a quarter turn
+either side of zero. That is the whole of what a slope can tell you: a slope is a ratio, and
+dividing the rise by the run throws away which of them was negative.
+
+With two, nothing is divided away before the function sees it, and the answer can name any
+direction in the circle. That is the form worth reaching for, and it is the subject of the
+next section.
+
+The two-argument form computes what [`math.atan2()`](/docs/standard-library/math/atan2)
+computes, argument for argument and in the same order, so code arriving from that function
+moves across by changing the name alone.
+
+The result is always a float, whatever went in. This function neither mirrors its arguments
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
+
+## The second argument and the quadrant
+
+Passing the rise and the run separately lets the function see two signs where a slope carries
+only one. A rise of `3` over a run of `4` and a rise of `-3` over a run of `-4` are the same
+slope and opposite directions; handed the pair, this function tells them apart.
+
+The answer sweeps the whole circle rather than a half of it. Its sign follows the rise: a
+direction above the axis gets a positive angle, one below gets a negative one, and the size
+grows toward half a turn as the direction swings behind. So the full span is half a turn
+either way, against the quarter turn either way that a single argument can produce.
+
+A run of zero is not a problem to be avoided. The ratio would be a division by zero, but the
+two-argument form never forms the ratio: a rise with no run at all is straight up or straight
+down, and that is what comes back. Given nothing in either direction, the answer is zero —
+a degenerate input answered with a definite value rather than with a failure.
+
+## Which inverse function to reach for
+
+Three functions turn a ratio back into an angle, and the choice between them is decided by
+what is in hand rather than by which ratio is easiest to compute.
+
+- [`math.asin()`](/docs/standard-library/math/asin) takes a rise over a *sloping length* and
+  answers within a quarter turn of zero. Reach for it when the hypotenuse is what was
+  measured.
+- [`math.acos()`](/docs/standard-library/math/acos) takes a run over a sloping length, or a
+  normalised dot product, and answers between nothing and half a turn without a sign. Reach
+  for it for an unsigned separation between two directions.
+- This function, with two arguments, takes the rise and the run themselves and answers
+  anywhere in the circle. Reach for it whenever both components of a direction are available.
+
+The last is the usual right answer, and the first two are the usual first instinct, because a
+problem stated as "I have a ratio" hides the fact that the ratio was built from two numbers
+whose signs were the useful part. Two further reasons back this up. There is no domain to
+police: an argument out of range is what makes the other two hand back a not-a-number value
+in silence, and this one has no out-of-range argument. And nothing is lost in a division that
+never happens — a very small run makes a slope enormous and coarse, where the pair reach the
+function exactly as they were measured.
+
+Where the components genuinely are not available and only a ratio is, use the one whose ratio
+it is; the ambiguity that comes with it is real and worth knowing about rather than working
+around.
+
+## Examples
+
+### The direction from one point to another
+
+<RunnableExample code={`local offsets = { { 4, 3 }, { 4, -3 }, { -4, -3 }, { -4, 3 } }\nfor index = 1, #offsets do\n  local east = offsets[index][1]\n  local north = offsets[index][2]\n  print(string.format("east %d, north %d: %.2f degrees", east, north, math.deg(math.atan(north, east))))\nend\n-- Expected output:\n-- east 4, north 3: 36.87 degrees\n-- east 4, north -3: -36.87 degrees\n-- east -4, north -3: -143.13 degrees\n-- east -4, north 3: 143.13 degrees`} />
+
+Four different directions, four different angles. The rise goes first and the run second,
+which is the reverse of the order the two are usually spoken in.
+
+### One argument cannot tell a direction from its opposite
+
+<RunnableExample code={`local first_angle = math.deg(math.atan(3 / 4))\nlocal second_angle = math.deg(math.atan(-3 / -4))\nprint(string.format("%.2f", first_angle))\nprint(string.format("%.2f", second_angle))\nprint(string.format("%.2f", math.deg(math.atan(-3, -4))))\n-- Expected output:\n-- 36.87\n-- 36.87\n-- -143.13`} />
+
+The first two calls are handed the same slope, because the division happened before the call
+and cancelled both signs. The third is handed the components and gets it right. This is the
+single most common reason a heading calculation points the wrong way.
+
+### A direction with no run at all
+
+<RunnableExample code={`print(string.format("%.2f", math.deg(math.atan(1, 0))))\nprint(string.format("%.2f", math.deg(math.atan(-1, 0))))\nprint(string.format("%.2f", math.deg(math.atan(0, 0))))\n-- Expected output:\n-- 90.00\n-- -90.00\n-- 0.00`} />
+
+Straight up, straight down, and nowhere. None of the three raises, and none needs guarding —
+which is what the "handles a run of zero" promise amounts to in practice.
+
+## Gotchas
+
+<Gotcha title="The rise comes first, not the run">
+`math.atan(y, x)` takes the numerator first, so a call written from the habit of naming a
+horizontal offset before a vertical one is reflected about the diagonal. It fails quietly: the
+angles it produces are perfectly plausible and wrong by exactly the amount needed to look like
+a sign convention problem somewhere else. `math.atan(north, east)`, never
+`math.atan(east, north)`.
+</Gotcha>
+
+<Gotcha title="Dividing before the call throws the quadrant away">
+`math.atan(rise / run)` and `math.atan(rise, run)` agree for half the circle and disagree by
+half a turn for the other half, because the division cancels a pair of minus signs the second
+form would have used. Code written the first way passes every test whose data happens to point
+up and to the right. Pass the two numbers, and let the function do the dividing.
+</Gotcha>
+
+## See also
+
+- [`math.tan()`](/docs/standard-library/math/tan) — the function this one undoes
+- [`math.atan2()`](/docs/standard-library/math/atan2) — the older spelling of the two-argument form
+- [`math.asin()`](/docs/standard-library/math/asin) — the inverse to use when a sloping length is what was measured
+- [`math.acos()`](/docs/standard-library/math/acos) — the inverse to use for an unsigned separation between directions
+- [`math.deg()`](/docs/standard-library/math/deg) — turning the radians this returns into degrees

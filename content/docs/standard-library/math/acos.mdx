@@ -1,8 +1,116 @@
 ---
 title: math.acos()
-description: ""
+description: Recover an angle in radians from its cosine.
+lua-compat: math.acos
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.acos
 ---
 
-{/* Not yet written. */}
+Undoes a cosine: given a ratio between minus one and one, hands back an angle whose cosine is
+that ratio. The angle comes back in *radians*, and it runs from nothing up to half a turn —
+never negative.
+
+<RunnableExample code={`local quarter_of_the_way = math.acos(0.5)\nprint(string.format("%.1f degrees", math.deg(quarter_of_the_way)))\n-- Expected output: 60.0 degrees`} />
+
+## Syntax
+
+```lua
+math.acos(x)
+```
+
+<Parameters>
+  <Param name="x">The cosine to recover an angle from — a ratio between `-1` and `1`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">An angle in radians whose cosine is `x`, between zero and half a turn. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The argument is a cosine, not an angle; the *result* is the angle, in radians, so
+[`math.deg()`](/docs/standard-library/math/deg) is what makes it readable in degrees. A ratio
+of one gives an angle of nothing, a ratio of zero gives a quarter turn, and minus one gives
+half a turn — the answer falls as the argument rises, which is the opposite of the reflex.
+
+What distinguishes this from [`math.asin()`](/docs/standard-library/math/asin) is which half
+of the circle it can express. The arc sine spans a quarter turn either side of zero and cannot
+say whether a direction points forward or backward; this one spans a full half turn but is
+never negative, and so cannot say whether a direction is clockwise or anti-clockwise. That
+makes it the right tool for an *unsigned separation* — how far apart two directions are,
+regardless of which side either is on — which is the shape of the angle-between-two-vectors
+calculation it is most often part of. When the answer needs a sign, the function to reach for
+is [`math.atan()`](/docs/standard-library/math/atan#which-inverse-function-to-reach-for) with
+two arguments.
+
+An argument outside minus one to one is not rejected. It produces a not-a-number value in
+silence, exactly as it does on
+[`math.asin()`](/docs/standard-library/math/asin#arguments-outside-the-domain), where the rule
+and its consequences are written out. What this entry adds is the case where it actually
+bites — a ratio that a chain of floating-point arithmetic pushed a hair past one, which is the
+second example below.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
+
+## Examples
+
+### The angle between two headings
+
+<RunnableExample code={`local first_heading = { 3, 4 }\nlocal second_heading = { 5, 12 }\nlocal dot_product = first_heading[1] * second_heading[1] + first_heading[2] * second_heading[2]\nlocal first_length = math.sqrt(first_heading[1] ^ 2 + first_heading[2] ^ 2)\nlocal second_length = math.sqrt(second_heading[1] ^ 2 + second_heading[2] ^ 2)\nprint(string.format("%.3f", math.deg(math.acos(dot_product / (first_length * second_length)))))\n-- Expected output: 14.250`} />
+
+The dot product divided by the two lengths is the cosine of the angle between them, whatever
+the number of dimensions. This function is the last step that turns it into an angle — and the
+step that can fail, which is the next example.
+
+### A cosine that arithmetic pushed past one
+
+<RunnableExample code={`local measured_ratio = (0.1 + 0.2) / 0.3\nprint(measured_ratio > 1)\nprint(math.acos(measured_ratio) ~= math.acos(measured_ratio))\nprint(string.format("%.4f", math.acos(math.min(1, math.max(-1, measured_ratio)))))\n-- Expected output:\n-- true\n-- true\n-- 0.0000`} />
+
+Two quantities that are equal on paper are a hair apart as floats, so their ratio lands just
+above one — and a cosine just above one is not a cosine. The angle is nearly nothing, which is
+the answer the clamped call gives; the unclamped one gives a not-a-number value that then
+travels. Clamping into range is not papering over a bug here: the overshoot is a property of
+the arithmetic, not of the data.
+
+### Arc cosine and arc sine add up to a quarter turn
+
+<RunnableExample code={`local slope_ratio = 0.4\nprint(string.format("%.6f", math.acos(slope_ratio) + math.asin(slope_ratio)))\nprint(string.format("%.6f", math.pi / 2))\n-- Expected output:\n-- 1.570796\n-- 1.570796`} />
+
+The two answer the same question from different sides, and their answers are complements of
+each other. That is worth knowing when a value arrives as one and the code wants the other,
+and it is a reminder that neither carries information the other lacks: knowing one is knowing
+the other, so swapping between them cannot rescue an answer that needed a sign.
+
+## Gotchas
+
+<Gotcha title="A ratio a rounding error above one gives a not-a-number value">
+A cosine computed as a dot product over two lengths is exactly one when two directions
+coincide — on paper. In floats it can come out a fraction above one, and this function answers
+that with a not-a-number value rather than with the zero angle that was meant. The bug then
+appears wherever the angle is next used, and only for inputs that happen to be parallel, which
+is precisely the case a hand-written test uses. Clamp the ratio into range before the call.
+</Gotcha>
+
+<Gotcha title="The answer is never negative">
+Every result lies between nothing and half a turn, so this function cannot report which
+direction a rotation goes in — two headings mirrored about the axis give the same angle.
+Reaching for it to compute a *signed* turn produces code that works until the first turn in
+the other direction. That question belongs to
+[`math.atan()`](/docs/standard-library/math/atan) with two arguments.
+</Gotcha>
+
+## See also
+
+- [`math.cos()`](/docs/standard-library/math/cos) — the function this one undoes
+- [`math.asin()`](/docs/standard-library/math/asin) — the same job from a sine, and where the out-of-range rule is written out
+- [`math.atan()`](/docs/standard-library/math/atan#which-inverse-function-to-reach-for) — which of the three inverses a problem actually wants
+- [`math.deg()`](/docs/standard-library/math/deg) — turning the radians this returns into degrees
+- [`math.sqrt()`](/docs/standard-library/math/sqrt) — where the lengths a dot product is divided by come from

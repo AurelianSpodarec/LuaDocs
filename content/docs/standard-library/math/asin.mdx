@@ -1,8 +1,124 @@
 ---
 title: math.asin()
-description: ""
+description: Recover an angle in radians from its sine.
+lua-compat: math.asin
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-math.asin
 ---
 
-{/* Not yet written. */}
+Undoes a sine: given a ratio between minus one and one, hands back an angle whose sine is
+that ratio. The angle comes back in *radians*, and it is always within a quarter turn of
+zero.
+
+<RunnableExample code={`local half_way_up = math.asin(0.5)\nprint(string.format("%.1f degrees", math.deg(half_way_up)))\n-- Expected output: 30.0 degrees`} />
+
+## Syntax
+
+```lua
+math.asin(x)
+```
+
+<Parameters>
+  <Param name="x">The sine to recover an angle from — a ratio between `-1` and `1`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">An angle in radians whose sine is `x`, between minus a quarter turn and a quarter turn. Always a float, whatever `x` was.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `x` is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+The argument is not an angle — it is a sine, which is why the range it accepts is so narrow.
+The *result* is the angle, and it is in radians, so
+[`math.deg()`](/docs/standard-library/math/deg) is what makes it readable to anyone thinking
+in degrees.
+
+Every ratio inside the accepted range is the sine of infinitely many angles, so this function
+has to choose one. It chooses from the quarter turn either side of zero: a positive ratio
+gives an angle up to a quarter turn upwards, a negative one an angle up to a quarter turn
+downwards, and nothing outside that. Feeding the answer back through
+[`math.sin()`](/docs/standard-library/math/sin) returns the ratio it started from, to the
+precision a float carries; going the other way round does not, because an angle beyond a
+quarter turn comes back as the one inside it with the same sine.
+
+The result is always a float, whatever went in. This function neither mirrors its argument
+nor rounds anything, so the library's
+[subtype rule](/docs/standard-library/math/floor#which-subtype-comes-back) does not reach it.
+
+## Arguments outside the domain
+
+No number outside minus one to one is anyone's sine, and this function does not raise for one.
+It hands back a not-a-number value and says nothing — the same silence
+[`math.acos()`](/docs/standard-library/math/acos) keeps for the same reason.
+
+That value then travels. It is not equal to itself, so `angle == angle` is `false` and any
+equality check written against it fails in a way that reads as a logic bug; every arithmetic
+operation it reaches produces another one, so a single out-of-range ratio can empty an entire
+calculation with nothing appearing to go wrong at the point of failure. Comparing a value
+against itself is the cheap test for having got one — `angle ~= angle` is true only for a
+not-a-number value.
+
+The ratio usually reaches this call as a quotient rather than as a literal, so guarding the
+argument is the useful discipline: a rise divided by a length is a sine only while the rise is
+no longer than the length, and a swapped pair of measurements is exactly how a ratio above one
+gets in. Where the ratio is the product of a chain of floating-point arithmetic and
+may overshoot by a fraction, clamping it into range before the call is the standard fix — the
+worked case is [on `math.acos()`](/docs/standard-library/math/acos), where it comes up most.
+
+## Examples
+
+### The angle of a ramp from its rise and its length
+
+<RunnableExample code={`local ramp_rise = 0.9\nlocal ramp_length = 6.4\nprint(string.format("%.2f", math.deg(math.asin(ramp_rise / ramp_length))))\n-- Expected output: 8.08`} />
+
+The rise over the sloping length is a sine, so this is the function that turns it into an
+angle. Note which length: the rise over the *ground* distance is a tangent, and belongs to
+[`math.atan()`](/docs/standard-library/math/atan).
+
+### A ratio that cannot be a sine
+
+<RunnableExample code={`local ramp_rise = 7.5\nlocal ramp_length = 6.4\nlocal ramp_angle = math.asin(ramp_rise / ramp_length)\nprint(ramp_angle ~= ramp_angle)\n-- Expected output: true`} />
+
+The two measurements have been swapped, so the ratio is above one and there is no angle to
+find. Nothing raises; the check is the value against itself.
+
+### The round trip only works in one direction
+
+<RunnableExample code={`local slope_ratio = 0.28\nprint(string.format("%.6f", math.sin(math.asin(slope_ratio))))\nprint(string.format("%.6f", math.asin(math.sin(3))))\n-- Expected output:\n-- 0.280000\n-- 0.141593`} />
+
+A sine turned into an angle and back is the sine it started as, to the precision a float
+carries. An angle of three radians turned into a sine and back is not three radians — it is
+the angle inside the quarter turn that shares that sine. The information about which turn it
+came from was never in the sine to begin with.
+
+## Gotchas
+
+<Gotcha title="An argument out of range does not raise">
+`math.asin(1.5)` hands back a not-a-number value rather than stopping, and that value spreads
+through everything it touches while comparing equal to nothing at all, itself included. The
+failure therefore surfaces a long way from the call that caused it, wearing the shape of a
+logic bug. Check the ratio before the call rather than the answer after it.
+</Gotcha>
+
+<Gotcha title="Half the circle cannot come back out">
+The answer never leaves the quarter turn either side of zero, so two genuinely different
+directions with the same sine collapse onto one. Recovering a heading from a sine alone
+therefore loses the distinction between forward and backward, silently and in a way no test
+of the sine can detect. Where both components of a direction are in hand,
+[`math.atan()`](/docs/standard-library/math/atan#which-inverse-function-to-reach-for) with two
+arguments is the call that keeps them.
+</Gotcha>
+
+## See also
+
+- [`math.sin()`](/docs/standard-library/math/sin) — the function this one undoes
+- [`math.acos()`](/docs/standard-library/math/acos) — the same job from a cosine, covering a different half of the circle
+- [`math.atan()`](/docs/standard-library/math/atan#which-inverse-function-to-reach-for) — which of the three inverses a problem actually wants
+- [`math.deg()`](/docs/standard-library/math/deg) — turning the radians this returns into degrees
+- [`math.pi`](/docs/standard-library/math/pi) — half of it is the quarter turn this result is bounded by

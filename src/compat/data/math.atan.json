@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Takes an optional second argument, the `x` of `y/x`, so the signs of both place the result in the right quadrant; earlier versions take `y` alone and silently ignore anything passed after it."
+  }
+}
