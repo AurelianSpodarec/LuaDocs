@@ -15,20 +15,44 @@ message saying what the compiler objected to.
 
 ## Syntax
 
+<Only before="5.2">
+
+```lua
+load(chunk [, chunkname])
+```
+
+</Only>
+
+<Only since="5.2">
+
 ```lua
 load(chunk [, chunkname [, mode [, env]]])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="chunk">The source to compile — either the text of it, or a function that hands it over a piece at a time. See [Reading the source a piece at a time](/docs/standard-library/globals/load#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
-  <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, source text is named after itself and a supplying function gets a fixed placeholder instead.</Param>
-  <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
-  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — see [Choosing the environment](/docs/standard-library/globals/load#choosing-the-environment).</Param>
+  <Only before="5.2">
+    <Param name="chunk">A function that hands the source over a piece at a time. See [Reading the source a piece at a time](/docs/standard-library/globals/load#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
+    <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, the chunk gets a fixed placeholder instead.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="chunk">The source to compile — either the text of it, or a function that hands it over a piece at a time. See [Reading the source a piece at a time](/docs/standard-library/globals/load#reading-the-source-a-piece-at-a-time) for how a supplying function is driven.</Param>
+    <Param name="chunkname">The name the chunk answers to in error messages and debug information. Left out, source text is named after itself and a supplying function gets a fixed placeholder instead.</Param>
+    <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
+    <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — see [Choosing the environment](/docs/standard-library/globals/load#choosing-the-environment).</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
-  <Return type="any">What went wrong, present on the failing path only; a call that compiled something hands back the function and nothing after it. Lua's own objections — source that will not compile, a `mode` that refuses the chunk — arrive as a string describing them. A failure raised inside a supplying function is reported here too, and what arrives then is not necessarily a string, so code that concatenates this value straight into a report is relying on something only the first kind guarantees.</Return>
+  <Only before="5.2">
+    <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
+    <Return type="any">What went wrong, present on the failing path only; a call that compiled something hands back the function and nothing after it. Lua's own objection to source that will not compile arrives as a string describing it. A failure raised inside a supplying function is reported here too, and what arrives then is not necessarily a string, so code that concatenates this value straight into a report is relying on something only the first kind guarantees.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="function or nil">The compiled chunk, as a function nothing has called yet — or `nil` in its place when the source was refused.</Return>
+    <Return type="any">What went wrong, present on the failing path only; a call that compiled something hands back the function and nothing after it. Lua's own objections — source that will not compile, a `mode` that refuses the chunk — arrive as a string describing them. A failure raised inside a supplying function is reported here too, and what arrives then is not necessarily a string, so code that concatenates this value straight into a report is relying on something only the first kind guarantees.</Return>
+  </Only>
 </Returns>
 
 <Errors>

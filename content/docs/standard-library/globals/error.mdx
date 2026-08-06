@@ -19,8 +19,18 @@ error(message [, level])
 ```
 
 <Parameters>
-  <Param name="message">The error object: the value carried to whatever catches the failure. Almost any value will do — a string, a table describing what went wrong, an object of your own. `nil` is the one that does not survive the trip; see below.</Param>
-  <Param name="level">Which line to name when `message` is a string. `1`, the default, names the line this call sits on; `2` names the line that called the function this call sits in; `0` names nothing and leaves the message as written.</Param>
+  <Only before="5.5">
+    <Param name="message">The error object: the value carried to whatever catches the failure. Almost any value will do — a string, a table describing what went wrong, an object of your own. `nil` travels like the rest and reaches a catcher as `nil`.</Param>
+  </Only>
+  <Only since="5.5">
+    <Param name="message">The error object: the value carried to whatever catches the failure. Almost any value will do — a string, a table describing what went wrong, an object of your own. `nil` is the one that does not survive the trip; see below.</Param>
+  </Only>
+  <Only before="5.3">
+    <Param name="level">Which line to name when `message` is a string, or a number, which counts as one here. `1`, the default, names the line this call sits on; `2` names the line that called the function this call sits in; `0` names nothing and leaves the message as written.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="level">Which line to name when `message` is a string. `1`, the default, names the line this call sits on; `2` names the line that called the function this call sits in; `0` names nothing and leaves the message as written.</Param>
+  </Only>
 </Parameters>
 
 <Returns>

@@ -27,7 +27,9 @@ pairs(t)
   <Return type="function">The iteration function — [`next()`](/docs/standard-library/globals/next), unless `__pairs` supplied one of its own.</Return>
   <Return type="any">The state: what the iteration function is handed back on every step, which for a plain table is the table itself.</Return>
   <Return type="nil">Where to start. A traversal begins before the first key, and `nil` is what says so.</Return>
-  <Return type="nil">The loop's closing value, which a plain table has nothing to put in.</Return>
+  <Only since="5.5">
+    <Return type="nil">The loop's closing value, which a plain table has nothing to put in.</Return>
+  </Only>
 </Returns>
 
 <Errors>

@@ -20,7 +20,12 @@ ipairs(t)
 ```
 
 <Parameters>
-  <Param name="t">The list to walk. Positions are looked up on it the way `t[1]` and `t[2]` would be.</Param>
+  <Only before="5.3">
+    <Param name="t">The list to walk. Its positions are read out of the table itself, so an `__index` has no say in what the walk finds.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="t">The list to walk. Positions are looked up on it the way `t[1]` and `t[2]` would be.</Param>
+  </Only>
 </Parameters>
 
 <Returns>

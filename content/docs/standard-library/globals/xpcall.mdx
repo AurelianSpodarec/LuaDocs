@@ -15,19 +15,43 @@ handler* that runs at the moment of the failure and decides what comes back in p
 
 ## Syntax
 
+<Only before="5.2">
+
+```lua
+xpcall(f, msgh)
+```
+
+</Only>
+
+<Only since="5.2">
+
 ```lua
 xpcall(f, msgh [, arg1, ···])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="f">What to call, under protection.</Param>
-  <Param name="msgh">The message handler. It is called with the error object when — and only when — `f` fails, and whatever it answers becomes the second value handed back.</Param>
-  <Param name="arg1, ···">The arguments to hand to `f`. They follow the handler rather than sitting straight after `f`, which is the argument order to get wrong when converting a call from `pcall()`.</Param>
+  <Only before="5.2">
+    <Param name="f">What to call, under protection. It is called with no arguments, so a call that needs some has to close over them.</Param>
+    <Param name="msgh">The message handler. It is called with the error object when — and only when — `f` fails, and whatever it answers becomes the second value handed back.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="f">What to call, under protection.</Param>
+    <Param name="msgh">The message handler. It is called with the error object when — and only when — `f` fails, and whatever it answers becomes the second value handed back.</Param>
+    <Param name="arg1, ···">The arguments to hand to `f`. They follow the handler rather than sitting straight after `f`, which is the argument order to get wrong when converting a call from `pcall()`.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
-  <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered. A handler that answers nothing, or answers `nil`, does not leave `nil` here — [`nil` is the one thing an error cannot carry](/docs/standard-library/globals/error#what-an-error-carries).</Return>
+  <Only before="5.5">
+    <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
+    <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered — `nil` included, which is what a handler that answers nothing leaves here.</Return>
+  </Only>
+  <Only since="5.5">
+    <Return type="boolean">The status: `true` when `f` ran to completion, `false` when something raised.</Return>
+    <Return type="any">On the `true` path, every value `f` returned, in the order it returned them. On the `false` path, exactly one value: whatever `msgh` answered. A handler that answers nothing, or answers `nil`, does not leave `nil` here — [`nil` is the one thing an error cannot carry](/docs/standard-library/globals/error#what-an-error-carries).</Return>
+  </Only>
 </Returns>
 
 <Errors>

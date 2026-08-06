@@ -20,8 +20,14 @@ assert(v [, message])
 ```
 
 <Parameters>
-  <Param name="v">The value to test. Only `nil` and `false` count as a failure; every other value passes, including `0` and the empty string.</Param>
-  <Param name="message">The error object to raise with — any value that [an error can carry](/docs/standard-library/globals/error#what-an-error-carries). Left out, a fixed string standing in for *this assertion did not hold* is used instead.</Param>
+  <Only before="5.3">
+    <Param name="v">The value to test. Only `nil` and `false` count as a failure; every other value passes, including `0` and the empty string.</Param>
+    <Param name="message">The message to raise with — a string, or a number, which is written out as one. Left out, a fixed string standing in for *this assertion did not hold* is used instead.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="v">The value to test. Only `nil` and `false` count as a failure; every other value passes, including `0` and the empty string.</Param>
+    <Param name="message">The error object to raise with — any value that [an error can carry](/docs/standard-library/globals/error#what-an-error-carries). Left out, a fixed string standing in for *this assertion did not hold* is used instead.</Param>
+  </Only>
 </Parameters>
 
 <Returns>

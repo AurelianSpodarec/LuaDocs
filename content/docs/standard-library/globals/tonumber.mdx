@@ -19,12 +19,23 @@ tonumber(e [, base])
 ```
 
 <Parameters>
-  <Param name="e">The value to read. Without `base`, a number is handed straight back and a string is read as a Lua numeral; with `base`, this has to be a string.</Param>
-  <Param name="base">Which base to read `e`'s digits in — a whole number from 2 to 36. Left out, or given as `nil`, the string is read as an ordinary Lua numeral instead.</Param>
+  <Only before="5.3">
+    <Param name="e">The value to read. Without `base`, a number is handed straight back and a string is read as a Lua numeral; with `base`, a number is read as the digits it is written with, just as a string would be.</Param>
+    <Param name="base">Which base to read `e`'s digits in — a whole number from 2 to 36. Left out, or given as `nil`, the string is read as an ordinary Lua numeral instead.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="e">The value to read. Without `base`, a number is handed straight back and a string is read as a Lua numeral; with `base`, this has to be a string.</Param>
+    <Param name="base">Which base to read `e`'s digits in — a whole number from 2 to 36. Left out, or given as `nil`, the string is read as an ordinary Lua numeral instead.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="integer or float">The number `e` names, and `nil` when it names none. For a string, the subtype follows the numeral: a fractional part or an exponent reads as a float, and digits with neither read as an integer. A *decimal* numeral too large for the integer range reads as a float instead; a *hexadecimal* one stays an integer and wraps around. A number handed in with no `base` comes back exactly as it was.</Return>
+  <Only before="5.3">
+    <Return type="integer or float">The number `e` names, and `nil` when it names none. A number handed in with no `base` comes back exactly as it was.</Return>
+  </Only>
+  <Only since="5.3">
+    <Return type="integer or float">The number `e` names, and `nil` when it names none. For a string, the subtype follows the numeral: a fractional part or an exponent reads as a float, and digits with neither read as an integer. A *decimal* numeral too large for the integer range reads as a float instead; a *hexadecimal* one stays an integer and wraps around. A number handed in with no `base` comes back exactly as it was.</Return>
+  </Only>
 </Returns>
 
 <Errors>

@@ -23,7 +23,12 @@ tostring(v)
 </Parameters>
 
 <Returns>
-  <Return type="string">`v` written as text.</Return>
+  <Only before="5.3">
+    <Return type="any">`v` written as text — or, where a `__tostring` metamethod answered with something that is not text, that answer itself, handed on exactly as it came back.</Return>
+  </Only>
+  <Only since="5.3">
+    <Return type="string">`v` written as text.</Return>
+  </Only>
 </Returns>
 
 <Errors>

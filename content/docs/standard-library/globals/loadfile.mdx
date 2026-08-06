@@ -21,14 +21,31 @@ your own machine.
 
 ## Syntax
 
+<Only before="5.2">
+
+```lua
+loadfile([filename])
+```
+
+</Only>
+
+<Only since="5.2">
+
 ```lua
 loadfile([filename [, mode [, env]]])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="filename">The file to read the chunk from. Left out entirely, the source is read from standard input instead.</Param>
-  <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
-  <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — [`load()`](/docs/standard-library/globals/load#choosing-the-environment) covers what changing it buys.</Param>
+  <Only before="5.2">
+    <Param name="filename">The file to read the chunk from. Left out entirely, the source is read from standard input instead.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="filename">The file to read the chunk from. Left out entirely, the source is read from standard input instead.</Param>
+    <Param name="mode">Which forms of chunk are acceptable: `"t"` for source text, `"b"` for a precompiled chunk, or `"bt"` for either, which is what is used when the argument is absent.</Param>
+    <Param name="env">The table the compiled chunk resolves its global names through. Absent, the chunk uses the same global environment as the rest of the program — [`load()`](/docs/standard-library/globals/load#choosing-the-environment) covers what changing it buys.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
