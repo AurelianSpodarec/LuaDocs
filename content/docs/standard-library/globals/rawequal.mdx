@@ -40,9 +40,9 @@ are a string and a number, so the answer is `false`. Within a type, the comparis
 the language performs on its own. Numbers are equal when they stand for the same
 mathematical value. Strings are equal when they hold the same bytes. A table, a userdata or a
 coroutine is equal to itself and to nothing else — two of them built the same way, holding
-the same things, are still two. Functions work the same way with one reservation the language
-keeps for itself: two written separately with no detectable difference between them may or
-may not be reported as one.
+the same things, are still two. A function is equal to itself as well; whether two written
+separately can ever turn out to be one is a question about the language rather than about this
+call, and both forms answer it the same way.
 
 All of that is what `==` does too. The one thing this call leaves out is the metamethod, and
 that narrows the difference between the two forms a long way, because `__eq` is reached only
@@ -51,16 +51,22 @@ value. On anything else there is no metamethod in the picture to skip.
 
 ## Where this differs from ordinary equality
 
-Put the two side by side and only one situation separates them: a pair of tables, or a pair
-of full userdata, that are not the same value, where a metatable offers an `__eq`. There
-`==` calls the metamethod and reports what it decided, and this call reports that the two are
-not the same value — which is the question it was asked.
+Put the two side by side. The clear case is a pair of tables, or a pair of full userdata, that
+are not the same value and that share an `__eq` between them: there `==` calls the metamethod
+and reports what it decided, while this call reports that the two are not the same value —
+which is the question it was asked.
 
-Everywhere else the two agree, and they agree by construction rather than by luck. On a
-number, a string, a boolean, `nil`, a function or a coroutine, no `__eq` is ever consulted, so
-*raw* equality and ordinary equality are one and the same thing. Reaching for this call to
-compare two prices or two names buys nothing and suggests to a reader that something subtle
-is going on.
+Outside that, on a number, a string, a boolean, `nil`, a function or a coroutine, no `__eq` is
+consulted by either form, so *raw* equality and ordinary equality are one and the same thing —
+by construction rather than by luck. Reaching for this call to compare two prices or two names
+buys nothing and suggests to a reader that something subtle is going on.
+
+What is left over is two tables, or two full userdata, that do *not* share an `__eq`: they
+carry different ones, or only one of them carries any. Whether `==` reaches a metamethod there
+is a question about `==` rather than about this call, and the
+[relational operators](/docs/language/expressions/relational-operators) entry is where it is
+settled. This call answers the same either way — it consults no metamethod in any of those
+cases.
 
 The disagreement also runs one way only. A metamethod is consulted only for values that are
 *not* already equal, so whenever this call answers `true`, `==` answers `true` as well; it is
@@ -101,10 +107,11 @@ that must not fail — inside the metamethod itself, for one.
 ## Gotchas
 
 <Gotcha title="On most values it is a longer way to write ==">
-The difference only exists for a pair of tables or a pair of full userdata carrying an `__eq`.
-Written over numbers, strings or booleans this call answers what `==` answers, so the reader
-is left looking for a subtlety that is not there. Reach for it where the values compared are
-tables whose equality somebody has redefined, and use `==` everywhere else.
+The difference only exists for a pair of tables or a pair of full userdata, and then only
+where a metatable has redefined what equality means for them. Written over numbers, strings or
+booleans this call answers what `==` answers, so the reader is left looking for a subtlety that
+is not there. Reach for it where the values compared are tables whose equality somebody has
+redefined, and use `==` everywhere else.
 </Gotcha>
 
 <Gotcha title="It compares the two values, not what is inside them">
@@ -116,10 +123,11 @@ uselessly. Comparing structure means walking it, with
 </Gotcha>
 
 <Gotcha title="A false answer does not mean the two are different">
-Where an `__eq` is in play, `==` and this call are asking different questions, and the raw one
-answers `false` for two values the rest of the program treats as equal. Used by mistake as a
-general equality test on such data — in a lookup, a filter, a de-duplication pass — it quietly
-finds nothing, because it was answering *is this the same value* all along.
+On data whose `==` has been given a meaning of its own, the two forms are asking different
+questions, and the raw one answers `false` for values the rest of the program treats as equal.
+Used by mistake as a general equality test on such data — in a lookup, a filter, a
+de-duplication pass — it quietly finds nothing, because it was answering *is this the same
+value* all along.
 </Gotcha>
 
 ## See also

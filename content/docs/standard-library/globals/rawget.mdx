@@ -66,10 +66,10 @@ declines to consult:
 
 | Raw call | The plain form of | The field it does not consult |
 |---|---|---|
-| `rawget(t, key)` | `t[key]` | `__index` |
-| `rawset(t, key, value)` | `t[key] = value` | `__newindex` |
-| `rawequal(left, right)` | `left == right` | `__eq` |
-| `rawlen(v)` | `#v` | `__len` |
+| [`rawget(t, key)`](/docs/standard-library/globals/rawget) | `t[key]` | `__index` |
+| [`rawset(t, key, value)`](/docs/standard-library/globals/rawset) | `t[key] = value` | `__newindex` |
+| [`rawequal(left, right)`](/docs/standard-library/globals/rawequal) | `left == right` | `__eq` |
+| [`rawlen(v)`](/docs/standard-library/globals/rawlen) | `#v` | `__len` |
 
 The middle column is a correspondence rather than a substitution. Swapping one for the other
 changes what is accepted as well as what is answered: `rawget()` and `rawset()` insist on a
