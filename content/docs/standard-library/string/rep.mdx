@@ -13,18 +13,41 @@ another. An optional separator goes *between* the copies.
 
 ## Syntax
 
+<Only before="5.2">
+
+```lua
+string.rep(s, n)
+```
+
+</Only>
+
+<Only since="5.2">
+
 ```lua
 string.rep(s, n [, sep])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="s">The string to repeat.</Param>
-  <Param name="n">How many copies to write.</Param>
-  <Param name="sep">Placed between one copy and the next. Omitted, the copies run together with nothing between them.</Param>
+  <Only before="5.2">
+    <Param name="s">The string to repeat.</Param>
+    <Param name="n">How many copies to write.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="s">The string to repeat.</Param>
+    <Param name="n">How many copies to write.</Param>
+    <Param name="sep">Placed between one copy and the next. Omitted, the copies run together with nothing between them.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
-  <Return type="string">The copies of `s` joined end to end, with `sep` between each pair. The empty string when `n` is not positive.</Return>
+  <Only before="5.2">
+    <Return type="string">The copies of `s` joined end to end, with nothing between them. The empty string when `n` is not positive.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="string">The copies of `s` joined end to end, with `sep` between each pair. The empty string when `n` is not positive.</Return>
+  </Only>
 </Returns>
 
 ## Description

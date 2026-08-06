@@ -17,13 +17,30 @@ message.
 
 ## Syntax
 
+<Only before="5.3">
+
+```lua
+string.dump(function)
+```
+
+</Only>
+
+<Only since="5.3">
+
 ```lua
 string.dump(function [, strip])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="function">The Lua function to compile. It must be written in Lua rather than in C.</Param>
-  <Param name="strip">Anything other than `nil` or `false` asks for a chunk that may leave some debug information out, to save space. Omitted, everything is kept.</Param>
+  <Only before="5.3">
+    <Param name="function">The Lua function to compile. It must be written in Lua rather than in C.</Param>
+  </Only>
+  <Only since="5.3">
+    <Param name="function">The Lua function to compile. It must be written in Lua rather than in C.</Param>
+    <Param name="strip">Anything other than `nil` or `false` asks for a chunk that may leave some debug information out, to save space. Omitted, everything is kept.</Param>
+  </Only>
 </Parameters>
 
 <Returns>

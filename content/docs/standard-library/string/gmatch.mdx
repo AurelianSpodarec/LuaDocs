@@ -14,14 +14,32 @@ what turns "every match in this string" into a two-line loop.
 
 ## Syntax
 
+<Only before="5.4">
+
+```lua
+string.gmatch(s, pattern)
+```
+
+</Only>
+
+<Only since="5.4">
+
 ```lua
 string.gmatch(s, pattern [, init])
 ```
 
+</Only>
+
 <Parameters>
-  <Param name="s">The string to walk.</Param>
-  <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) each turn looks for.</Param>
-  <Param name="init">Where the *first* search begins; every later turn carries on from the previous match. Omitted, the walk starts at the first byte.</Param>
+  <Only before="5.4">
+    <Param name="s">The string to walk.</Param>
+    <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) each turn looks for.</Param>
+  </Only>
+  <Only since="5.4">
+    <Param name="s">The string to walk.</Param>
+    <Param name="pattern">The [pattern](/docs/standard-library/string/patterns) each turn looks for.</Param>
+    <Param name="init">Where the *first* search begins; every later turn carries on from the previous match. Omitted, the walk starts at the first byte.</Param>
+  </Only>
 </Parameters>
 
 <Returns>
