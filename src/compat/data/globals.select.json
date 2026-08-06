@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Requires `index` to hold an exact whole-number value. Earlier versions truncate one carrying a fraction towards zero, so `select(1.5, ...)` behaves there as `select(1, ...)` does."
+  }
+}

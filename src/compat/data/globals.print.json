@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "Converts each argument itself instead of calling the global `tostring` to do it. Replacing that global changes what earlier versions print and has no effect from here on; a `__tostring` metamethod on the value is honoured either way."
+  }
+}

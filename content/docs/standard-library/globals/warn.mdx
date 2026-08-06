@@ -1,8 +1,155 @@
 ---
 title: warn()
-description: ""
+description: Emit a warning that does not interrupt the program, and switch the warning system on or off.
+lua-compat: globals.warn
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-warn
 ---
 
-{/* Not yet written. */}
+Emits a warning: a message about something that looks wrong, sent to whoever is running the
+program rather than to the code that called you. It does not interrupt anything. The call
+returns, the next statement runs, and no caller has to catch it or know it happened.
+
+<RunnableExample code={`local settings = { retries = 2 }\n\nif settings.timeout == nil then\n  warn("settings.timeout is missing; using 30 seconds")\n  settings.timeout = 30\nend\n\nprint(settings.timeout)\nprint(settings.retries)\n-- Expected output:\n-- 30\n-- 2`} />
+
+<Note>
+The output pane above shows what a program printed, and a warning is not printed — it goes to
+the error stream, which the runner does not capture. So the examples on this page show the
+program carrying on around the call, which is the half worth seeing, and the warning text
+itself is quoted in the prose instead.
+</Note>
+
+## Syntax
+
+```lua
+warn(msg1, ···)
+```
+
+<Parameters>
+  <Param name="msg1">The message, or the first piece of it. At least this one is required.</Param>
+  <Param name="···">Further pieces of the same message. They are joined onto `msg1` with nothing between them, so any spacing has to be written into the pieces themselves.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing at all. A warning is a side channel, and the call is made for what it emits.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no arguments at all. A warning with no message is refused rather than treated as an empty one.
+- Raises when an argument is neither a string nor a number. `nil`, a boolean and a table are all refused. A number is accepted and written as its digits, but a message is meant to be text and converting it yourself is the clearer habit.
+
+</Errors>
+
+## Description
+
+A warning says *this is probably a mistake* without deciding what to do about it. That is the
+whole distinction from [`error()`](/docs/standard-library/globals/error): raising stops the
+code that called you and makes the caller responsible, while a warning leaves the program
+running exactly as it would have run without the call. Nothing catches a warning and nothing
+handles it: there is no path by which it changes what the code around it does, which is why
+a [`pcall()`](/docs/standard-library/globals/pcall) wrapped around a call that emits one
+comes back reporting success.
+
+The message is assembled from the arguments in order, joined end to end. Handing over three
+pieces emits the same warning as joining those three pieces with `..` and handing over the
+result; writing them separately just saves building the string first. Because nothing is
+inserted between them, a space between two pieces has to be written into one of them.
+
+It is the right call for the condition a library notices and the caller did not ask about: a
+setting that is missing and has been defaulted, a function that still works but has been
+superseded, a resource that was not closed. All of those are worth saying and none of them is
+worth raising, because the caller has no decision to make.
+
+## Control messages
+
+By convention, a message that arrives as a *single* piece and begins with `@` is not a
+message for a reader at all: it is addressed to the warning system. The system Lua ships with
+reads three cases:
+
+- `@off` stops warnings being written.
+- `@on` starts them being written again.
+- Anything else beginning with `@` is ignored — and *ignored* means discarded rather than
+  written out.
+
+The single-piece part is the trap. `warn("@off")` is a control message; `warn("@", "off")`
+composes the same characters out of two pieces and is an ordinary warning that reads `@off`.
+
+Nothing about this is enforced by the language. It is what the warning function shipped with
+Lua does with a message, so a program that has installed a warning function of its own is
+free to read `@` messages differently or not at all.
+
+## Where a warning goes
+
+With the warning function Lua ships with, a warning is written to the standard error stream,
+each one on a line of its own and with something in front of it to mark it as a warning.
+
+That function writes nothing until warnings have been switched on. The interpreter that comes
+with Lua starts with them off and takes a
+[command-line option](/docs/standalone/command-line-options) to turn them on; a program can
+also turn them on for itself by sending `@on`. A program that embeds Lua supplies its own
+warning function and settles both questions for itself, so a warning may end up in a log
+file, in a window, or nowhere.
+
+The consequence is worth stating plainly: emitting a warning is worth doing and is not worth
+relying on. Whether anybody sees it is decided somewhere else, by somebody else.
+
+## Examples
+
+### The same warning, written two ways
+
+<RunnableExample code={`local setting_name = "timeout"\nlocal message = "no value for '" .. setting_name .. "' in settings.lua"\n\nwarn(message)\nwarn("no value for '", setting_name, "' in settings.lua")\n\nprint(message)\n-- Expected output: no value for 'timeout' in settings.lua`} />
+
+Both calls emit the same warning, because the pieces are joined end to end with nothing
+inserted between them. The printed line is the text those warnings carry; it is printed only
+because the warnings themselves go somewhere this pane cannot show.
+
+### Turning the emission off and on again
+
+<RunnableExample code={`local function report_retry(attempt_number)\n  warn("retrying, attempt ", tostring(attempt_number))\nend\n\nwarn("@off")\nreport_retry(1)\nwarn("@on")\nreport_retry(2)\n\nprint("both calls returned, and neither stopped the program")\n-- Expected output: both calls returned, and neither stopped the program`} />
+
+The first control message silences what follows it and the second restores it, so the two
+identical calls to `report_retry` behave differently without either of them knowing: the
+first emits nothing and the second emits `retrying, attempt 2`. Neither control message is
+written out itself, and none of the calls changes what the program computes.
+
+### Reporting a superseded function without breaking its callers
+
+<RunnableExample code={`local function shipping_rate(weight_kilos)\n  return weight_kilos * 2\nend\n\nlocal function old_shipping_rate(weight_kilos)\n  warn("old_shipping_rate is superseded; call shipping_rate instead")\n  return shipping_rate(weight_kilos)\nend\n\nprint(old_shipping_rate(4))\n-- Expected output: 8`} />
+
+The caller gets the answer it asked for and the person running the program gets told to stop
+calling this. Raising here would break working code to make a point; returning a second value
+would change the function's contract for everybody. A warning changes neither.
+
+## Gotchas
+
+<Gotcha title="A warning nobody switched on is a warning nobody sees">
+Warnings start switched off in the interpreter Lua ships with, and a program that never turns
+them on runs through every one of these calls in silence. So a library reporting a problem
+this way is reporting it to a channel its caller may never have opened. Where a condition
+genuinely has to be noticed, raise it or return it; keep this call for what is worth saying
+and not worth insisting on.
+</Gotcha>
+
+<Gotcha title="A message beginning with an at sign disappears">
+Any single-piece message starting with `@` is taken for a control message, and one the system
+does not recognise is dropped without a trace — no warning, no complaint, nothing written.
+So a message that opens with a file name in `@` form, or with an address, silently emits
+nothing. Put a word in front of it, or hand it over as more than one piece, and it is an
+ordinary warning again.
+</Gotcha>
+
+<Gotcha title="It is not an error, and nothing catches it">
+There is no object to inspect, no status to test and no handler to install. A
+[protected call](/docs/standard-library/globals/pcall) wrapped around code that warns comes
+back reporting success, because nothing failed. Code that has to *respond* to the condition
+needs it raised or returned; a warning only describes it.
+</Gotcha>
+
+## See also
+
+- [`error()`](/docs/standard-library/globals/error) — reporting a problem in the way that does stop the caller
+- [`print()`](/docs/standard-library/globals/print) — showing a value on standard output, where a program's results go
+- [`io.stderr`](/docs/standard-library/io/stderr) — writing to the error stream yourself, with no system in between
+- [Warnings](/docs/language/error-handling/warnings) — warnings as a language feature, beside errors
+- [Command-line options](/docs/standalone/command-line-options) — the option that turns warnings on in the interpreter

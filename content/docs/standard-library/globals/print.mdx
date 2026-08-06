@@ -1,8 +1,137 @@
 ---
 title: print()
-description: ""
+description: Write values to standard output as text, as a quick way to see what they are.
+lua-compat: globals.print
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-print
 ---
 
-{/* Not yet written. */}
+Turns every value it is given into text and writes the lot to standard output on one line.
+It is the shortest way to look at something while you are working, and the reference manual
+is explicit that this is all it is meant for: not formatted output, just a quick look at a
+value.
+
+<RunnableExample code={`local parcel_count = 3\nlocal destination = "Lisbon"\nlocal signed_for = false\n\nprint(parcel_count, destination, signed_for)\n-- Expected output: 3\tLisbon\tfalse`} />
+
+## Syntax
+
+```lua
+print(···)
+```
+
+<Parameters>
+  <Param name="···">Any number of values, of any type. Each is converted to text before it is written, so `nil`, a boolean, a table and a function are all acceptable here; none of them has to be converted first.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing at all. The call is made for what it writes, so it cannot be chained onto and there is no value to test.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a value's `__tostring` metamethod answers with something that cannot stand in for text — a table or `nil`, say. A string is accepted, and so is a number.
+
+</Errors>
+
+## Description
+
+Each argument is converted to text, the pieces are written to standard output with a tab
+between them, and a newline finishes the line. There is nothing else to it: a call with no
+arguments at all writes an empty line, and a call with ten writes ten pieces separated by
+nine tabs.
+
+The conversion follows the same rules as
+[`tostring()`](/docs/standard-library/globals/tostring). A string is written as it stands,
+without quotes or escapes; a number is written the way the language spells it; `nil` and the
+two booleans are written as those three words; and anything else gets a word for what it is
+followed by something standing for *which one* — unless
+[its metatable says otherwise](/docs/standard-library/globals/tostring#what-a-metatable-can-change),
+which is the supported way to decide how a value of your own appears here.
+
+That conversion is built into this call. Replacing the global `tostring` with a version of
+your own changes what `tostring()` answers everywhere and leaves this call's output alone, so
+a `__tostring` metamethod on the value is what to reach for when the spelling matters.
+
+What comes out is
+[not a promised format](/docs/standard-library/globals/tostring#the-format-is-not-a-promise).
+Nothing fixes how a number is spelled or what a table looks like, which makes this output
+something for a person to read and a poor thing for a program to parse — including the
+program that reads your program's output.
+
+## What it is not for
+
+Two jobs people reach for this call to do want something else, and both go wrong quietly.
+
+*Laying output out* is [`string.format()`](/docs/standard-library/string/format)'s job. The
+tab between values is a separator, not a column: values of different widths land in different
+places, and a table that looked aligned for the first three rows stops being aligned on the
+fourth. Where the bytes matter exactly,
+[`io.write()`](/docs/standard-library/io/write) writes the values it is given and nothing
+else — no separator between them and no newline at the end.
+
+*Reporting a problem* is not this call's job either. Everything written here goes to standard
+output, which is where a program's real results go, so a diagnostic written this way is
+interleaved with the output somebody is trying to read, redirect or pipe onwards. A
+diagnostic belongs on the error stream —
+[`io.stderr`](/docs/standard-library/io/stderr) writes to it directly — or in the warning
+system, which is what [`warn()`](/docs/standard-library/globals/warn) is for and which can be
+switched off by whoever is running the program rather than by whoever wrote it.
+
+## Examples
+
+### Giving a value of your own a readable form
+
+<RunnableExample code={`local duration_display = {\n  __tostring = function(value) return value.minutes .. " min" end,\n}\nlocal commute = setmetatable({ minutes = 35 }, duration_display)\n\nprint(commute)\nprint(commute.minutes)\n-- Expected output:\n-- 35 min\n-- 35`} />
+
+The metamethod is reached without being asked for, which is what makes it worth defining: a
+record, a date or a measurement written this way shows up readably everywhere a value is
+looked at, and the table itself is untouched.
+
+### Everything a call returned arrives on the line
+
+<RunnableExample code={`local quantity, unit = string.match("450g of cocoa", "(%d+)(%a+)")\n\nprint(quantity, unit)\nprint(string.match("450g of cocoa", "(%d+)(%a+)"))\n-- Expected output:\n-- 450\tg\n-- 450\tg`} />
+
+A call written as the last argument hands over every value it produced, so the second line
+needs no names for them. That is convenient while looking at something and misleading in a
+test, where a second return value quietly joins the line and nothing says where it came from.
+
+### Laying values out, which this call does not do
+
+<RunnableExample code={`local stock_levels = {\n  { name = "cocoa", units = 2 },\n  { name = "flour", units = 15 },\n  { name = "sugar", units = 1 },\n}\n\nfor position = 1, #stock_levels do\n  local item = stock_levels[position]\n  print(string.format("%-6s %3d", item.name, item.units))\nend\n-- Expected output:\n-- cocoa    2\n-- flour   15\n-- sugar    1`} />
+
+The alignment is `string.format()`'s doing, not this call's. Handing the two values over
+separately — `print(item.name, item.units)` — puts a tab between them and lets the numbers
+wander, which is exactly the difference between output that is shown and output that is
+formatted.
+
+## Gotchas
+
+<Gotcha title="It writes where the program's real output goes">
+Standard output is what a shell pipeline reads and what a caller redirects into a file. A
+call left in a function that produces data corrupts that data for anybody consuming it, and
+it does so silently, because the program still works when a person runs it by hand. Debug
+output belongs on the error stream or in the warning system.
+</Gotcha>
+
+<Gotcha title="The tab between values is not a column">
+Two values on a line are separated by one tab character, and how wide that looks depends on
+whatever is displaying it. Columns that line up for short values stop lining up for long
+ones, and pasting the output into anything that does not expand tabs the same way rearranges
+it again. Build the line with `string.format()` when the shape of it matters.
+</Gotcha>
+
+<Gotcha title="It hands nothing back">
+`local shown = print(total)` puts `nil` in `shown`, and `return print(value)` returns
+nothing — this call is not a pass-through and does not answer with what it wrote. Where the
+same text is wanted both on screen and in a variable, build it with
+[`tostring()`](/docs/standard-library/globals/tostring) or
+[`string.format()`](/docs/standard-library/string/format) first and print the result.
+</Gotcha>
+
+## See also
+
+- [`tostring()`](/docs/standard-library/globals/tostring) — the conversion this call performs on each argument, on its own
+- [`string.format()`](/docs/standard-library/string/format) — deciding how a value is written, which this call does not offer
+- [`io.write()`](/docs/standard-library/io/write) — writing exactly the bytes given, with no separator and no newline
+- [`warn()`](/docs/standard-library/globals/warn) — reporting something rather than showing it
+- [`io.stderr`](/docs/standard-library/io/stderr) — the stream a diagnostic belongs on

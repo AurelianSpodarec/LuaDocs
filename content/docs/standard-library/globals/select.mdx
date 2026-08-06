@@ -1,8 +1,146 @@
 ---
 title: select()
-description: ""
+description: Read a call's arguments from a given position onwards, or ask how many followed.
+lua-compat: globals.select
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-select
 ---
 
-{/* Not yet written. */}
+Reads an argument list. Given a position, it hands back every argument from that position
+onwards; given the string `"#"`, it hands back a single number instead — how many arguments
+were written after it. Those are the two questions
+[`...`](/docs/language/expressions/varargs) cannot answer on its own.
+
+<RunnableExample code={`local function count_arguments(...)\n  return select("#", ...)\nend\n\nprint(count_arguments("cocoa", "flour", "sugar"))\nprint(count_arguments(nil, nil))\nprint(count_arguments())\n-- Expected output:\n-- 3\n-- 2\n-- 0`} />
+
+## Syntax
+
+```lua
+select(index, ···)
+```
+
+<Parameters>
+  <Param name="index">Where to start reading, counted from `1`. A negative number counts back from the end instead, so `-1` names the last argument. The string `"#"` asks for a count rather than for the arguments themselves.</Param>
+  <Param name="···">The arguments to read from. As many as wanted, or none at all.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">Given `"#"`: how many arguments were written after it.</Return>
+  <Return type="any">Given a position: every argument from that position to the last one, in order — as many values as there are, and no values at all when the position is past the end.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `index` is `0`, and when a negative `index` reaches back further than the first argument — `select(-3, "first", "second")` is out of range. A positive `index` past the last argument is *not*: it produces no values and no complaint.
+- Raises when `index` is left out.
+- Raises when `index` names neither a position nor a count. `nil`, a boolean and a table are all refused.
+- <Since v="5.3" /> Raises when `index` is a number carrying a fraction rather than an exact whole-number value. A float with nothing after the point is accepted; `1.5` is not.
+
+</Errors>
+
+## Description
+
+This is an ordinary function, so it sees only what it is handed — which is why the calls you
+write pass `...` along. Inside a variadic function, `select("#", ...)` is therefore how many values
+`...` is carrying, and `select(2, ...)` is everything in `...` from its second value onwards.
+
+The count is a count of *arguments*, not of values that happened to be worth counting. An
+argument written as `nil` is an argument and is counted, and so is a `nil` that arrived
+because a call returned one. That is the whole reason this form exists: putting the arguments
+in a table with `{...}` and measuring it with the
+[length operator](/docs/language/expressions/length-operator) asks a different question,
+because storing `nil` at a position is how a position is emptied and a table cannot tell an
+emptied position from one that was never filled.
+
+A position hands back a *run* of values rather than one. `select(2, ...)` is every argument
+from the second onwards, and the usual ways of narrowing
+[multiple results](/docs/language/expressions/multiple-results) apply to it: an assignment
+takes as many as it has names for, an extra pair of parentheses takes the first and drops the
+rest, and a call receiving it as its last argument receives all of them.
+
+## Reaching from the end
+
+A negative position counts back from the last argument: `-1` names the last, `-2` the one
+before it, and so on down to the first. So `select(-1, ...)` is the last argument without
+having to know how many there are, and `select(-2, ...)` is the last two, with no count taken
+first and no arithmetic to get wrong.
+
+The two directions do not describe the same thing. A positive position says *start here and
+take the rest*; a negative one says *take this many from the end*. `select(2, ...)` and
+`select(-2, ...)` agree only when three arguments were given.
+
+## Where the positions run out
+
+The two ends fail differently, and it is worth knowing which way an off-by-one will go.
+
+Counting forwards, `1` names the first argument and the largest position that still names one
+is the count. A position beyond that is not a mistake: no values come back, the call goes
+through, and code that walks a list by index simply stops finding things.
+
+Counting backwards, `-1` names the last argument and the furthest you may reach is the first.
+One step further raises. So a position computed from a count that is off by one fails loudly
+in one direction and silently in the other, and it is the silent direction that ends up in a
+bug report.
+
+`0` names no argument in either direction, and raises.
+
+## Examples
+
+### Telling *no argument* from *an argument that was nothing*
+
+<RunnableExample code={`local function set_timeout(...)\n  if select("#", ...) == 0 then\n    return "left as it was"\n  end\n  local seconds = ...\n  if seconds == nil then\n    return "cleared"\n  end\n  return "set to " .. seconds\nend\n\nprint(set_timeout())\nprint(set_timeout(nil))\nprint(set_timeout(30))\n-- Expected output:\n-- left as it was\n-- cleared\n-- set to 30`} />
+
+Three calls, three different intentions, and the count is what tells the first two apart. A
+parameter list cannot: `nil` is what a missing argument looks like from the inside, so a
+function that wants to offer *clear this setting* alongside *leave it alone* has to ask how
+many arguments arrived.
+
+### Reading the last argument without counting first
+
+<RunnableExample code={`local function last_of(...)\n  if select("#", ...) == 0 then\n    return "nothing given"\n  end\n  return select(-1, ...)\nend\n\nprint(last_of("draft", "review", "published"))\nprint(last_of())\n-- Expected output:\n-- published\n-- nothing given`} />
+
+`-1` names the last argument without the length having to be worked out first. The guard
+above it is not optional: with no arguments at all there is no last one, and `-1` reaches
+back past the first and raises rather than answering `nil`.
+
+### Walking the arguments without building a table
+
+<RunnableExample code={`local function total_of(...)\n  local running_total = 0\n  for position = 1, select("#", ...) do\n    local amount = select(position, ...)\n    running_total = running_total + (amount or 0)\n  end\n  return running_total\nend\n\nprint(total_of(4, 7, 2))\nprint(total_of(4, nil, 2))\n-- Expected output:\n-- 13\n-- 6`} />
+
+The count drives the loop and the position form reads one value per turn — `local amount =`
+takes the first of the run and drops the rest. The second call is the point: the count says
+three whatever is in the middle, so the gap is visited like any other position and the value
+after it is reached. Driving the same loop from the
+[length operator](/docs/language/expressions/length-operator) over `{...}` asks a table with
+a hole in it how long it is, and that question has more than one defensible answer.
+
+## Gotchas
+
+<Gotcha title="The count is of what this call received, not of what the caller received">
+`select("#", ...)` counts the arguments handed to *this* call after the first one, which is
+the same as the length of `...` only while `...` is written last. Put anything after it and
+`...` is cut down to a single value before the count is taken, so `select("#", ..., "extra")`
+answers `2` however many values `...` was carrying. Keep `...` at the end of the argument
+list, and where something has to be appended, count first and append afterwards.
+</Gotcha>
+
+<Gotcha title="A position gives back everything from there on, not one value">
+`print(select(2, ...))` prints the second argument *and every one after it*, which is easy to
+miss when a test happens to pass exactly two. The same shape bites where the result is handed
+to a function with more parameters — the extra values land in them. Assign it to a name, or
+wrap the call in a second pair of parentheses, when exactly one value is wanted.
+</Gotcha>
+
+<Gotcha title="Zero is not the count, and it is not the first argument either">
+Positions start at `1`, so `select(1, ...)` is the whole list and `select(0, ...)` raises.
+The count is what `"#"` asks for; a number never means *how many* here, however natural
+`select(0, ...)` looks beside the length operator.
+</Gotcha>
+
+## See also
+
+- [`...`](/docs/language/expressions/varargs) — the argument list this call reads
+- [Multiple results](/docs/language/expressions/multiple-results) — how a run of values is cut down, and where it is not
+- [`table.pack()`](/docs/standard-library/table/pack) — the same count, stored in a table beside the values
+- [`table.unpack()`](/docs/standard-library/table/unpack) — turning a table back into a run of values
+- [The length operator](/docs/language/expressions/length-operator) — the other `#`, and a different question

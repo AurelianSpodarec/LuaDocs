@@ -88,6 +88,9 @@ import globalsAssert from './data/globals.assert.json';
 import globalsLoad from './data/globals.load.json';
 import globalsLoadfile from './data/globals.loadfile.json';
 import globalsDofile from './data/globals.dofile.json';
+import globalsSelect from './data/globals.select.json';
+import globalsPrint from './data/globals.print.json';
+import globalsWarn from './data/globals.warn.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -369,6 +372,30 @@ const raw: Record<string, unknown> = {
   // to `lua_callk` with a `dofilecont` continuation. ADR 0010 rule 3, the same shape as
   // `pcall`'s 5.2 note above, and probed on 5.3 and 5.4 from the positive side.
   'globals.dofile': globalsDofile,
+  // Three unrelated functions. `select` has not changed a line since 5.1 —
+  // `luaB_select` is the same handful of statements at every release tag from v5.1 to
+  // v5.5.0, negative index included. The 5.2 manual is where that negative index is first
+  // *described*, which is a documentation change and not a `changed_in`, on the ruling
+  // `math.huge` set for reworded passages. What is recorded is the one thing that really
+  // moved, and it moved for the whole language rather than for this function: from 5.3 an
+  // argument standing in for a whole number has to be one, where `luaL_checkint` used to
+  // truncate. `error` and `tonumber` record the same shift on the same reasoning.
+  'globals.select': globalsSelect,
+  // `print` carries the only Incompatibilities entry any of the three appears in — 5.4 §8.2,
+  // which G1 established belongs here rather than on `tostring`. `luaB_print` opens with
+  // `lua_getglobal(L, "tostring")` in 5.1, 5.2 and 5.3 and calls it once per argument; 5.4
+  // and 5.5 call `luaL_tolstring` and never touch the global. `tostring` itself is unchanged
+  // either way, so the fact is observable by calling *this* function and is absent from
+  // `globals.tostring`. Confirmed from both sides: reassigning the global hijacks `print` on
+  // a 5.3 build and does nothing on 5.4.
+  'globals.print': globalsPrint,
+  // The section's only arrival after 5.1. `warn` enters with 5.4 alongside `lua_warning`,
+  // `lua_setwarnf` and `lua_WarnFunction`, and has not moved since — the 5.4 and 5.5 passages
+  // are word-identical and `luaB_warn` is byte-identical at v5.4.0, v5.4.7 and v5.5.0. The
+  // control-message protocol lives in the auxiliary library rather than the core, and its one
+  // refactor between v5.4.0 and v5.4.7 — a single `warnf` reading a state integer becomes
+  // three functions swapped by `lua_setwarnf` — leaves every observable answer the same.
+  'globals.warn': globalsWarn,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
