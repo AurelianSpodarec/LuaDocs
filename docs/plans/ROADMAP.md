@@ -5,7 +5,10 @@ before it is executed** — writing them all up front guarantees they go stale a
 the codebase. This file is the only place that looks further ahead than the current
 slice.
 
-A slice is done when its plan's final GATE passes and the work is on `main`.
+A slice is done when its plan's final GATE passes and the work is committed on `dev`.
+Nothing in this repository is merged into `main` — see `CLAUDE.md`. The definition used to
+say "on `main`"; that was never how this repository worked, and slices were being marked
+Done against a condition nothing would ever meet.
 
 ## Status
 
@@ -269,11 +272,11 @@ Two things the section surfaced that are **not** content problems and are owed e
 ## `table` and `math` are finished (2026-08-06)
 
 Both sections are complete: `table` is twelve entries plus its overview, `math` is
-thirty-five plus its overview. Forty-nine entries in ten authoring batches, each batch
-reviewed adversarially and each needing exactly one fix round — sixteen Criticals in all,
-and on the order of a hundred recorded corrections against the manuals. The detail lives in
-the batch reports under `.superpowers/sdd/2026-08-05-table-and-math/`; what follows is what
-outlives them.
+thirty-five plus its overview. Forty-nine entries in twelve authoring batches, every one
+reviewed adversarially and every one needing a fix round — two of them needing two —
+seventeen Criticals in all, and on the order of a hundred recorded corrections against the
+manuals. The detail lives in the batch reports under
+`.superpowers/sdd/2026-08-05-table-and-math/`; what follows is what outlives them.
 
 ### Removal: which axis decides that a symbol is gone
 
@@ -393,9 +396,18 @@ of authoring rather than as review.
   The editorial rules above narrow it and do not remove it. The fix is component work and the
   route already loads the map (`compatByUrl`): render each index bullet through it and mark a
   link the selected version lacks the *same way the sidebar marks it*, same treatment and same
-  vocabulary. It must be derived; hand-written badges go stale. Doing it would collapse the
-  third rule above into "group by task, put what left the library last", which is a smaller
-  thing to ask of every overview after this one.
+  vocabulary. It must be derived; hand-written badges go stale.
+
+  **It would not retire the third rule above, and the next overview author should not plan as
+  though it will.** The fix can only mark what the selected version *lacks*, and the two
+  glosses on `math`'s page that most needed qualifying — `math.log()`, whose base argument
+  arrived later, and `math.atan()`, whose second argument arrived later still — are on entries
+  present on all five lines. Nothing about them is dimmable; only their *arity* moved. So the
+  rule survives in reduced form: a gloss still needs a hand-written qualification wherever what
+  changed is what a call accepts rather than whether it exists. That is the same root cause as
+  the first debt in this list — the site can say "this argument arrived later" nowhere except
+  an `<Errors>` bullet — and fixing that one would retire more of the rule than the badge work
+  would.
 - **No mechanism gates an example on another entry's availability.** `RunnableExample` gained
   a per-example `usesEntry` prop this slice — auto-run had been keyed on the entry rather than
   on the example, so on a removed entry every card showing the *replacement* sat silent for

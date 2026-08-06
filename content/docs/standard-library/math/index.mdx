@@ -33,8 +33,8 @@ is the question the paragraph above points at, and the first thing about this li
 reading.
 
 <Note>
-The functions that answer with a float whatever went in — the roots, the logarithms, the
-trigonometry — compute in floating-point arithmetic, where a value that ought to come out
+The functions that answer with a float whatever went in — the logarithms, the exponentials,
+the trigonometry — compute in floating-point arithmetic, where a value that ought to come out
 exact usually lands a hair away from it. That is why `math.sin()` of a half-turn is a very
 small number rather than zero, and why comparing one of these results with `==` tends to
 disappoint.
@@ -61,7 +61,7 @@ leaves behind.
 How far a number sits from zero, which of several values wins, and one comparison that reads
 a sign bit as part of the value — which needs integers to be a kind of number of their own.
 
-- [`math.abs()`](/docs/standard-library/math/abs) — a number's distance from zero, with its sign dropped
+- [`math.abs()`](/docs/standard-library/math/abs) — a number with its sign dropped, which is its distance from zero for all but one integer
 - [`math.max()`](/docs/standard-library/math/max) — the largest of the values handed to it
 - [`math.min()`](/docs/standard-library/math/min) — the smallest of the values handed to it
 - [`math.ult()`](/docs/standard-library/math/ult) — two integers compared as unsigned, so the sign bit counts as value rather than as sign
@@ -72,7 +72,7 @@ Growth in one direction and back again, with the square root standing beside the
 
 - [`math.sqrt()`](/docs/standard-library/math/sqrt) — the square root of a number
 - [`math.exp()`](/docs/standard-library/math/exp) — e, the base of natural logarithms, raised to a power
-- [`math.log()`](/docs/standard-library/math/log) — the logarithm of a number, natural or in a base you name
+- [`math.log()`](/docs/standard-library/math/log) — the logarithm of a number, natural, or in a base you name where it reads one
 
 ## Angles and trigonometry
 
@@ -84,7 +84,7 @@ converts between the two units an angle is written in.
 - [`math.tan()`](/docs/standard-library/math/tan) — the tangent of an angle measured in radians
 - [`math.asin()`](/docs/standard-library/math/asin) — the angle, in radians, whose sine you already have
 - [`math.acos()`](/docs/standard-library/math/acos) — the angle, in radians, whose cosine you already have
-- [`math.atan()`](/docs/standard-library/math/atan) — the angle a slope describes, or the one a rise and a run describe together
+- [`math.atan()`](/docs/standard-library/math/atan) — the angle a slope describes, or the one a rise and a run describe together, where it reads both
 - [`math.rad()`](/docs/standard-library/math/rad) — an angle converted from degrees to radians
 - [`math.deg()`](/docs/standard-library/math/deg) — an angle converted from radians to degrees
 
@@ -92,12 +92,12 @@ converts between the two units an angle is written in.
 
 What a number is made of — a whole part and a fraction, or a fraction and a power of two —
 and which of the two ways of holding a number it is being held by. That last question can
-only be asked where Lua tells the two apart, so the two entries that ask it come and go with
-the distinction itself.
+only be asked where Lua tells the two apart, so the two entries that ask it are there
+wherever the distinction is.
 
 - [`math.modf()`](/docs/standard-library/math/modf) — a number split into its whole part and its fraction
 - [`math.frexp()`](/docs/standard-library/math/frexp) — a number split into a fraction and a power of two, on the lines that have it
-- [`math.ldexp()`](/docs/standard-library/math/ldexp) — a number scaled by a power of two in one exact step, which is the way back from the pair above, on the lines that have it
+- [`math.ldexp()`](/docs/standard-library/math/ldexp) — a number scaled by a power of two in one exact step, which is the way back from the two values `math.frexp()` hands out, on the lines that have it
 - [`math.tointeger()`](/docs/standard-library/math/tointeger) — the integer a value names exactly, or `nil` when it names none
 - [`math.type()`](/docs/standard-library/math/type) — whether a number is held as an integer or as a float, and `nil` for anything that is not a number
 
