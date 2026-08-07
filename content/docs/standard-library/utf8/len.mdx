@@ -1,8 +1,152 @@
 ---
 title: utf8.len()
-description: ""
+description: Count the characters in a UTF-8 string, or find where it stops being valid.
+lua-compat: utf8.len
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.len
 ---
 
-{/* Not yet written. */}
+Counts *characters* where `#` counts bytes, over the whole string or a range of it. Text
+that is not valid UTF-8 does not raise here: the count is replaced by a false value, and
+the byte position where the reading broke down comes back beside it.
+
+<RunnableExample code={`local dessert = "crème brûlée"\nprint(#dessert)\nprint(utf8.len(dessert))\n-- Expected output:\n-- 15\n-- 12`} />
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+utf8.len(s [, i [, j]])
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+utf8.len(s [, i [, j [, lax]]])
+```
+
+</Only>
+
+<Parameters>
+  <Param name="s">The string to measure.</Param>
+  <Param name="i">The byte position the range starts at. Omitted, it starts at the first byte.</Param>
+  <Param name="j">The byte position the range ends at. Omitted, it ends at the last byte, so the whole string is measured.</Param>
+  <Only since="5.4">
+    <Param name="lax">A true value reads the string permissively, lifting the limit on what a byte sequence may decode to. Omitted or false, the strict reading applies. See [which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count).</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="integer or nil">How many characters start inside the range — or `nil` in its place when the range holds a byte sequence that cannot be read.</Return>
+  <Return type="integer">The byte position of the first byte that could not be read. It is there on the failing path only; a range that read cleanly hands back the count and nothing after it.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `i` resolves to a position before the first byte, or more than one past the last.
+- Raises when `j` resolves to a position past the last byte. There is no lower bound on it: a `j` that lands before `i` describes an empty range, which counts zero.
+- Raises when `s` is neither a string nor a number.
+- Content that is not valid UTF-8 does *not* raise — that is what the two return values are for, and it is how this function differs from [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint), which raises on the same input.
+
+</Errors>
+
+## Description
+
+A character is counted when the byte it starts at falls inside the range, so the last
+character counted may extend past `j`. Reading walks forward from `i` one sequence at a
+time, which is why a range starting in the middle of a character has nowhere to begin and
+reports a failure at its very first position.
+
+Failure means the bytes, not the text: a sequence that is truncated, spelled with the
+wrong continuation bytes, written longer than it needs to be, or that decodes to a value
+the reading in force refuses.
+[Which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count)
+is where those rules live, since the readers in this library share them.
+
+The second return value is the byte position the reading stopped at, and it is the one
+worth keeping. It says *where* the string went wrong, which is what turns "this input is
+bad" into a message naming the offending byte or a slice of the text either side of it.
+
+<Note>
+The first value is a false value, which is what makes `if utf8.len(text) then` the natural
+test. Comparing against a particular false value is narrower than the promise: the manual
+commits only to falsity here, so treating the result as a condition is what stays true.
+</Note>
+
+## How the byte positions are read
+
+Positions are counted in *bytes*, from 1 for the first one, and a negative position
+counts backwards from the end, so `-1` is the last byte and `-2` the one before it. That
+is the arithmetic [`string.sub()`](/docs/standard-library/string/sub) uses, and it is
+shared by every function in this library that takes a position.
+
+The two ends are bounded differently, and the asymmetry is worth knowing:
+
+- `i` may be anywhere from the first byte to *one past* the last — that last position is
+  the empty range at the end of the string, and counts zero. Anything outside that raises.
+- `j` may be anywhere up to the last byte, with nothing below. A `j` before the start of
+  the string, or simply before `i`, describes an empty range and counts zero rather than
+  raising.
+
+Neither end is required to be a character boundary by the argument check itself. `j` never
+needs to be one, since it only bounds where counting stops. `i` does, but the complaint
+arrives as a failure to read rather than as a raised error — the same two return values
+any other malformed input produces.
+
+## Examples
+
+### Reporting where the input broke
+
+<RunnableExample code={`local received = string.sub("order: café", 1, -2)\nlocal character_count, first_bad_byte = utf8.len(received)\nprint(character_count)\nprint(first_bad_byte)\n-- Expected output:\n-- nil\n-- 11`} />
+
+The last byte has been lopped off, leaving the opening byte of `é` with nothing after it.
+Byte 11 is where that half-written character begins, which is exactly the position a
+truncated read would want to report.
+
+### Measuring part of a string
+
+<RunnableExample code={`local sentence = "naïve approach"\nprint(utf8.len(sentence, 1, 6))\n-- Expected output: 5`} />
+
+Bytes 1 to 6 hold five characters, because `ï` takes two of them.
+
+### Counting characters against counting bytes
+
+<RunnableExample code={`local labels = { "flour", "poêle", "crème fraîche" }\nfor index = 1, #labels do\n  local label = labels[index]\n  print(label, #label, utf8.len(label))\nend\n-- Expected output:\n-- flour\t5\t5\n-- poêle\t6\t5\n-- crème fraîche\t15\t13`} />
+
+The two numbers agree only while the text stays inside ASCII, and a field limit checked
+with the wrong one is either too generous or too mean by the number of accented letters.
+
+## Gotchas
+
+<Gotcha title="Assigning to one name throws away the diagnosis">
+`local character_count = utf8.len(text)` keeps the false value and drops the position, so
+a program that knows its input is broken has no idea where. Take both values, or take the
+second one alone with a second name, before deciding what to do about the failure.
+</Gotcha>
+
+<Gotcha title="A character count is not a byte position">
+The number this returns is how many characters there are, and it cannot be handed to
+[`string.sub()`](/docs/standard-library/string/sub) as a length. On `crème` the count is
+`5` against six bytes, so `string.sub(label, 1, 5)` quietly loses the last character —
+and asking for the first three characters the same way, `string.sub(label, 1, 3)`, cuts
+`è` in half and produces something that is no longer valid UTF-8.
+[`utf8.offset()`](/docs/standard-library/utf8/offset) is what turns a character number
+into the byte position it starts at, and that position is what `string.sub()` wants.
+</Gotcha>
+
+<Gotcha title="Falling back to # reports a different quantity">
+Code that reads `utf8.len(text) or #text` looks like a defensive default and is not one:
+the fallback substitutes a byte count for a character count, in the same slot, with no
+sign that the units changed. A limit enforced that way starts measuring something else
+exactly when the input is malformed, which is when it mattered.
+</Gotcha>
+
+## See also
+
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — what the characters are, rather than how many
+- [`utf8.offset()`](/docs/standard-library/utf8/offset) — turning a character number into a byte position
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — walking the characters one at a time
+- [`string.len()`](/docs/standard-library/string/len) — the byte count, and what `#` does

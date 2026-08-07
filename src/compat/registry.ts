@@ -20,6 +20,9 @@ import stringSub from './data/string.sub.json';
 import stringUnpack from './data/string.unpack.json';
 import stringUpper from './data/string.upper.json';
 import utf8Library from './data/utf8.library.json';
+import utf8Char from './data/utf8.char.json';
+import utf8Codepoint from './data/utf8.codepoint.json';
+import utf8Len from './data/utf8.len.json';
 import tableConcat from './data/table.concat.json';
 import tableCreate from './data/table.create.json';
 import tableLibrary from './data/table.library.json';
@@ -147,6 +150,40 @@ const raw: Record<string, unknown> = {
   // encoding note does exactly that. So this node exists ahead of the entry it belongs
   // to, and says only when the library arrived.
   'utf8.library': utf8Library,
+  // The whole `utf8` library arrives at 5.3 — `passage.py pdf-utf8.char`,
+  // `pdf-utf8.codepoint` and `pdf-utf8.len` all report `absent` for 5.1 and 5.2, and
+  // `lutf8lib.c` has no ancestor before v5.3.0 — so every entry here repeats
+  // `version_added: "5.3"` rather than inheriting it from the section node.
+  //
+  // The section's one real version fact is a single edit at **5.4**, recorded on each of
+  // the three entries from the side it is observable from. The 5.3 manual's UTF-8 Support
+  // preamble (§6.5) says nothing at all about ranges; 5.4's and 5.5's (§6.5, §6.6) add two
+  // paragraphs that split the library in half:
+  //   * *Creating* a sequence — `utf8.char` alone — accepts everything up to `0x7FFFFFFF`,
+  //     "as defined in the original UTF-8 specification", which is six bytes wide. v5.3.0
+  //     and 5.3.6 both bound `pushutfchar` with `0 <= code && code <= MAXUNICODE` where
+  //     `MAXUNICODE` is `0x10FFFF`; v5.4.0 onwards test `(lua_Unsigned)code <= MAXUTF`
+  //     with `MAXUTF` `0x7FFFFFFF`. A negative argument still raises on both lines — 5.3
+  //     by the explicit `0 <=`, 5.4+ because the unsigned cast makes it enormous.
+  //   * *Interpreting* a sequence — `len`, `codepoint` and `codes` — gained the `lax`
+  //     argument and, in the same release, a stricter default. 5.3's `utf8_decode` rejects
+  //     overlong spellings and anything above `0x10FFFF` and has no surrogate test at all,
+  //     so `utf8.len(utf8.char(0xD800))` answers `1` there and `nil, 1` from 5.4. That
+  //     tightening is the one thing the manuals record as an incompatibility: 5.4 §8.2,
+  //     "By default, the decoding functions in the utf8 library do not accept surrogates
+  //     as valid code points." Nothing about `utf8` appears in 5.3's or 5.5's chapter.
+  //
+  // `lax` is *not* on `utf8.char` and *not* on `utf8.offset`, so those two carry no note of
+  // it. What `lax` lifts is only the check on the decoded value; the 5.4 preamble's closing
+  // parenthesis — "(Not well formed and overlong sequences are still rejected.)" — is the
+  // half that is easy to read past, and both decoder notes are written against it.
+  //
+  // Nothing in `lutf8lib.c` moved for these three between v5.4.0, 5.4.8 and v5.5.0 beyond
+  // renaming `utfint` to `l_uint32` and adding casts. The 5.4.8 and 5.5 edits that *are*
+  // behavioural belong to `utf8.codes` and `utf8.offset`, which are U2's.
+  'utf8.char': utf8Char,
+  'utf8.codepoint': utf8Codepoint,
+  'utf8.len': utf8Len,
   'table.concat': tableConcat,
   'table.create': tableCreate,
   // The `table` section's own node, on the rule `string.library` set: the library's

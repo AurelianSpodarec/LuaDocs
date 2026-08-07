@@ -1,8 +1,121 @@
 ---
 title: utf8.char()
-description: ""
+description: Build a string out of code points, encoded as UTF-8.
+lua-compat: utf8.char
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.char
 ---
 
-{/* Not yet written. */}
+Turns code points into text, encoding each one as UTF-8 and joining the results, taking
+as many arguments as you care to hand it. It is the inverse of
+[`utf8.codepoint()`](/docs/standard-library/utf8/codepoint), and the code-point
+counterpart of [`string.char()`](/docs/standard-library/string/char), which fills one
+byte per argument instead.
+
+<RunnableExample code={`print(utf8.char(99, 97, 102, 233))\nprint(#utf8.char(233))\n-- Expected output:\n-- café\n-- 2`} />
+
+## Syntax
+
+```lua
+utf8.char(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more code points, each a non-negative integer no larger than `0x7FFFFFFF`. Each becomes one UTF-8 byte sequence in the result, in the order given.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The byte sequences for the arguments, joined end to end. With no arguments, the empty string.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when an argument is below zero, or above the largest value this function encodes.
+- Raises when an argument is a number with a fractional part, since there is no code point between two whole ones.
+- Raises when an argument is neither a number nor a string that reads as one.
+
+</Errors>
+
+## Description
+
+One argument produces one character, but not one byte. A code point below `128` is
+written as a single byte, and larger ones take more — two for most of the Latin-1 range,
+three for the bulk of the world's writing systems, four for the emoji and the rarer
+scripts above them. So the length of the result is settled by the values handed in and
+not by how many of them there were, which is the difference between this function and
+[`string.char()`](/docs/standard-library/string/char).
+
+The encoding is the whole of the work. Each argument is bounds-checked and then written
+out; nothing asks whether Unicode has assigned that number to a character, whether the
+characters sit sensibly beside each other, or what any of them means. That is deliberate,
+and [what this library leaves alone](/docs/standard-library/utf8/codepoint#what-a-code-point-is-and-what-this-library-leaves-alone)
+covers where the line is drawn.
+
+The ceiling is `0x7FFFFFFF` — the top of the original UTF-8 specification rather than the
+top of Unicode, which stops at `0x10FFFF` — and a value that large needs six bytes. What
+this function will *write* and what the library's readers will *accept back* are two
+different questions with two different answers;
+[which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count)
+settles the second.
+
+Building a string this way is worth it when the number is not written down: read out of
+data, computed, or decoded from some other notation. Lua's own string syntax already
+writes a code point directly — `"\u{20AC}"` is `€` — so `utf8.char(0x20AC)` in a literal
+buys nothing but length.
+
+## Examples
+
+### Decoding a notation that spells characters as numbers
+
+<RunnableExample code={`local escaped_label = "caf%u00E9 au lait"\nlocal label = string.gsub(escaped_label, "%%u(%x%x%x%x)", function(hex_digits)\n  return utf8.char(tonumber(hex_digits, 16))\nend)\nprint(label)\n-- Expected output: café au lait`} />
+
+`tonumber()` reads the four hexadecimal digits as a code point and `utf8.char()` writes
+it out as the bytes that spell it — here two of them, for one `%u00E9` in the source.
+Every number reaching the call is worked out while the program runs, from text it had not
+seen when it was written.
+
+### A round trip through the code points
+
+<RunnableExample code={`local greeting = "Grüße"\nlocal rebuilt = utf8.char(utf8.codepoint(greeting, 1, -1))\nprint(rebuilt)\nprint(rebuilt == greeting)\n-- Expected output:\n-- Grüße\n-- true`} />
+
+[`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) returns one value per
+character, and those values land here as the whole argument list, so the two compose into
+a round trip with no loop between them.
+
+### How wide each character turns out
+
+<RunnableExample code={`local sign_code_points = { 0x24, 0xA3, 0x20AC }\nfor index = 1, #sign_code_points do\n  local sign = utf8.char(sign_code_points[index])\n  print(sign, #sign)\nend\n-- Expected output:\n-- $\t1\n-- £\t2\n-- €\t3`} />
+
+Three calls, one argument each, three different lengths.
+
+## Gotchas
+
+<Gotcha title="The result's length is not the argument count">
+`#utf8.char(0x20AC)` is `3`, not `1`, because `#` measures bytes and one code point can
+need several. Reach for [`utf8.len()`](/docs/standard-library/utf8/len) when the question
+is how many characters were built, and keep `#` for when it is how much room they take.
+This is exactly where [`string.char()`](/docs/standard-library/string/char) differs: there
+the two numbers agree, because each argument fills one byte.
+</Gotcha>
+
+<Gotcha title="An argument is a code point, not a byte">
+Reaching for this function to place a known byte gives something else entirely.
+`utf8.char(233)` is not the byte `233`; it is the two bytes that spell `é` in UTF-8.
+[`string.char()`](/docs/standard-library/string/char) is the one that writes a byte from
+its numeric value. The two agree across the ASCII range and part company above it.
+</Gotcha>
+
+<Gotcha title="Nothing here checks the number against Unicode">
+A code point Unicode has never assigned, or one from the surrogate range reserved for
+UTF-16's own encoding machinery, is bounds-checked like any other number and written out.
+The result is a string Lua is perfectly happy to carry, concatenate and print — and
+whether anything can read it back as characters is
+[the readers' rule](/docs/standard-library/utf8/codepoint#which-code-points-count), not
+this one's.
+</Gotcha>
+
+## See also
+
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — the inverse, a string back into code points
+- [`utf8.len()`](/docs/standard-library/utf8/len) — counting the characters a string holds
+- [`string.char()`](/docs/standard-library/string/char) — building from byte values instead of code points

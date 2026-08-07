@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.4": "A fourth argument, `lax`, is added. A true value lifts the limit on what a byte sequence may decode to, accepting anything up to `0x7FFFFFFF`; malformed and overlong sequences are refused either way. The default reading also became stricter at the same time: a sequence encoding a surrogate, `0xD800` through `0xDFFF`, now raises, where earlier versions read it like any other code point."
+  }
+}

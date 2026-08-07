@@ -1,8 +1,166 @@
 ---
 title: utf8.codepoint()
-description: ""
+description: Read characters out of a string as code-point numbers.
+lua-compat: utf8.codepoint
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.codepoint
 ---
 
-{/* Not yet written. */}
+Reads a UTF-8 string as numbers rather than as text, giving the code point of each
+character that starts inside a range of byte positions — *one return value per character*, the way
+[`string.byte()`](/docs/standard-library/string/byte) gives one per byte.
+[`utf8.char()`](/docs/standard-library/utf8/char) is the way back.
+
+<RunnableExample code={`local menu_item = "café"\nprint(utf8.codepoint(menu_item))\nprint(utf8.codepoint(menu_item, 1, -1))\n-- Expected output:\n-- 99\n-- 99\t97\t102\t233`} />
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+utf8.codepoint(s [, i [, j]])
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+utf8.codepoint(s [, i [, j [, lax]]])
+```
+
+</Only>
+
+<Parameters>
+  <Param name="s">The string to read.</Param>
+  <Param name="i">The byte position the range starts at. Omitted, it starts at the first byte.</Param>
+  <Param name="j">The byte position the range ends at. Omitted, it ends where it started, so at most one character comes back.</Param>
+  <Only since="5.4">
+    <Param name="lax">A true value reads the string permissively, lifting the limit on what a byte sequence may decode to. Omitted or false, the strict reading applies. See [Which code points count](#which-code-points-count).</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="integer">One value per character whose *first* byte falls inside the range, in order. A range with no character starting in it returns nothing at all.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a byte sequence inside the range cannot be read — a truncated character, a stray continuation byte, or a value the reading in force refuses.
+- Raises when `i` lands in the middle of a character rather than on its first byte, which is a particular case of the same thing.
+- Raises when `i` resolves to a position before the first byte, or `j` to a position past the last. An empty string reaches this through the defaults alone, since the range they describe is the first byte of a string that has none.
+- Raises when `s` is neither a string nor a number.
+
+</Errors>
+
+## Description
+
+Positions are counted in *bytes*, from 1 for the first one, and a negative position
+counts backwards from the end, so `-1` is the last byte. That is the same arithmetic
+[`string.sub()`](/docs/standard-library/string/sub) uses, and it is deliberate: a byte
+position is the only kind of position a Lua string has.
+[`utf8.len()`](/docs/standard-library/utf8/len#how-the-byte-positions-are-read) carries
+the rest of the rules, which the two functions share.
+
+What each end of the range picks out, though, is a *character*: a character is returned
+when the byte it starts at is inside the range, and the rest of its bytes may sit beyond
+`j`. So `utf8.codepoint(drink, 1, 4)` on a string whose fourth byte opens a two-byte
+character returns that character in full, and the count of values is the count of
+characters rather than of bytes.
+
+Every character in the range is read, so an unreadable byte sequence anywhere inside it
+stops the call with an error rather than returning a partial list.
+[`utf8.len()`](/docs/standard-library/utf8/len) is the function that reports the same
+condition as a return value instead.
+
+## What a code point is, and what this library leaves alone
+
+A *code point* is the number Unicode assigns to a character — `233` for `é`, `8364` for
+`€`. UTF-8 is one way of writing that number down as bytes, and writing it down is the
+whole of what this library does. It encodes a number into bytes, decodes bytes back into
+a number, counts how many characters a string holds, and finds where each one starts.
+
+What it does not do is anything that depends on what a character *means*. There is no
+case conversion, no normalisation, no sorting order, no test for whether a code point is
+a letter or a digit or a space, and no notion of a grapheme — the thing a reader would
+call one character on screen, which may be several code points. Those are Unicode
+questions, not encoding questions, and answering them needs a table of character data
+that Lua does not ship.
+
+Two consequences worth carrying: the `string` library's character classes (`%a`, `%u`,
+`%s` and the rest) are defined over bytes and know nothing about any of this, and a code
+point count is not a count of what a reader sees.
+
+## Which code points count
+
+The number handed back is *whatever the bytes encode*, checked against two separate
+rules.
+
+The first is about the bytes themselves: a sequence has to be well formed — a lead byte
+followed by exactly the continuation bytes it promises — and it has to be the shortest
+spelling of its value. A longer spelling of a small number is refused however the call is
+made.
+
+The second is about the value: by default the reading stays inside Unicode, so a code
+point above `0x10FFFF` is refused, and so is one in the surrogate range `0xD800` to
+`0xDFFF`, which UTF-16 reserves for its own encoding machinery and which no character
+has. `lax` lifts that second rule and nothing else — values run up to `0x7FFFFFFF`, the
+ceiling of the original UTF-8 specification, and the first rule still applies.
+
+[`utf8.char()`](/docs/standard-library/utf8/char) is checked against a bound of its own
+rather than against either of these, and the surrogate range is not part of that bound —
+which is what makes it possible to build a string this function will not read back.
+
+## Examples
+
+### Code points against the bytes that spell them
+
+<RunnableExample code={`local sign = "€"\nprint(string.byte(sign, 1, -1))\nprint(utf8.codepoint(sign, 1, -1))\n-- Expected output:\n-- 226\t130\t172\n-- 8364`} />
+
+Three bytes, one character. `string.byte()` reports how it is stored and
+`utf8.codepoint()` reports what it is.
+
+### A range that ends inside a character
+
+<RunnableExample code={`local drink = "café au lait"\nprint(utf8.codepoint(drink, 1, 4))\n-- Expected output: 99\t97\t102\t233`} />
+
+Byte 4 opens the two-byte `é`, whose second byte sits at 5 — outside the range. The
+character is still returned whole, because what the range tests is where a character
+*starts*.
+
+<Only since="5.4">
+
+### Reading a value the strict checks refuse
+
+<RunnableExample code={`local encoded = utf8.char(0x200000)\nprint(#encoded)\nlocal strict_reading_worked = pcall(utf8.codepoint, encoded)\nprint(strict_reading_worked)\nprint(utf8.codepoint(encoded, 1, 1, true))\n-- Expected output:\n-- 5\n-- false\n-- 2097152`} />
+
+`0x200000` is far above anything Unicode defines, so the default reading refuses the
+sequence and `lax` accepts it. The bytes are the same either way; only the rule applied
+to the number they spell has changed.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="i and j are byte positions, so they cannot count characters">
+`utf8.codepoint(label, 2, 3)` asks for bytes 2 and 3, which on a string of multi-byte
+characters is rarely the second and third characters and may not even be a character
+boundary — landing on a continuation byte raises. Arithmetic on positions has to go
+through [`utf8.offset()`](/docs/standard-library/utf8/offset), which turns a character
+number into the byte position that character starts at.
+</Gotcha>
+
+<Gotcha title="One argument is the first character only, not the string">
+With `j` left out it defaults to `i`, so the range is one byte wide. On a string with
+something in it, `utf8.codepoint(word)` reports the character at the front and stops
+there — a reader expecting the whole string gets one number and no complaint.
+`utf8.codepoint(word, 1, -1)` is the whole string, and it is the same spelling
+[`string.byte()`](/docs/standard-library/string/byte) needs for the same reason.
+</Gotcha>
+
+## See also
+
+- [`utf8.char()`](/docs/standard-library/utf8/char) — the inverse, code points back into a string
+- [`utf8.len()`](/docs/standard-library/utf8/len) — how many characters, instead of what they are
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — walking a whole string a character at a time
+- [`string.byte()`](/docs/standard-library/string/byte) — one number per byte instead of per character

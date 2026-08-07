@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.4": "The largest value an argument may hold rises from `0x10FFFF`, the top of the Unicode range, to `0x7FFFFFFF`, so a single argument can now produce a byte sequence up to six bytes long. Earlier versions raise for anything above `0x10FFFF`."
+  }
+}
