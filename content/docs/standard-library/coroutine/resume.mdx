@@ -27,12 +27,12 @@ coroutine.resume(co [, val1, ···])
 
 <Returns>
   <Return type="boolean">The status: `true` when the coroutine suspended or finished, `false` when it failed or could not be resumed at all.</Return>
-  <Return type="any">On the `true` path, the values the coroutine handed over — those passed to [`coroutine.yield()`](/docs/standard-library/coroutine/yield) if it suspended, or those its body returned if it finished, as many as there were or none at all. On the `false` path, one value describing what went wrong, and nothing after it.</Return>
+  <Return type="any">On the `true` path, the values the coroutine handed over — those passed to [`coroutine.yield()`](/docs/standard-library/coroutine/yield) if it suspended, or those its body returned if it finished, as many as there were or none at all. On the `false` path, exactly one value — the [error object](/docs/standard-library/globals/error#what-an-error-carries) the failure carried, or a description of why the coroutine could not be resumed — and nothing after it.</Return>
 </Returns>
 
 <Errors>
 
-- Raises when `co` is not a coroutine. The argument is checked before anything is resumed, and this is the one failure that escapes rather than being reported as a status.
+- Raises when `co` is not a coroutine. The argument is checked before anything is resumed, so this failure escapes rather than being reported as a status.
 - A coroutine that has already finished does not raise. `false` and a description come back, in the same shape as a failure inside the body.
 - A coroutine that is not suspended does not raise either — the one doing the resuming, or one that is itself waiting on a coroutine it resumed. Again `false` and a description come back.
 

@@ -30,6 +30,7 @@ coroutine.create(f)
 <Errors>
 
 - Raises when `f` is anything other than a function — a string, a table, or no argument at all. It is the value's *type* that is checked, so a table carrying a `__call` metamethod is refused here even though calling it would have worked.
+- <Only before="5.2">Raises when `f` is a function written in C rather than one written in Lua, such as `print` or `string.format`.</Only>
 
 </Errors>
 
@@ -49,9 +50,10 @@ what the function reaches *outside* itself — an upvalue or a global read from 
 one value, and a write from either is visible to the other.
 
 Arguments to the body do not belong here. `coroutine.create()` takes the function and
-nothing else; whatever the body's parameters are, they are filled in by the first
-[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides),
-along with every later value that travels in the same direction.
+nothing else; the body's parameters are filled in by the *first*
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides).
+Values handed over on any later resume travel in the same direction but arrive somewhere
+else — as the results of the `coroutine.yield()` the body is stopped in.
 
 ## Examples
 

@@ -6,11 +6,10 @@ entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.yield
 ---
 
-Stops the coroutine that is running and hands its arguments back to the
-[`coroutine.resume()`](/docs/standard-library/coroutine/resume) waiting on it. The call has
-not finished, though: everything the coroutine was in the middle of stays exactly as it is,
-and when the coroutine is resumed again this call returns, handing back whatever that resume
-passed in.
+Stops the coroutine that is running and hands its arguments back to whatever resumed it. The
+call has not finished, though: everything the coroutine was in the middle of stays exactly as
+it is, and when the coroutine is resumed again this call returns, handing back whatever that
+resume passed in.
 
 <RunnableExample code={`local weather_log = coroutine.create(function()\n  coroutine.yield("monday", 14)\n  coroutine.yield("tuesday", 17)\n  return "week so far"\nend)\n\nprint(coroutine.resume(weather_log))\nprint(coroutine.resume(weather_log))\nprint(coroutine.resume(weather_log))\n-- Expected output:\n-- true\tmonday\t14\n-- true\ttuesday\t17\n-- true\tweek so far`} />
 
@@ -21,11 +20,11 @@ coroutine.yield(···)
 ```
 
 <Parameters>
-  <Param name="···">Values to hand to the waiting [`coroutine.resume()`](/docs/standard-library/coroutine/resume), which receives them after its status. As many as wanted, or none.</Param>
+  <Param name="···">Values to hand back to whatever resumed this coroutine — a [`coroutine.resume()`](/docs/standard-library/coroutine/resume) receives them after its status, and a function made by [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) returns them as they are. As many as wanted, or none.</Param>
 </Parameters>
 
 <Returns>
-  <Return type="any">The values the *next* resume passes after the coroutine — in the order given, as many as there were, or none at all.</Return>
+  <Return type="any">The values handed in by whatever resumes this coroutine *next* — in the order they were given, as many as there were, or none at all.</Return>
 </Returns>
 
 <Errors>
@@ -45,9 +44,10 @@ which point this call returns and the body carries on with the next statement as
 nothing had happened in between.
 
 The values crossing in the two directions are unrelated. What this call hands *out* reaches
-the waiting `coroutine.resume()`, arriving after its `true` status. What it later hands
-*back* is written by whichever resume revives the coroutine, which may be a different call
-site entirely and may happen much later. A yield that passes three values can return none,
+whatever resumed the coroutine — a `coroutine.resume()` receives it after the `true` status,
+a wrapper function returns it as it stands. What this call later hands *back* is written by
+whichever resume revives the coroutine, which may be a different call site entirely and may
+happen much later. A yield that passes three values can return none,
 and a yield that passes none can return three; the two counts have nothing to do with each
 other. [`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
 covers the full round trip.
@@ -91,12 +91,16 @@ Each question is handed out by a yield; each answer arrives as that same yield's
 one resume later. The result is a conversation written as straight-line code, with no state
 machine and no callbacks.
 
+<Only since="5.2">
+
 ### Suspending from inside a protected call
 
 <RunnableExample code={`local risky_import = coroutine.create(function()\n  local completed, outcome = pcall(function()\n    coroutine.yield("halfway through the import")\n    return "import finished"\n  end)\n  return completed, outcome\nend)\n\nprint(select(2, coroutine.resume(risky_import)))\nprint(select(2, coroutine.resume(risky_import)))\n-- Expected output:\n-- halfway through the import\n-- true\timport finished`} />
 
 The protection is still in place across the suspension: the second resume re-enters the same
 protected call, and it reports `true` when the function inside it finally returns.
+
+</Only>
 
 ## Gotchas
 
