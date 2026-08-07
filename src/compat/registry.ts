@@ -23,6 +23,9 @@ import utf8Library from './data/utf8.library.json';
 import utf8Char from './data/utf8.char.json';
 import utf8Codepoint from './data/utf8.codepoint.json';
 import utf8Len from './data/utf8.len.json';
+import utf8Codes from './data/utf8.codes.json';
+import utf8Offset from './data/utf8.offset.json';
+import utf8Charpattern from './data/utf8.charpattern.json';
 import tableConcat from './data/table.concat.json';
 import tableCreate from './data/table.create.json';
 import tableLibrary from './data/table.library.json';
@@ -180,10 +183,39 @@ const raw: Record<string, unknown> = {
   //
   // Nothing in `lutf8lib.c` moved for these three between v5.4.0, 5.4.8 and v5.5.0 beyond
   // renaming `utfint` to `l_uint32` and adding casts. The 5.4.8 and 5.5 edits that *are*
-  // behavioural belong to `utf8.codes` and `utf8.offset`, which are U2's.
+  // behavioural belong to `utf8.codes` and `utf8.offset`, recorded below.
+  //
+  // The section's other three, and the two things that moved within a line:
+  //   * `utf8.codes` takes `lax` from 5.4 like the other two decoders, so its 5.4 note
+  //     carries the same pair of facts. It also gained an up-front rejection of a subject
+  //     that starts on a continuation byte — `luaL_argcheck(L, !iscontp(s), 1, MSGInvalid)`
+  //     in `iter_codes` — which lands at **v5.4.8**, not v5.4.0. Both lines raise on such a
+  //     subject; what moved is whether the raise comes from `utf8.codes(s)` itself or from
+  //     the loop's first step, so `pcall(utf8.codes, "\x80")` answers `true` on v5.3.6 and
+  //     v5.4.0 and `false` from v5.4.8. Recorded at 5.4 on the standing ruling that a line
+  //     is credited with what its final release has; the patch boundary is in the U2 report.
+  //     (v5.4.0 also dropped 5.3's `iscontp(next)` check and v5.4.8 restored it, which
+  //     leaves no minor-line difference at all and is therefore recorded nowhere.)
+  //   * `utf8.offset` returns **two** integers from 5.5 — `byteoffset` pushes the initial
+  //     position, then walks the continuation bytes and pushes the final one. The failing
+  //     path still pushes one `fail`. 5.3 says "returns nil" and 5.4 says "returns fail" for
+  //     that path; both are `lua_pushnil`/`luaL_pushfail`, so that is the `math.huge` wording
+  //     case and carries no note. `utf8.offset` has no `lax` in any version, and no version
+  //     of it decodes anything — it reads continuation bits only.
+  //   * `utf8.charpattern` is the one *value* in the section that changed. `UTF8PATT` is
+  //     `"[\0-\x7F\xC2-\xF4][\x80-\xBF]*"` at v5.3.0 and v5.3.6 and
+  //     `"[\0-\x7F\xC2-\xFD][\x80-\xBF]*"` from v5.4.0 — the same widening as `utf8.char`'s
+  //     ceiling, since a six-byte sequence starts at `0xFC`/`0xFD`. Fourteen bytes on both
+  //     lines; confirmed by probe as well as by source.
+  //
+  // Nothing in any Incompatibilities chapter names `utf8.offset` or `utf8.charpattern`, and
+  // 5.5's chapter does not mention the extra return value at all.
   'utf8.char': utf8Char,
   'utf8.codepoint': utf8Codepoint,
   'utf8.len': utf8Len,
+  'utf8.codes': utf8Codes,
+  'utf8.offset': utf8Offset,
+  'utf8.charpattern': utf8Charpattern,
   'table.concat': tableConcat,
   'table.create': tableCreate,
   // The `table` section's own node, on the rule `string.library` set: the library's

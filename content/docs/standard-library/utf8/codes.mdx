@@ -1,8 +1,153 @@
 ---
 title: utf8.codes()
-description: ""
+description: Walk a UTF-8 string one character at a time, with the byte position and the code point of each.
+lua-compat: utf8.codes
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.codes
 ---
 
-{/* Not yet written. */}
+Sets up a generic `for` that visits the characters of a string in order, handing the loop
+the byte position each character starts at and the code point it encodes. It is the
+character-by-character counterpart of walking a string with
+[`string.byte()`](/docs/standard-library/string/byte) a byte at a time.
+
+<RunnableExample code={`local greeting = "héllo"\nfor byte_position, code_point in utf8.codes(greeting) do\n  print(byte_position, code_point)\nend\n-- Expected output:\n-- 1\t104\n-- 2\t233\n-- 4\t108\n-- 5\t108\n-- 6\t111`} />
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+utf8.codes(s)
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+utf8.codes(s [, lax])
+```
+
+</Only>
+
+<Parameters>
+  <Param name="s">The string to walk. There is no range argument: the walk begins at the first byte and runs to the end of the string unless the loop leaves early.</Param>
+  <Only since="5.4">
+    <Param name="lax">A true value reads the string permissively, lifting the limit on what a byte sequence may decode to. Omitted or false, the strict reading applies. See [which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count).</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="function">The step, called once per character. Given the string and the byte position the last step reported, it answers with the next character's byte position and code point, with nothing once the string is spent, or with an error when the bytes in front of it cannot be read.</Return>
+  <Return type="string">The string itself, which the loop hands back to the step each time.</Return>
+  <Return type="integer">The starting control value, `0`, which is the position before the first character.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a step reaches a byte sequence it cannot read — truncated, spelled with the wrong continuation bytes, written longer than it needs to be, or decoding to a value the reading in force refuses.
+- Raises when the string begins in the middle of a character, since the walk has nowhere to start.
+- Raises when `s` is neither a string nor a number.
+
+</Errors>
+
+## Description
+
+Three values come back, which is exactly what a generic `for` consumes, so the call goes
+into the `in` clause whole rather than being taken apart. The two loop variables are a
+*byte* position and a code point, in that order.
+
+The position is where the character's first byte sits, counted from 1, so it advances by
+the width of each character rather than by one. On text that stays inside ASCII the
+positions run `1, 2, 3`; add one two-byte character and the numbers after it jump. That
+makes the position useful for reaching back into the string with
+[`string.sub()`](/docs/standard-library/string/sub) and useless as a count of characters
+seen so far — a loop that wants the latter keeps its own counter.
+
+The code point is the number the byte sequence encodes, the same value
+[`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) would report for that
+character, and [`utf8.char()`](/docs/standard-library/utf8/char) turns it back into text.
+What counts as a readable sequence is shared with the rest of the library and lives under
+[which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count).
+
+Failure is reported by raising rather than by a return value, and the raise comes from the
+walk itself rather than from anything the loop body did. Characters ahead of the bad bytes
+have already been handed over by then, so a partial walk is what a caught error leaves
+behind.
+[`utf8.len()`](/docs/standard-library/utf8/len) is the function that answers the same
+question about the same bytes with a return value instead of an error, and it is the one
+to reach for when the input is not trusted.
+
+## Examples
+
+### Positions move by the width of a character
+
+<RunnableExample code={`local word = "naïve"\nlocal characters = {}\nfor byte_position, code_point in utf8.codes(word) do\n  characters[#characters + 1] = byte_position .. "=" .. utf8.char(code_point)\nend\nprint(table.concat(characters, " "))\nprint(#word, #characters)\n-- Expected output:\n-- 1=n 2=a 3=ï 5=v 6=e\n-- 6\t5`} />
+
+Position `4` never appears: it is the second byte of `ï`, and no character starts there.
+Five characters in six bytes, which is why a character number and a byte position have to
+be kept apart.
+
+### Stopping early
+
+<RunnableExample code={`local label = "Grüße"\nlocal first_wide_at\nfor byte_position, code_point in utf8.codes(label) do\n  if code_point > 127 then\n    first_wide_at = byte_position\n    break\n  end\nend\nprint(first_wide_at)\nprint(string.sub(label, first_wide_at, first_wide_at + 1))\n-- Expected output:\n-- 3\n-- ü`} />
+
+`break` leaves the walk the way it leaves any other loop. The position it kept is a byte
+position, which is what `string.sub()` wants.
+
+### What a caught failure leaves behind
+
+<RunnableExample code={`local truncated = string.sub("café au lait", 1, 4)\nlocal read_so_far = {}\nlocal reading_finished = pcall(function()\n  for byte_position, code_point in utf8.codes(truncated) do\n    read_so_far[#read_so_far + 1] = byte_position .. ":" .. code_point\n  end\nend)\nprint(reading_finished)\nprint(table.concat(read_so_far, " "))\n-- Expected output:\n-- false\n-- 1:99 2:97 3:102`} />
+
+The cut has left the opening byte of `é` with nothing after it. Three characters were
+handed to the body before the step that met those bytes raised, and the work done for
+them stands.
+
+<Only since="5.4">
+
+### Reading a value the strict checks refuse
+
+<RunnableExample code={`local built = utf8.char(0xD800)\nlocal strict_reading_worked = pcall(function()\n  for byte_position, code_point in utf8.codes(built) do\n    print(byte_position, code_point)\n  end\nend)\nprint(strict_reading_worked)\nfor byte_position, code_point in utf8.codes(built, true) do\n  print(byte_position, code_point)\nend\n-- Expected output:\n-- false\n-- 1\t55296`} />
+
+`0xD800` is in the surrogate range, which UTF-16 reserves for its own encoding machinery
+and which no character has. The bytes are the same in both walks; only the rule applied to
+the number they spell has changed.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="The loop variable is a byte position, not a character number">
+Writing `for character_number, code_point in utf8.codes(text)` names the first variable
+after something it is not. It is where the character starts in the string, so on text
+outside ASCII it skips values, and using it to index a list of results leaves holes. Keep
+a counter of your own when the ordinal is what you want, and use the position for reaching
+back into the string.
+</Gotcha>
+
+<Gotcha title="The three values belong to the for, not to you">
+`local step = utf8.codes(text)` keeps the first of the three and throws the other two
+away, and `for byte_position, code_point in step do` then calls that function with no
+string to read and raises. The call belongs in the `in` clause whole. Taking it apart is
+only worth it to drive the walk by hand, and then all three values have to be kept.
+</Gotcha>
+
+<Gotcha title="A malformed string stops the loop rather than skipping the bad part">
+Permissiveness in this library is about *which decoded values* are acceptable; a sequence
+that is malformed or written longer than it needs to be is refused however the call is
+made, so there is no mode that walks past bytes it cannot read. See
+[which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count).
+Code that has to survive arbitrary input checks it with
+[`utf8.len()`](/docs/standard-library/utf8/len) first, or wraps the loop in
+[`pcall()`](/docs/standard-library/globals/pcall) and accepts that the walk stops where
+the bytes went wrong.
+</Gotcha>
+
+## See also
+
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — the same numbers, asked for by byte position instead of walked to
+- [`utf8.len()`](/docs/standard-library/utf8/len) — how many characters, and where the reading broke down
+- [`utf8.offset()`](/docs/standard-library/utf8/offset) — jumping to one character rather than walking to it
+- [`utf8.charpattern`](/docs/standard-library/utf8/charpattern) — the same walk written as a pattern, over the text rather than the numbers
+- [Generic `for`](/docs/language/statements/generic-for) — the loop this call is built to feed

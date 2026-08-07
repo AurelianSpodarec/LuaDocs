@@ -1,8 +1,109 @@
 ---
 title: utf8.charpattern
-description: ""
+description: The pattern that matches one UTF-8 byte sequence, for use with the string library.
+lua-compat: utf8.charpattern
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.charpattern
 ---
 
-{/* Not yet written. */}
+A ready-made [pattern](/docs/standard-library/string/patterns) matching one UTF-8 byte
+sequence in a subject that is already valid, so that the `string` library's matching
+functions can be made to step a character at a time instead of a byte at a time.
+
+<RunnableExample code={`local word = "naïve"\nlocal characters = {}\nfor character in string.gmatch(word, utf8.charpattern) do\n  characters[#characters + 1] = character\nend\nprint(#characters)\nprint(table.concat(characters, "|"))\n-- Expected output:\n-- 5\n-- n|a|ï|v|e`} />
+
+## Value
+
+A string, fourteen bytes long, spelled `"[\0-\x7F\xC2-\xFD][\x80-\xBF]*"`. The escapes in
+that spelling are ordinary string escapes rather than pattern syntax: they are how the
+bytes are written down, and by the time a program reads the field it holds those bytes and
+nothing else. The characters that *are* pattern syntax are the two bracketed classes, the
+ranges inside them, and the `*`.
+
+It is a pattern, which is to say a string — not a function, and not something any
+function in this library accepts as an argument. Using it means calling into the `string`
+library with this value in the pattern slot.
+
+## Description
+
+The `string` library works in bytes. Its character classes are defined over bytes, its
+positions are byte positions, and a `.` matches one byte rather than one character. This
+field is the bridge: it describes the shape of one encoded character in the vocabulary
+those functions do speak, which lets
+[`string.gmatch()`](/docs/standard-library/string/gmatch),
+[`string.find()`](/docs/standard-library/string/find) and
+[`string.gsub()`](/docs/standard-library/string/gsub) advance a character at a time.
+
+What it buys over the functions in this library is the rest of the pattern machinery —
+anchors, captures, `gsub`'s replacement forms — applied to whole characters. Where all
+that is wanted is a walk in order,
+[`utf8.codes()`](/docs/standard-library/utf8/codes) does the same job with the code points
+already decoded and with malformed input reported rather than matched over.
+
+## What the two classes match
+
+The first class is the byte a character starts with. It admits `\0` through `\x7F`, which
+are the single-byte characters of ASCII, and `\xC2` through `\xFD`, which are the first
+bytes of the wider sequences. The second class, repeated zero or more times, admits `\x80`
+through `\xBF` — the continuation bytes that fill out a wider sequence. One byte from the
+first class followed by its continuations is one character.
+
+Two byte values are left out of the first class on purpose. `\xC0` and `\xC1` can only ever
+begin a two-byte spelling of a value that fits in one byte, which is the overlong form the
+readers in this library refuse, so nothing well formed starts with either.
+
+## Examples
+
+### Taking a number of characters off the front
+
+<RunnableExample code={`local title = "crème brûlée"\nlocal kept = {}\nfor character in string.gmatch(title, utf8.charpattern) do\n  kept[#kept + 1] = character\n  if #kept == 5 then break end\nend\nprint(table.concat(kept))\n-- Expected output: crème`} />
+
+Five characters, six bytes. Counting the same five with `string.sub(title, 1, 5)` measures
+the wrong thing and stops a character early, and the same mistake made for three characters
+— `string.sub(title, 1, 3)` — cuts `è` in half.
+
+### Finding where one character ends
+
+<RunnableExample code={`local sign = "€uro"\nlocal starts, finishes = string.find(sign, utf8.charpattern)\nprint(starts, finishes)\nprint(string.sub(sign, starts, finishes))\n-- Expected output:\n-- 1\t3\n-- €`} />
+
+`string.find()` reports byte positions, and the two of them bracket the whole sequence
+rather than its first byte.
+
+### What the field actually holds
+
+<RunnableExample code={`print(type(utf8.charpattern))\nprint(#utf8.charpattern)\n-- Expected output:\n-- string\n-- 14`} />
+
+A string of fourteen bytes, read like any other field of a table.
+
+## Gotchas
+
+<Gotcha title="It is only a pattern where a pattern is expected">
+`string.find(text, utf8.charpattern, 1, true)` looks for those fourteen bytes as literal
+text, because the fourth argument turns pattern matching off — and ordinary text does not
+contain them, so the search comes back empty. The same goes for any argument slot that
+takes a plain substring rather than a pattern.
+</Gotcha>
+
+<Gotcha title="A run of continuation bytes is swallowed whole">
+The trailing `*` has no upper bound, so on bytes that are not valid UTF-8 one lead byte
+followed by five continuation bytes matches as a single six-byte "character" — and a
+continuation byte with no lead byte in front of it matches nothing at all and is stepped
+over in silence. The field is documented for subjects that are already valid, and it
+reports nothing about ones that are not.
+[`utf8.len()`](/docs/standard-library/utf8/len) is what establishes that beforehand.
+</Gotcha>
+
+<Gotcha title="Matching a character is not understanding one">
+Stepping by encoded sequences is not the same as stepping by what a reader would call a
+character: a letter followed by a combining accent is two sequences and two matches, and
+this pattern has no way to know they belong together. That is
+[what this library leaves alone](/docs/standard-library/utf8/codepoint#what-a-code-point-is-and-what-this-library-leaves-alone),
+and the pattern inherits the limit rather than escaping it.
+</Gotcha>
+
+## See also
+
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — the same walk with the code points decoded for you
+- [`utf8.len()`](/docs/standard-library/utf8/len) — counting characters without matching them
+- [Patterns](/docs/standard-library/string/patterns) — what the brackets, the ranges and the `*` mean
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — the function this value is most often handed to

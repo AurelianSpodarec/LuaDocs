@@ -1,9 +1,84 @@
 ---
 title: utf8
-description: ""
+description: Basic support for the UTF-8 encoding — writing code points as bytes, reading them back, and counting, walking and locating the characters of a string.
 lua-compat: utf8.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.6
 ---
 
-{/* Not yet written. */}
+A Lua string is a sequence of bytes, and this library is what lets a program treat some of
+those bytes as *characters* written in UTF-8. It encodes a number as the bytes that spell
+it, decodes bytes back into the number, counts how many characters a run of bytes holds,
+walks them in order, and finds where each one begins. Its functions and its one constant
+live in the table `utf8`.
+
+That list is the whole of it. Handling the encoding is all this library claims to do, and
+everything that depends on what a character *means* — case, sorting order, whether
+something is a letter, what a reader would count as one character on screen — is outside
+it. [What a code point is, and what this library leaves
+alone](/docs/standard-library/utf8/codepoint#what-a-code-point-is-and-what-this-library-leaves-alone)
+sets out where that line falls and what it costs.
+
+Nothing here changes what a string is, either. Where these functions take or report a
+position, it is a *byte* position, counted and negated the way the
+[`string`](/docs/standard-library/string) library counts and negates one, so results drop
+straight into [`string.sub()`](/docs/standard-library/string/sub) and friends.
+[How the byte positions are
+read](/docs/standard-library/utf8/len#how-the-byte-positions-are-read) carries the rules
+the whole library shares.
+
+<RunnableExample code={`local menu_item = "crème brûlée"\nprint(#menu_item, utf8.len(menu_item))\n\nlocal first_accent_at\nfor byte_position, code_point in utf8.codes(menu_item) do\n  if code_point > 127 then\n    first_accent_at = byte_position\n    break\n  end\nend\nprint(first_accent_at, utf8.codepoint(menu_item, first_accent_at))\n\nlocal sixth_starts_at = utf8.offset(menu_item, 6)\nprint(string.sub(menu_item, 1, sixth_starts_at - 1))\n-- Expected output:\n-- 15\t12\n-- 3\t232\n-- crème`} />
+
+Three numbers and a slice, and the gap between the first two is what the library is for:
+fifteen bytes hold twelve characters. The position the walk stopped at is a
+byte position, which is why it can be handed straight to
+[`utf8.codepoint()`](/docs/standard-library/utf8/codepoint); and the slice is cut where a
+character begins rather than after a count of bytes, which is the difference between
+`crème` and a broken string.
+
+<Note>
+The two halves of this library are checked against different rules. Writing a byte sequence
+accepts a wide range of numbers, including ones no character has been assigned to; reading
+one back insists that the bytes are well formed and that the value they spell passes
+whatever check is in force. So a string this library will happily build is not always a
+string it will read back, and
+[which code points count](/docs/standard-library/utf8/codepoint#which-code-points-count)
+is where both rules are set out.
+</Note>
+
+Nothing has joined or left since the library arrived: the same six names, in the same
+table, on every line that carries the library at all. What has moved is what the readers
+will accept, what `utf8.char()` will write, and what `utf8.offset()` hands back. Each
+entry's own version support says where its line falls, and the sidebar dims what your
+selected version does not have.
+
+## Turning code points into text, and back
+
+The two directions of the encoding itself — a number written out as bytes, and bytes read
+back as numbers.
+
+- [`utf8.char()`](/docs/standard-library/utf8/char) — code points written out as UTF-8 byte sequences and joined, one sequence per argument
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — the numbers behind the characters starting in a range of byte positions, one value each
+
+## Counting, walking and finding your place
+
+Three questions about the characters of a string rather than about the values they hold:
+how many there are, what each one is in turn, and where a numbered one begins.
+
+- [`utf8.len()`](/docs/standard-library/utf8/len) — how many characters a string holds, or a false value and the byte position where the bytes stopped making sense
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — a generic `for` set up to visit every character, giving the byte position and the code point of each
+- [`utf8.offset()`](/docs/standard-library/utf8/offset) — where a numbered character sits among the bytes, which is what turns a count of characters into something `string.sub()` will take
+
+## Constants
+
+One value rather than a call — read as a field, never called.
+
+- [`utf8.charpattern`](/docs/standard-library/utf8/charpattern) — a pattern matching one encoded character, so the `string` library's matching functions can step by characters
+
+## See also
+
+- [`string`](/docs/standard-library/string) — the library that owns the bytes underneath, and the patterns `utf8.charpattern` is written for
+- [`string.sub()`](/docs/standard-library/string/sub) — where the byte positions from this library are meant to end up
+- [`string.byte()`](/docs/standard-library/string/byte) — the numbers of the individual bytes, rather than of the characters they spell
+- [Patterns](/docs/standard-library/string/patterns) — what `utf8.charpattern` is a piece of
+- [Generic `for`](/docs/language/statements/generic-for) — the loop `utf8.codes()` is built to feed

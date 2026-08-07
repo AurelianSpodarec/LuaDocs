@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.4": "A second argument, `lax`, is added. A true value lifts the limit on what a byte sequence may decode to, accepting anything up to `0x7FFFFFFF`; malformed and overlong sequences are refused either way. The default reading also became stricter at the same time: a sequence encoding a surrogate, `0xD800` through `0xDFFF`, now stops the walk with an error, where earlier versions handed it to the loop like any other character. A string that itself begins in the middle of a character is refused by the call that sets the loop up, where earlier versions accepted that call and raised at the loop's first step instead."
+  }
+}

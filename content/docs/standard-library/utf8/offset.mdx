@@ -1,8 +1,160 @@
 ---
 title: utf8.offset()
-description: ""
+description: Find the byte position a numbered character starts at, counting forwards or backwards.
+lua-compat: utf8.offset
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.offset
 ---
 
-{/* Not yet written. */}
+Turns a character number into the byte position that character begins at, which is what
+bridges a count of characters and the byte positions the `string` library works in. It
+reaches a character directly instead of walking to it the way
+[`utf8.codes()`](/docs/standard-library/utf8/codes) does.
+
+<RunnableExample code={`local phrase = "café au lait"\nlocal sixth_starts_at = utf8.offset(phrase, 6)\nprint(sixth_starts_at)\nprint(string.sub(phrase, sixth_starts_at))\n-- Expected output:\n-- 7\n-- au lait`} />
+
+## Syntax
+
+```lua
+utf8.offset(s, n [, i])
+```
+
+<Parameters>
+  <Param name="s">The string to look in. It is taken to be valid UTF-8; nothing here verifies that.</Param>
+  <Param name="n">Which character to find, counted from `i`. `1` is the character starting at `i`, `2` the one after it; a negative number counts backwards from `i` instead. `0` asks a different question — see [what a zero n asks for](#what-a-zero-n-asks-for).</Param>
+  <Param name="i">The byte position the counting starts from. Omitted, it depends on the sign of `n`: the first byte when `n` is zero or above, and one past the last byte when `n` is negative, so counting runs from whichever end `n` points away from.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer or nil">The byte position where that character's encoding starts — or `nil` when the string holds no such character.</Return>
+  <Only since="5.5">
+    <Return type="integer">The byte position where that character's encoding ends, which is the same position again for a character one byte wide. It comes back on the succeeding path only; the answer for a character that is not there is a single `nil`.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when `i` resolves to a position before the first byte, or more than one past the last.
+- Raises when `n` is not zero and `i` lands on a continuation byte instead of the first byte of a character. Counting has to start from a character, and a position inside one names none. This applies to the position `i` defaults to as much as to one written out, so a string that itself begins with a continuation byte raises on a plain call.
+- Raises when `n` is left out. `i` may be left out; it has a default.
+- Raises when `n` or `i` is a number with a fractional part, since there is no character between two whole ones and no position between two bytes.
+- Raises when `s` is neither a string nor a number, and when `i` is neither.
+- A byte sequence that spells no valid character does *not* raise on that account. This function decodes nothing, so it has no value to reject — see [it counts boundaries, not characters](#it-counts-boundaries-not-characters).
+
+</Errors>
+
+## Description
+
+Byte positions here follow the rules the rest of the library uses:
+[how the byte positions are read](/docs/standard-library/utf8/len#how-the-byte-positions-are-read)
+carries them, including that a negative `i` counts backwards from the end and that one
+past the last byte is a legal position rather than an error.
+
+What is unusual is `n`, and it is unusual twice over. It is counted *from `i`* rather than
+from the front of the string, so `utf8.offset(text, 2, start)` is the character after the
+one at `start` rather than the second character of the text. And the default for `i`
+follows the sign of `n`: a non-negative `n` counts forward from the first byte, a negative
+`n` counts back from one past the last. That pairing is what makes `utf8.offset(text, 4)`
+the fourth character from the front and `utf8.offset(text, -4)` the fourth from the back,
+with no third argument in either.
+
+One position past the last byte is an answer rather than a failure. Asking for the
+character just after the last one gives `#s + 1`, which is where a slice that runs to the
+end of the string stops. Asking for one beyond that gives `nil`, and so does counting back
+further than the string has characters.
+
+## What a zero n asks for
+
+`n = 0` is not a character number, and it is the one form that reads `i` as an arbitrary
+byte position rather than as a character boundary. It answers with the start of the
+character that *contains* byte `i`, walking backwards over continuation bytes until it
+reaches a first byte.
+
+That makes it the way to snap a position onto a boundary — after arithmetic on byte
+positions, after a cut made by length, or after any calculation that did not know where
+the characters were. Handing the same `i` to a call with a non-zero `n` would raise
+instead, because a count of characters has to begin at a character.
+
+## It counts boundaries, not characters
+
+Nothing here decodes anything. The walk moves by asking of each byte only whether it is a
+continuation byte, so it never forms a code point and has no value to check. That is why
+the parameter list has no permissive switch: there is no strict reading here for one to
+loosen.
+
+The consequence is that a string which is not valid UTF-8 usually gets an answer rather
+than a complaint, and the answer is arithmetic on whatever the bytes happen to be. An
+overlong sequence, or one encoding a value beyond anything Unicode has assigned, is
+counted as a character like any other. The single place bad bytes are noticed is the
+starting position: an `i` sitting on a continuation byte raises, because a count has to
+begin at a character. Where the input is not trusted,
+[`utf8.len()`](/docs/standard-library/utf8/len) is the function that says so before any of
+this is worth doing.
+
+## Examples
+
+### Cutting between characters
+
+<RunnableExample code={`local title = "crème brûlée"\nlocal first_starts_at = utf8.offset(title, 1)\nlocal sixth_starts_at = utf8.offset(title, 6)\nprint(string.sub(title, first_starts_at, sixth_starts_at - 1))\n-- Expected output: crème`} />
+
+Two positions, and the slice runs from the first up to one byte before the second. Taking
+the first five characters by their count instead — `string.sub(title, 1, 5)` — would cut
+`è` in half.
+
+### Counting back from the end
+
+<RunnableExample code={`local label = "poêle"\nlocal last_starts_at = utf8.offset(label, -1)\nprint(last_starts_at)\nprint(string.sub(label, last_starts_at))\n-- Expected output:\n-- 6\n-- e`} />
+
+`-1` is the last character, `-2` the one before it. The starting position defaults to the
+end of the string, so nothing else has to be worked out first.
+
+### Snapping a byte position onto a character
+
+<RunnableExample code={`local word = "naïve"\nlocal boundary = utf8.offset(word, 0, 4)\nprint(boundary)\nprint(string.sub(word, boundary, boundary + 1))\n-- Expected output:\n-- 3\n-- ï`} />
+
+Byte 4 is the second byte of `ï`. A zero `n` walks back to byte 3, where that character
+begins.
+
+### Just past the end, and past that
+
+<RunnableExample code={`local word = "café"\nlocal character_count = utf8.len(word)\nlocal just_past = utf8.offset(word, character_count + 1)\nlocal too_far = utf8.offset(word, character_count + 2)\nprint(just_past, #word + 1)\nprint(too_far)\n-- Expected output:\n-- 6\t6\n-- nil`} />
+
+The character after the last one has a position — one past the final byte — and it is the
+end a slice covering the whole string is written against. One further, and there is
+nothing to point at.
+
+## Gotchas
+
+<Gotcha title="n counts from i, not from the start of the string">
+`utf8.offset(text, 3, somewhere)` is the third character *from `somewhere`*, not the third
+character of `text`. The two agree only when `somewhere` is the position counting would
+have begun from anyway. Code that walks a string in steps and passes the last position
+back in is counting afresh each time, which is usually what was wanted — but it means the
+number handed in is a distance, not an index.
+</Gotcha>
+
+<Gotcha title="The answer is a byte position, not a character number">
+Subtracting two results gives a number of *bytes*, not a number of characters, and adding
+`1` to a result lands inside a character whenever that character is wider than one byte.
+[`utf8.len()`](/docs/standard-library/utf8/len) is what counts characters, and this
+function is what turns such a count back into something `string.sub()` will accept.
+</Gotcha>
+
+<Only since="5.5">
+
+<Gotcha title="Two values come back, so the call expands where one was meant">
+Written as the last argument of a call, or as the last expression of a `return`, this
+hands on both positions rather than one — `string.sub(text, utf8.offset(text, 3))` becomes
+a two-position slice of a single character instead of everything from that character
+onwards. Keep the result in a variable, or wrap the call in parentheses, wherever only the
+starting position is meant.
+</Gotcha>
+
+</Only>
+
+## See also
+
+- [`utf8.len()`](/docs/standard-library/utf8/len) — how many characters there are, which is the number this turns into a position
+- [`utf8.codes()`](/docs/standard-library/utf8/codes) — reaching every character in turn instead of one by number
+- [`utf8.codepoint()`](/docs/standard-library/utf8/codepoint) — what the character at a byte position is
+- [`string.sub()`](/docs/standard-library/string/sub) — the function these positions are for

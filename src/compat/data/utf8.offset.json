@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.5": "Returns two integers where earlier versions return one: the byte position where the character's encoding starts, and the byte position where it ends. A character one byte wide reports the same position twice, and the answer for a character that is not there is still a single `nil`."
+  }
+}

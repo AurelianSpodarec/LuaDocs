@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.4": "The class of first bytes widens from `[\\0-\\x7F\\xC2-\\xF4]` to `[\\0-\\x7F\\xC2-\\xFD]`, so the pattern covers the byte sequences of up to six bytes that `utf8.char()` writes from the same version. Earlier versions stop at the four-byte sequences Unicode needs."
+  }
+}
