@@ -51,6 +51,27 @@ describe('ReviewStatus', () => {
     expect(href(/report a problem/i)).toContain('/issues/new?');
   });
 
+  it('carries the last-updated stamp in the same text column as the status', () => {
+    // Provenance is one block (ADR 0011). Rendered as a sibling, the date began level
+    // with the icon rather than with the words, and the ragged edge made two facts
+    // about the same page look like two unrelated widgets.
+    render(
+      <ReviewStatus path="standard-library/string/len.mdx" lastModified="2026-08-03T09:12:00Z" />,
+    );
+
+    const stamp = document.querySelector('[data-last-updated]')!;
+    expect(stamp).toHaveTextContent('Last updated on 3 August 2026');
+
+    const sentence = screen.getByText(/checked against the reference manual/i);
+    expect(stamp.parentElement).toBe(sentence.closest('p')!.parentElement);
+  });
+
+  it('says nothing about age when git has no date for the file', () => {
+    render(<ReviewStatus path="x.mdx" />);
+    expect(document.querySelector('[data-last-updated]')).toBeNull();
+    expect(status()).toHaveTextContent('Awaiting review');
+  });
+
   it('opens both links safely in a new tab', () => {
     render(<ReviewStatus path="x.mdx" />);
     for (const link of screen.getAllByRole('link')) {

@@ -1,5 +1,6 @@
 import { CircleCheck, CircleDashed } from 'lucide-react';
 import { gitConfig } from '@/lib/shared';
+import { LastUpdated } from './LastUpdated';
 
 /** `2026-08-05` → `5 August 2026`. Parsed as UTC so the date cannot slip a day. */
 function readable(date: string): string {
@@ -39,8 +40,23 @@ const linkClass =
  *
  * The links are the other half. An unchecked page is worth more when the reader who
  * spots the problem can fix it or report it without leaving the page they found it on.
+ *
+ * **The last-updated stamp is rendered here rather than beside this.** It answers a
+ * different question — how old, not how vetted — but it answers it *about the same
+ * thing*, and a reader weighing a page reads them as one paragraph. Sitting outside,
+ * it started at the container's margin, level with the icon rather than with the
+ * words, and a ragged left edge is most of what made two related facts look like two
+ * unrelated widgets. Inside, it shares the text column and needs no alignment rule.
  */
-export function ReviewStatus({ date, path }: { date?: string | null; path: string }) {
+export function ReviewStatus({
+  date,
+  path,
+  lastModified,
+}: {
+  date?: string | null;
+  path: string;
+  lastModified?: Date | string | null;
+}) {
   const repo = `https://github.com/${gitConfig.user}/${gitConfig.repo}`;
   const file = `content/docs/${path}`;
 
@@ -57,33 +73,38 @@ export function ReviewStatus({ date, path }: { date?: string | null; path: strin
 
   return (
     <div data-reviewed={checked ? 'yes' : 'no'} className="not-prose text-sm">
-      <p className="flex items-start gap-2 text-fd-muted-foreground">
+      {/* A `div`, not a `p`: the date below is its own paragraph, and a `p` cannot
+          hold one. */}
+      <div className="flex items-start gap-2 text-fd-muted-foreground">
         <Icon
           aria-hidden
           className={`mt-0.5 size-4 shrink-0 ${
             checked ? 'text-emerald-600 dark:text-emerald-400' : 'text-fd-muted-foreground/70'
           }`}
         />
-        <span>
-          <strong className="text-fd-foreground">
-            {checked ? 'Reviewed' : 'Awaiting review'}
-          </strong>
-          {' — '}
-          {checked ? (
-            <>a person read this entry on {readable(date as string)}.</>
-          ) : (
-            <>checked against the reference manual, and by running every example.</>
-          )}{' '}
-          <a href={editUrl} target="_blank" rel="noreferrer noopener" className={linkClass}>
-            Improve this page
-          </a>{' '}
-          or{' '}
-          <a href={issueUrl} target="_blank" rel="noreferrer noopener" className={linkClass}>
-            report a problem
-          </a>
-          .
-        </span>
-      </p>
+        <div className="space-y-1">
+          <p>
+            <strong className="text-fd-foreground">
+              {checked ? 'Reviewed' : 'Awaiting review'}
+            </strong>
+            {' — '}
+            {checked ? (
+              <>a person read this entry on {readable(date as string)}.</>
+            ) : (
+              <>checked against the reference manual, and by running every example.</>
+            )}{' '}
+            <a href={editUrl} target="_blank" rel="noreferrer noopener" className={linkClass}>
+              Improve this page
+            </a>{' '}
+            or{' '}
+            <a href={issueUrl} target="_blank" rel="noreferrer noopener" className={linkClass}>
+              report a problem
+            </a>
+            .
+          </p>
+          <LastUpdated at={lastModified} />
+        </div>
+      </div>
     </div>
   );
 }

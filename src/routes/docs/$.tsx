@@ -24,7 +24,6 @@ import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
 import { ReviewStatus } from '@/entry/ReviewStatus';
-import { LastUpdated } from '@/entry/LastUpdated';
 import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
@@ -111,7 +110,9 @@ function Content({
   });
 
   return (
-    <DocsPage toc={fullToc} slots={{ breadcrumb: Breadcrumb }}>
+    // `footer` is Fumadocs's previous/next pair, and a reference has no sequence for it
+    // to describe — see ADR 0011. It comes back scoped to Learn, which does.
+    <DocsPage toc={fullToc} footer={{ enabled: false }} slots={{ breadcrumb: Breadcrumb }}>
       <DocsTitle>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       {/* Above the copy row and the strip, because it is not a detail about the entry —
@@ -145,15 +146,11 @@ function Content({
           after "See also" so neither is a thing an author has to remember to place. */}
       {node && <VersionMatrix node={node} />}
       {sourceUrl && <EntrySource url={sourceUrl} />}
-      {/* Provenance sits together: what the entry was rewritten from, and whether a
-          person has since read it. */}
-      {/* How vetted, and how old — two different questions, and one provenance block.
-          Both sit left, on the text's own margin: pinning the date to the far right
-          left it stranded across a gap that grew with the viewport, reading as chrome
-          belonging to the page frame rather than as a fact about this entry. */}
-      <div className="mt-3 flex flex-wrap items-start gap-x-6 gap-y-2">
-        <ReviewStatus date={reviewed} path={path} />
-        <LastUpdated at={lastModified} />
+      {/* Provenance is one block, not two adjacent ones: what the entry was rewritten
+          from, whether a person has since read it, and how old it is. `ReviewStatus`
+          places the date itself — see the note there (ADR 0011). */}
+      <div className="mt-3">
+        <ReviewStatus date={reviewed} path={path} lastModified={lastModified} />
       </div>
     </DocsPage>
   );
