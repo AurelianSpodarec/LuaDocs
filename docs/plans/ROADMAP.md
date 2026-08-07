@@ -254,6 +254,20 @@ static, so this is a late, cheap decision.
 ship them — either they are authored, or the build filters unwritten entries out of
 the sidebar, search index and `llms.txt` first.
 
+**It is also a migration.** Deploy takes over `www.luadocs.com` from the old site
+rather than standing up somewhere new, so it owes the sixty-five permanent redirects,
+the sitemap, `robots.txt` and canonicals in
+[ADR 0012](../adr/0012-legacy-url-migration.md). Two things that ADR settles which
+this slice would otherwise decide badly: the host is no longer fully open — it must
+issue real 301s, which rules out bare GitHub Pages — and the sitemap's
+authored-entries-only predicate is the same one the stub filter above needs, so they
+are one piece of work and not two.
+
+**Its own content gate is four pages.** Sixty-one of the sixty-five redirect targets
+are authored today; the exceptions are the `io`, `os`, `package` and `debug` section
+overviews, still 8-line stubs, whose old counterparts are live and indexed. Until
+they are written, four 301s land on an empty page.
+
 ## Deliberately unscheduled
 
 - **Guides and the Learn path** — depend on the content pipeline; sequence once
