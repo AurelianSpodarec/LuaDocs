@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import { targetVersion, unavailableText, VersionUnavailable } from '@/version/VersionNote';
+import {
+  targetVersion,
+  unavailableLead,
+  unavailableText,
+  VersionUnavailable,
+} from '@/version/VersionNote';
 import type { CompatNode, LuaVersion } from '@/compat/schema';
 
 /** The four shapes of absence. Only the first had a branch of its own. */
@@ -33,41 +38,43 @@ describe('the unavailable callout', () => {
     expect(note()).toBeNull();
   });
 
-  it('tells a reader below version_added when it arrives', () => {
-    // The case that already worked. It must keep reading exactly this.
+  it('tells a reader below version_added which version to want', () => {
     renderAt(notYetAdded, '5.1');
     expect(note()).toHaveTextContent(
-      'Not in Lua 5.1. Introduced in Lua 5.2. Everything below describes it as it exists from then on.',
+      'Not in Lua 5.1. Everything below describes Lua 5.2, where it was introduced.',
     );
   });
 
-  it('says a removed entry was removed, and when', () => {
+  it('points a reader past a removed entry at the last version that had it', () => {
     renderAt(removed, '5.5');
-    expect(note()).toHaveTextContent('removed in Lua 5.2');
+    expect(note()).toHaveTextContent(
+      'Not in Lua 5.5. Everything below describes Lua 5.1, the last version that had it.',
+    );
   });
 
   it('never promises a removed entry survives into the reader’s version', () => {
-    // The defect: every unavailable entry closed with "as it exists from then on",
-    // which on a removed one asserts a present tense the symbol does not have.
+    // The original defect: every unavailable entry closed with "as it exists from then
+    // on", which on a removed one asserts a present tense the symbol does not have.
     renderAt(removed, '5.5');
     expect(note()).not.toHaveTextContent('from then on');
-    expect(note()).toHaveTextContent('as it was, up to Lua 5.1');
   });
 
-  it('states the whole span from the dataset, not from version_added alone', () => {
-    renderAt(removed, '5.5');
-    expect(note()).toHaveTextContent(
-      'Not in Lua 5.5. Introduced in Lua 5.1 and removed in Lua 5.2.',
-    );
+  it('names each version once', () => {
+    // What replaced "Introduced in Lua 5.1 and removed in Lua 5.2. Everything below
+    // describes it as it was, up to Lua 5.1" — four numbers carrying two facts, with
+    // the reader's version repeated from the lead and the target named twice. The
+    // support strip below carries the history, in colour and clickable.
+    renderAt(removed, '5.2');
+    const text = note()!.textContent!;
+    expect(text.match(/5\.2/g)).toHaveLength(1);
+    expect(text.match(/5\.1/g)).toHaveLength(1);
   });
 
-  it('tells a reader inside the gap that the entry comes back, and when', () => {
+  it('tells a reader inside the gap that the entry comes back, and where', () => {
     // The branch that had no dataset able to reach it until `version_restored` existed.
-    // It is driven here through the real switcher and a real node, which is the whole
-    // proof that the schema and the renderer now meet.
     renderAt(cameBack, '5.4');
     expect(note()).toHaveTextContent(
-      'Not in Lua 5.4. Introduced in Lua 5.1, removed in Lua 5.3, and back in Lua 5.5.',
+      'Not in Lua 5.4. Everything below describes Lua 5.5, where it returns after a gap.',
     );
   });
 
@@ -78,109 +85,61 @@ describe('the unavailable callout', () => {
 
   it('claims nothing about a symbol no documented version has', () => {
     renderAt(never, '5.5');
-    expect(note()).toHaveTextContent('Not in Lua 5.5. Not part of any documented Lua version.');
-    // The same trailing clause used to be appended here too, describing an existence
-    // the sentence before it had just denied.
-    expect(note()).not.toHaveTextContent('from then on');
-  });
-});
-
-describe('the way out of a version the entry is not in', () => {
-  const offer = () => screen.queryByRole('button', { name: /view as lua/i });
-
-  it('offers the version the entry arrived in, to a reader who is early', () => {
-    renderAt(notYetAdded, '5.1');
-    expect(offer()).toHaveTextContent('View as Lua 5.2');
+    // No "Not in Lua 5.5" lead: it is a special case of what the sentence already says,
+    // and there is no version worth naming for a symbol no version has.
+    expect(note()).toHaveTextContent('Not part of any documented Lua version.');
+    expect(note()).not.toHaveTextContent('Not in Lua 5.5');
+    expect(note()).not.toHaveTextContent('Everything below');
   });
 
-  it('offers the last version that had it, to a reader who is late', () => {
+  it('offers no button — the support strip is where a version is chosen', () => {
+    // There was one, briefly. It read "View as Lua 5.1" under a sentence already
+    // ending in 5.1, and the strip below now selects any version directly.
     renderAt(removed, '5.5');
-    expect(offer()).toHaveTextContent('View as Lua 5.1');
-  });
-
-  it('sends a reader in the gap forward, to where the body is written about', () => {
-    // Either direction is defensible from availability alone; the prose is not. It
-    // says "as it exists there", meaning the version it came back in.
-    renderAt(cameBack, '5.4');
-    expect(offer()).toHaveTextContent('View as Lua 5.5');
-  });
-
-  it('offers nothing for a symbol no documented version has', () => {
-    renderAt(never, '5.5');
-    expect(offer()).toBeNull();
-  });
-
-  it('offers nothing where the entry exists — there is no callout to hold it', () => {
-    renderAt(removed, '5.1');
-    expect(offer()).toBeNull();
-  });
-
-  it('actually switches the selected version, and dismisses itself by doing so', () => {
-    renderAt(removed, '5.5');
-    fireEvent.click(offer()!);
-
-    expect(screen.getByLabelText(/lua version/i)).toHaveValue('5.1');
-    // The entry exists in 5.1, so the callout that carried the button is gone.
-    expect(note()).toBeNull();
-    expect(offer()).toBeNull();
-  });
-
-  it('names the same version the sentence promises the body describes', () => {
-    // The pair that must never drift: `unavailableText` ends by naming what is
-    // described below, and the button is where it sends you.
-    const gap = {
-      kind: 'restored',
-      addedIn: '5.1',
-      removedIn: '5.3',
-      lastAvailable: '5.2',
-      restoredIn: '5.5',
-    } as const;
-    expect(unavailableText(gap)).toContain('back in Lua 5.5');
-    expect(targetVersion(gap)).toBe('5.5');
-
-    const gone = {
-      kind: 'removed',
-      addedIn: '5.1',
-      removedIn: '5.2',
-      lastAvailable: '5.1',
-    } as const;
-    expect(unavailableText(gone)).toContain('up to Lua 5.1');
-    expect(targetVersion(gone)).toBe('5.1');
+    expect(screen.queryByRole('button', { name: /lua 5\.1/i })).toBeNull();
   });
 });
 
 describe('the sentence each shape of absence gets', () => {
+  const gone = { kind: 'removed', addedIn: '5.1', removedIn: '5.2', lastAvailable: '5.1' } as const;
+  const gap = {
+    kind: 'restored',
+    addedIn: '5.1',
+    removedIn: '5.3',
+    lastAvailable: '5.2',
+    restoredIn: '5.5',
+  } as const;
+
   it('distinguishes all four', () => {
-    // Kept as a direct test of the four shapes even though every one of them is now
-    // reachable from a node: these are the exact strings, and the callout tests above
-    // assert substrings of them.
-    expect(unavailableText({ kind: 'never' })).toBe('Not part of any documented Lua version.');
-
-    expect(unavailableText({ kind: 'not-yet', addedIn: '5.2' })).toContain(
-      'Introduced in Lua 5.2',
+    expect(unavailableText({ kind: 'never' })).toBe('');
+    expect(unavailableText({ kind: 'not-yet', addedIn: '5.2' })).toBe(
+      'Everything below describes Lua 5.2, where it was introduced.',
     );
-
-    expect(
-      unavailableText({
-        kind: 'removed',
-        addedIn: '5.1',
-        removedIn: '5.2',
-        lastAvailable: '5.1',
-      }),
-    ).toBe(
-      'Introduced in Lua 5.1 and removed in Lua 5.2. Everything below describes it as it was, up to Lua 5.1.',
+    expect(unavailableText(gone)).toBe(
+      'Everything below describes Lua 5.1, the last version that had it.',
     );
-
-    expect(
-      unavailableText({
-        kind: 'restored',
-        addedIn: '5.1',
-        removedIn: '5.3',
-        lastAvailable: '5.2',
-        restoredIn: '5.5',
-      }),
-    ).toBe(
-      'Introduced in Lua 5.1, removed in Lua 5.3, and back in Lua 5.5. Everything below describes it as it exists there.',
+    expect(unavailableText(gap)).toBe(
+      'Everything below describes Lua 5.5, where it returns after a gap.',
     );
+  });
+
+  it('leads with the reader’s version, except where that says nothing', () => {
+    expect(unavailableLead(gone, '5.4')).toBe('Not in Lua 5.4.');
+    expect(unavailableLead({ kind: 'never' }, '5.4')).toBe(
+      'Not part of any documented Lua version.',
+    );
+  });
+
+  it('names the version `targetVersion` resolves, never another', () => {
+    // The sentence is built from `targetVersion`, so the two cannot disagree. `restored`
+    // is the case where they could: either side of the gap is defensible from
+    // availability alone, and the body is written about the version it came back in.
+    expect(targetVersion(gap)).toBe('5.5');
+    expect(unavailableText(gap)).toContain('Lua 5.5');
+    expect(unavailableText(gap)).not.toContain('5.2');
+
+    expect(targetVersion(gone)).toBe('5.1');
+    expect(unavailableText(gone)).toContain('Lua 5.1');
+    expect(targetVersion({ kind: 'never' })).toBeNull();
   });
 });

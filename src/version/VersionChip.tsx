@@ -8,9 +8,18 @@ import type { LuaVersion } from '@/compat/schema';
  */
 export type ChipState = 'yes' | 'changed' | 'no' | 'since';
 
+/**
+ * Blue for `changed`, not amber, so the site spends each colour on one meaning.
+ *
+ * Amber was saying two opposite things about forty pixels apart: "available, with
+ * changes" on this chip, and "not available at all" on the unavailable callout beside
+ * it. Blue is what the *changed* callout already uses, so aligning the chip to it leaves
+ * amber meaning absence and blue meaning "here, but different", in both the pills and
+ * the callouts.
+ */
 const chipClass: Record<ChipState, string> = {
   yes: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  changed: 'border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  changed: 'border-blue-500/35 bg-blue-500/10 text-blue-700 dark:text-blue-400',
   no: 'border-fd-border bg-fd-muted text-fd-muted-foreground/70 line-through decoration-1',
   since: 'border-fd-border bg-fd-muted text-fd-muted-foreground',
 };
@@ -61,7 +70,14 @@ export function VersionChip({
       data-state={state}
       aria-current={current ? 'true' : undefined}
       onClick={() => onSelect(version)}
-      title={`${chipTitle[state]} — view as Lua ${version}`}
+      /*
+        "Switch to", not "view as". The selected version is site-wide and persisted, so
+        clicking a chip says "I work in 5.3" rather than "show me this entry in 5.3" —
+        which is the whole reason the unavailable chips are controls too. A reader who
+        needs to move to a version this entry never had is not asking about this entry,
+        and the nearest control should not refuse them over a page they are leaving.
+      */
+      title={`${chipTitle[state]} — switch to Lua ${version}`}
       /*
         The ring, not the colour, marks the selected one. Each state already owns a
         colour, so tinting the current chip would collide with whatever it is saying

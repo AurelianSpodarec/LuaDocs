@@ -89,7 +89,9 @@ describe('the assembled string.format entry', () => {
 
     const note = document.querySelector('[data-note="unavailable"]');
     expect(note).toHaveTextContent(/Not in Lua 5\.1/);
-    expect(note).toHaveTextContent(/Introduced in Lua 5\.3/);
+    // The callout names the version the prose below belongs to, rather than reciting
+    // an added/removed history the strip beside it already shows.
+    expect(note).toHaveTextContent(/describes Lua 5\.3, where it was introduced/);
   });
 });
 
