@@ -12,7 +12,7 @@ Five rules:
    An old 5.4-era URL lands on the entry, and the reader sees the default version.
 3. **Every redirect points at a real entry, not at a parent.** Where the old URL
    named something that does not exist, it points at the thing that does.
-4. **The map is finite, hand-written and checked in.** Sixty-five paths, listed
+4. **The map is finite, hand-written and checked in.** Sixty-nine paths, listed
    below. There are no pattern rules and no rewrite regexes.
 5. **Redirects are permanent.** They are never removed, never expired.
 
@@ -39,9 +39,10 @@ under `coroutine`, `io`, `file`, `os`, `package`, `debug` and `utf8`, plus
 four prose pages, nine section overviews, and the leaves of `string` (17), `table`
 (13) and `math` (26).
 
-Seventy is small enough to write out by hand and verify one at a time, which is why
-rule 4 forbids pattern rules. A regex from `/docs/functions/(\w+)/(\w+)` to
-`/docs/standard-library/$1/$2` would be correct for fifty-five paths and silently
+The homepage does not move, so that is **sixty-nine redirects** — small enough to
+write out by hand and verify one at a time, which is why rule 4 forbids pattern
+rules. A regex from `/docs/functions/(\w+)/(\w+)` to `/docs/standard-library/$1/$2`
+would cover the fifty-six leaves, and would be correct for fifty of them and silently
 wrong for six — see below.
 
 ### `table.setmetatable` does not exist, and the old URL said it did
@@ -100,7 +101,7 @@ a contribution page exists is a one-line change.
 
 The old site is on Vercel and so is the new one, so the map ships as `vercel.json`
 `redirects` with `"permanent": true`. Nothing about this ADR depends on that: the map
-is data, and the same seventy pairs generate a Cloudflare `_redirects` file or a
+is data, and the same sixty-nine pairs generate a Cloudflare `_redirects` file or a
 Netlify `_redirects` file unchanged.
 
 The one hosting constraint this does place on [ADR 0004](0004-self-hosted-on-github-no-third-parties.md)'s
@@ -121,7 +122,7 @@ The other sixty-one targets are authored today. This is the whole gate.
 
 ### The map is enforced against build output, not trusted
 
-The seventy pairs are a test fixture. CI asserts that every target resolves to a file
+The sixty-nine pairs are a test fixture. CI asserts that every target resolves to a file
 that exists in `.output/public` — the same job, and the same reason, as the link check
 the roadmap already owes: the dev server answers every path with a 200 SPA shell, so a
 check against it can never fail. A later rename that breaks a 301 fails the build.
@@ -153,7 +154,8 @@ not ship them"), reached from the other direction.
 
 ## The map
 
-Sixty-five paths, plus the homepage, which does not move.
+Sixty-nine paths. The homepage does not move and needs no redirect. The sixty-nine
+resolve to sixty-six distinct targets, because the four prose pages share one.
 
 ### Prose pages
 
@@ -258,7 +260,7 @@ Sixty-five paths, plus the homepage, which does not move.
 
 1. Author the four stub overviews — `io`, `os`, `package`, `debug`.
 2. Add the map, the sitemap, `robots.txt` and canonicals; add the CI assertion.
-3. Deploy to a preview URL and verify all sixty-five redirects against build output.
+3. Deploy to a preview URL and verify all sixty-nine redirects against build output.
 4. Point `www.luadocs.com` at the new deployment; keep apex → `www`.
 5. Keep the existing Search Console property — same domain, no change of address —
    and submit the new sitemap.
