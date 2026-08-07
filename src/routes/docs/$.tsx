@@ -23,7 +23,7 @@ import { compatNodeFor } from '@/compat/registry';
 import { varies } from '@/compat/resolve';
 import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
-import { ReviewStatus } from '@/entry/ReviewStatus';
+import { EntryProvenance } from '@/entry/EntryProvenance';
 import { parseManualUrl } from '@/entry/manualSource';
 import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
@@ -146,12 +146,10 @@ function Content({
           after "See also" so neither is a thing an author has to remember to place. */}
       {node && <VersionMatrix node={node} />}
       {sourceUrl && <EntrySource url={sourceUrl} />}
-      {/* Provenance is one block, not two adjacent ones: what the entry was rewritten
-          from, whether a person has since read it, and how old it is. `ReviewStatus`
-          places the date itself — see the note there (ADR 0011). */}
-      <div className="mt-3">
-        <ReviewStatus date={reviewed} path={path} lastModified={lastModified} />
-      </div>
+      {/* Last on the page, and a panel rather than loose lines: it is about this site's
+          copy of the entry rather than about Lua, and with previous/next gone it is what
+          gives the page an ending (ADR 0011). */}
+      <EntryProvenance reviewed={reviewed} path={path} lastModified={lastModified} />
     </DocsPage>
   );
 }
