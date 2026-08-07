@@ -22,6 +22,15 @@ export function EntrySource({ url }: { url: string }) {
   return (
     <section id="source" className="not-prose mt-12 border-t pt-6">
       <h2 className={sectionHeadingClass}>Source</h2>
+      {/*
+        One link over the whole citation, because it is one destination: `url` already
+        carries the anchor, so the manual name and the passage name point at the same
+        place. Splitting them made the generic half clickable and left the specific
+        half — the part a reader is actually reaching for — as dead text beside it.
+
+        "The" and the full stop stay outside. They are sentence, not citation, and a
+        link that swallows its own punctuation reads as a typo.
+      */}
       <p className="text-sm text-fd-muted-foreground">
         The{' '}
         <a
@@ -31,9 +40,10 @@ export function EntrySource({ url }: { url: string }) {
           className="underline decoration-fd-muted-foreground/40 underline-offset-2 hover:text-fd-primary"
         >
           Lua {ref.version} reference manual
+          {' — '}
+          <span className="font-mono text-xs">{citationFor(ref.anchor)}</span>
         </a>
-        {' — '}
-        <span className="font-mono text-xs">{citationFor(ref.anchor)}</span>.
+        .
       </p>
     </section>
   );
