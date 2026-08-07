@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Adds `coroutine.isyieldable`.",
+    "5.4": "Adds `coroutine.close`."
+  }
+}

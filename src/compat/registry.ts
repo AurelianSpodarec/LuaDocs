@@ -107,6 +107,9 @@ import coroutineYield from './data/coroutine.yield.json';
 import coroutineStatus from './data/coroutine.status.json';
 import coroutineRunning from './data/coroutine.running.json';
 import coroutineIsyieldable from './data/coroutine.isyieldable.json';
+import coroutineWrap from './data/coroutine.wrap.json';
+import coroutineClose from './data/coroutine.close.json';
+import coroutineLibrary from './data/coroutine.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -568,6 +571,71 @@ const raw: Record<string, unknown> = {
   'coroutine.status': coroutineStatus,
   'coroutine.running': coroutineRunning,
   'coroutine.isyieldable': coroutineIsyieldable,
+  // The two that close the section, and the section node itself.
+  //
+  // `wrap` carries four notes because four separate things about it moved, and two of
+  // them are shared with entries above. Its body goes through `luaB_cocreate`, so
+  // `create`'s 5.2 relaxation (a C function is accepted) is observable here too; and a
+  // 5.1 body that yields from inside a protected call, a metamethod or a generic `for`
+  // iterator makes the *wrapper* raise rather than return, which is `yield`'s 5.2 fact
+  // seen from a third side. The two that belong to `wrap` alone are both in
+  // `luaB_auxwrap`:
+  //
+  //   * The position-info guard. 5.1.5, v5.2.0 and 5.2.4 test the error object with
+  //     `lua_isstring`, which is true for a **number** as well as a string, so a number
+  //     raised inside a wrapped coroutine is concatenated with `luaL_where(L, 1)` and
+  //     reaches the caller as a *string*. From `lua_type(L, -1) == LUA_TSTRING` onwards
+  //     a number travels through as a number. That spelling arrives at **v5.3.3**, not
+  //     at a minor-line edge — v5.3.0 through v5.3.2 still have `lua_isstring` — so the
+  //     note is dated 5.3 on the standing ruling that a line is credited with what its
+  //     final release (5.3.6) has, and the patch boundary is recorded in the C3 report.
+  //   * Closing on failure. v5.4.0 adds `lua_resetthread(co)` before the error is
+  //     re-raised, spelled `lua_closethread(co, L)` from 5.4.8; the 5.4 manual records
+  //     it in the entry passage ("the function closes the coroutine and propagates the
+  //     error") and in §3.3.8, and 5.1–5.3 say only that the error is propagated.
+  //
+  // What did *not* change on `wrap`, checked rather than assumed: the position of the
+  // call to the wrapper is prepended to a string error object at every release read,
+  // 5.1.5 through v5.5.0; and a wrapper whose coroutine has nothing left to run raises
+  // in every version — 5.1's `auxresume` refuses any non-suspended coroutine itself,
+  // 5.2/5.3's test for a dead one and leave the rest to `lua_resume`, and 5.4/5.5 leave
+  // all of it to `lua_resume`'s `resume_error`, but the wrapper has no status to report
+  // through and raises whichever route the refusal took.
+  //
+  // `close` arrives at **5.4** — `passage.py pdf-coroutine.close` reports `absent` for
+  // 5.1, 5.2 and 5.3, and `luaB_close` first appears in v5.4.0's `lcorolib.c`. Its 5.5
+  // note carries three things at once because they are one edit to `luaB_close`:
+  // `getco` becomes `getoptco` (the argument is now optional), the `COS_RUN` case stops
+  // raising and calls `lua_closethread(co, L)`, which does not return, and a separate
+  // `LUA_RIDX_MAINTHREAD` test keeps the main line of execution refused. 5.4's `default:`
+  // arm raises for *both* `normal` and `running`, so on that line the coroutine making
+  // the call is refused like any other.
+  //
+  // The `false` path is where 5.4's own releases disagree. v5.4.0's `lua_resetthread`
+  // starts the close from `CLOSEPROTECT` rather than from the thread's own status, so
+  // closing a coroutine that stopped with an error returns `true` and the error is never
+  // handed back; 5.4.8's `lua_closethread` passes `L->status` into `luaE_resetthread`,
+  // which returns it, so the same call returns `false` plus the original error object —
+  // which is what the 5.4 manual describes. Credited to 5.4 on the final-release ruling;
+  // probed on the runtime (5.4.x) and it answers `false` plus the object.
+  //
+  // Neither `wrap` nor `close` is named in any Incompatibilities chapter. All four were
+  // read in full, sliced from `<a name="8">` to end of file. 5.5 §8.1's "In an error, a
+  // nil as the error object is replaced by a string message" is the one entry that
+  // reaches either of them, and it reaches both — `luaG_errormsg` in v5.5.0's `ldebug.c`
+  // is a single funnel with no counterpart at v5.4.8, so it is the same fact
+  // `globals.error`, `globals.pcall`, `globals.xpcall`, `globals.assert` and
+  // `coroutine.resume` already carry, recorded here from two more sides.
+  //
+  // `coroutine.library` records membership and nothing else, like the other section
+  // nodes. Derived from `co_funcs[]` at 5.1.5, v5.2.0, 5.2.4, v5.3.0, 5.3.6, v5.4.0,
+  // 5.4.8 and v5.5.0 and checked against each manual's Coroutine Manipulation section
+  // (§5.2 in 5.1, §6.2 in 5.2–5.4, §6.3 in 5.5): six names in 5.1 and 5.2, `isyieldable`
+  // added at 5.3, `close` added at 5.4, nothing at 5.5. Nothing has ever left, which is
+  // why there is no removal note and no legacy group on the overview.
+  'coroutine.wrap': coroutineWrap,
+  'coroutine.close': coroutineClose,
+  'coroutine.library': coroutineLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

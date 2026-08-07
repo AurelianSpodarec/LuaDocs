@@ -1,8 +1,145 @@
 ---
 title: coroutine.close()
-description: ""
+description: Put a stopped coroutine into the dead state, releasing whatever its body was still holding.
+lua-compat: coroutine.close
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.close
 ---
 
-{/* Not yet written. */}
+Ends a coroutine that has stopped. Anything the body was still holding through a
+[to-be-closed variable](/docs/language/statements/to-be-closed-variables) is closed, the
+coroutine moves to the `"dead"` state, and a status comes back saying whether that went
+cleanly. A coroutine parked in a yield that nothing will resume again does not release what
+it is still holding on its own, which is what this call is for.
+
+<RunnableExample code={`local stock_take = coroutine.create(function()\n  coroutine.yield("shelves counted")\n  return "stockroom counted"\nend)\n\nprint(select(2, coroutine.resume(stock_take)))\nprint(coroutine.close(stock_take))\nprint(coroutine.status(stock_take))\n-- Expected output:\n-- shelves counted\n-- true\n-- dead`} />
+
+## Syntax
+
+<Only before="5.5">
+
+```lua
+coroutine.close(co)
+```
+
+</Only>
+
+<Only since="5.5">
+
+```lua
+coroutine.close([co])
+```
+
+</Only>
+
+<Parameters>
+  <Only before="5.5">
+    <Param name="co">The coroutine to close. It has to be one that has stopped — parked in a yield, finished, or never started.</Param>
+  </Only>
+  <Only since="5.5">
+    <Param name="co">The coroutine to close. It has to be one that has stopped — parked in a yield, finished, or never started — or the one making the call. Left out, it is the one making the call.</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true` when there is nothing to report, `false` when there is.</Return>
+  <Return type="any">On the `false` path, the [error object](/docs/standard-library/globals/error#what-an-error-carries) being reported: the one the coroutine stopped with, or the one a closing method raised on the way out. Nothing follows the status on the `true` path.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `co` is not a coroutine — a value of another type, or `nil`.
+- Raises when the coroutine named is waiting on another one it resumed. It is on the stack in the middle of its own [`coroutine.resume()`](/docs/standard-library/coroutine/resume) rather than stopped.
+- Raises when the coroutine named is the main line of execution.
+- <Only before="5.5">Raises when the coroutine named is the one making the call.</Only>
+
+</Errors>
+
+## Description
+
+A coroutine that has stopped is not the same as one that has finished tidily. A body parked
+in [`coroutine.yield()`](/docs/standard-library/coroutine/yield) has left none of the scopes
+it is standing in, so nothing still in scope there has been closed; a body that stopped with
+an error does not unwind its stack either, for the same reason its stack is still there to
+be inspected. In both cases the file it opened or the lock it took is still held, and
+letting go of the handle is not what releases it. This call is what ends that: the closing
+methods run, in the reverse of the order the variables were declared, and the coroutine is
+left dead.
+
+The status it hands back is about the closing, not about the coroutine's own success. `true`
+means there is nothing to report. `false` comes with one value after it, and that value is
+either the error the coroutine stopped with, handed on here rather than dropped, or an error
+a closing method raised while it was being run.
+
+Reporting is a one-off. Once a coroutine's error has been handed back here, it is spent:
+closing the same coroutine a second time finds nothing left to report and answers `true`.
+Closing one with nothing pending answers `true` as well, so the outcome does not turn on
+knowing whether the coroutine failed; what it does turn on is the coroutine being one this
+call accepts.
+
+A coroutine this call returns from is dead, whichever status came back.
+[`coroutine.status()`](/docs/standard-library/coroutine/status#the-states-a-coroutine-can-be-in)
+says so, and [`coroutine.resume()`](/docs/standard-library/coroutine/resume) reports the
+refusal it reports for any other dead coroutine, so a suspended coroutine closed part-way
+through never runs the rest of its body.
+
+Named the coroutine that is making the call, this does not return at all. The coroutine is
+closed where it stands, and the
+[resume that started it](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
+returns instead, in the shape it would have taken had the body simply run out with nothing
+to hand over. A closing method that raises on the way out is reported to that resume rather
+than here, since there is no *here* left to report it to. The statement after the call is
+not reached.
+
+## Examples
+
+### Releasing what a suspended coroutine still holds
+
+<RunnableExample code={`local released = {}\nlocal upload = coroutine.create(function()\n  local connection <close> = setmetatable({}, {\n    __close = function() released[#released + 1] = "connection" end,\n  })\n  coroutine.yield("first chunk sent")\n  return "all chunks sent"\nend)\n\ncoroutine.resume(upload)\nprint(#released)\nprint(coroutine.close(upload))\nprint(#released, released[1])\n-- Expected output:\n-- 0\n-- true\n-- 1\tconnection`} />
+
+The coroutine is parked in its yield with `connection` still in scope, so the count is `0`:
+nothing has gone out of scope and no closing method has run. Nothing would have run it
+either, had the handle simply been dropped instead.
+
+### Closing one that stopped with an error
+
+<RunnableExample code={`local import_batch = coroutine.create(function()\n  error("row 12 is malformed")\nend)\n\ncoroutine.resume(import_batch)\nlocal completed, reason = coroutine.close(import_batch)\nprint(completed)\nprint(type(reason))\nprint(coroutine.close(import_batch))\n-- Expected output:\n-- false\n-- string\n-- true`} />
+
+The `false` is the coroutine's own failure being handed on a second time, not a failure of
+the closing. The second call answers `true` because there is nothing left to report — the
+coroutine is no more successful than it was a line earlier.
+
+### The coroutines it refuses
+
+<RunnableExample code={`local dispatcher\nlocal worker\nworker = coroutine.create(function()\n  local completed = pcall(coroutine.close, dispatcher)\n  print(completed)\nend)\ndispatcher = coroutine.create(function()\n  coroutine.resume(worker)\nend)\n\ncoroutine.resume(dispatcher)\nprint(coroutine.close(dispatcher))\n-- Expected output:\n-- false\n-- true`} />
+
+While the worker runs, the dispatcher is sitting inside its own resume waiting for it, and
+closing it there is refused. A few statements later the dispatcher's body has run out, it
+is dead, and the same call is accepted.
+
+## Gotchas
+
+<Gotcha title="The failure is reported once, and the second reader sees success">
+A coroutine that stopped with an error hands that error back the first time it is closed
+and `true` every time after. Cleanup that runs down a list of coroutines and closes each of
+them will therefore see failures that a second, later pass over the same list does not —
+and code that closes defensively before closing properly throws away the one report it was
+going to get. Where the outcome matters, keep what the first close said.
+</Gotcha>
+
+<Gotcha title="It is not a way to stop another coroutine mid-flight">
+This ends a coroutine that has already stopped; it is not an interruption of one that has
+not. A coroutine waiting on another one it resumed is refused, and so is the main line of
+execution. Nothing in this library reaches into a coroutine part-way through a statement and
+unwinds it — a coroutine that should be able to be cancelled has to yield often enough to
+be told so, and stop itself.
+</Gotcha>
+
+## See also
+
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — the state this leaves a coroutine in, and the ones it refuses
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — how a coroutine stops in the first place, and what it reports when it fails
+- [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) — the one form that closes its coroutine for you when it fails
+- [To-be-closed variables](/docs/language/statements/to-be-closed-variables) — what the closing methods this runs are attached to
+- [`error()`](/docs/standard-library/globals/error) — where the object on the `false` path came from
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

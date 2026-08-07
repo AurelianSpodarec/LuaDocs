@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.4" } },
+  "changed_in": {
+    "5.5": "Takes the coroutine as an optional argument and accepts the one making the call, which 5.4 refuses along with every other coroutine that is not stopped. Left out, the argument is the running coroutine; named or left out, closing the coroutine that is making the call does not return here at all — the resume that started it returns instead. The main line of execution is still refused. An error object of `nil` is also replaced by a string before it is reported, so a coroutine that stopped by calling `error()` with no argument at all is reported here with a string where 5.4 reports `nil`."
+  }
+}

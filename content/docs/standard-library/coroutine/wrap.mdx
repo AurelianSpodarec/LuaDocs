@@ -1,8 +1,149 @@
 ---
 title: coroutine.wrap()
-description: ""
+description: Turn a function into a coroutine driven by an ordinary function call, with no status to read.
+lua-compat: coroutine.wrap
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.wrap
 ---
 
-{/* Not yet written. */}
+Turns a function into a coroutine and hands back a function that resumes it. Calling that
+function does what [`coroutine.resume()`](/docs/standard-library/coroutine/resume) does —
+control goes in, values come back — with the status left off: whatever the coroutine handed
+over is returned directly, and a failure inside it is raised here rather than reported.
+
+<RunnableExample code={`local next_line = coroutine.wrap(function()\n  coroutine.yield("dear sir")\n  coroutine.yield("we regret to inform you")\n  return "yours faithfully"\nend)\n\nprint(next_line())\nprint(next_line())\nprint(next_line())\n-- Expected output:\n-- dear sir\n-- we regret to inform you\n-- yours faithfully`} />
+
+## Syntax
+
+```lua
+coroutine.wrap(f)
+```
+
+<Parameters>
+  <Param name="f">The function the new coroutine runs — its body, checked here exactly as [`coroutine.create()`](/docs/standard-library/coroutine/create) checks it.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function">A function that resumes the coroutine each time it is called. Its arguments travel in the way a resume's do, and its results are the values the coroutine handed over, with no status in front of them.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is anything other than a function. That check happens here, where the coroutine is made, rather than at the first call of the function handed back.
+- Raises rather than reports. A failure inside the body travels out through this call instead of arriving as a value.
+- Raises when the coroutine has nothing left to run, or is one that could not be resumed anyway. There is no status here for a refusal to arrive as, so it takes the same route a failure does.
+- <Only before="5.2">Raises when the suspension would have to cross a metamethod, a generic `for` loop's iterator, or a protected call.</Only>
+
+</Errors>
+
+## Description
+
+What comes back is an ordinary function holding one coroutine. Each call goes to *that*
+coroutine, so the calls are a sequence rather than independent: the first starts the body,
+the second picks it up where the first left it, and so on until the body runs out. Two
+wrappers made from the same function hold two coroutines and do not interfere; one wrapper
+called twice is one coroutine, twice.
+
+Values cross in both directions as they do through a resume. Arguments to the wrapper fill
+in the body's parameters on the first call and become the results of the
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield) the body is parked in on
+every call after that. What comes back is what the body passed to that yield, or what it
+returned when it finished — and nothing else, since the boolean
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
+puts in front of those values is exactly what this call drops.
+
+The coroutine itself is not handed out. `coroutine.create()` gives you a `thread` you can
+ask about; this gives you a function, and the coroutine behind it is not part of what the
+call returns — so the calls that take a handle have nothing here to be pointed at. A body
+that needs its own handle can ask
+[`coroutine.running()`](/docs/standard-library/coroutine/running) for it.
+
+Dropping the status is what makes a wrapper usable where a plain function is expected, and
+a [generic `for`](/docs/language/statements/generic-for) loop is the case that comes up
+most: the loop calls its iterator and stops when the first value back is `nil`, which is
+what a body that has run out of work produces by returning nothing. A producer written as
+straight-line code with a yield in the middle of it therefore reads as an iterator with no
+adapter in between.
+
+## How a failure reaches the caller
+
+This is the difference from `coroutine.resume()` that decides which of the two to reach
+for, and it runs in both directions. A resume catches a failure and reports it: the call returns `false` and the
+[error object](/docs/standard-library/globals/error#what-an-error-carries), and the code
+around it carries on. A wrapper does not catch it. The failure keeps travelling, out of the
+coroutine and on past the call, and stops wherever the next
+[protected call](/docs/standard-library/globals/pcall) is — which may be nowhere, in which
+case it ends the program. Code that wants a failure as a value puts the wrapper call inside
+a `pcall()` and gets back the same two values a resume would have handed it.
+
+The error object arriving at the caller is the one the body raised, with one adjustment:
+when it is a string, the position of the *call to the wrapper* is written on the front of
+it. The message the body raised usually carries a position already, so what a handler
+receives has two of them in it — the line inside the coroutine where the error was raised,
+and the line outside it where the wrapper was called. An error object of another type
+travels through unchanged, which is one reason for raising a table rather than a string
+where a program is going to read the object rather than print it.
+
+Once a failure has passed through, the coroutine is finished, and the closing methods of
+anything a [to-be-closed variable](/docs/language/statements/to-be-closed-variables) in the
+body was standing over are run on the way out. A failure reported by `coroutine.resume()`
+leaves that undone — the coroutine keeps its stack exactly as it stopped, and
+[`coroutine.close()`](/docs/standard-library/coroutine/close) is what runs those closing
+methods. Either way there is nothing left to resume: calling the wrapper again raises
+again, this time to say there is no work to pick up.
+
+## Examples
+
+### A producer read by a `for` loop
+
+<RunnableExample code={`local function words_of(sentence)\n  return coroutine.wrap(function()\n    for word in sentence:gmatch("%a+") do\n      coroutine.yield(word)\n    end\n  end)\nend\n\nfor word in words_of("the quick brown fox") do\n  print(word)\nend\n-- Expected output:\n-- the\n-- quick\n-- brown\n-- fox`} />
+
+`words_of` hands the loop a function, and the loop asks it for the next value the way it
+would ask any iterator. When the body's own loop runs out the body returns nothing, the
+first value back is `nil`, and the `for` stops.
+
+### Values travelling in as well as out
+
+<RunnableExample code={`local running_total = coroutine.wrap(function(opening_balance)\n  local balance = opening_balance\n  while true do\n    balance = balance + coroutine.yield(balance)\n  end\nend)\n\nprint(running_total(100))\nprint(running_total(-30))\nprint(running_total(12))\n-- Expected output:\n-- 100\n-- 70\n-- 82`} />
+
+The `100` fills in `opening_balance`; the two after it are read by the
+`coroutine.yield()` the body is parked in. The body never returns, and it does not need to:
+it is driven one call at a time and holds its own state between them, which is a running
+total written without a variable outside the function to keep it in.
+
+### A failure, and what comes after it
+
+<RunnableExample code={`local read_reading = coroutine.wrap(function()\n  coroutine.yield(12)\n  error("sensor stopped responding")\nend)\n\nprint(read_reading())\nlocal completed, reason = pcall(read_reading)\nprint(completed)\nprint(type(reason))\nlocal resumed_again = pcall(read_reading)\nprint(resumed_again)\n-- Expected output:\n-- 12\n-- false\n-- string\n-- false`} />
+
+The first call returns the yielded value as an ordinary result. The second raises, and the
+`pcall()` around it is what turns the failure back into the pair a resume would have
+handed over. The third is refused, because the coroutine stopped when it failed — and that
+refusal is raised too, so it needs the same `pcall()` to be seen as a value.
+
+## Gotchas
+
+<Gotcha title="A wrapper is one coroutine, not a supply of them">
+`coroutine.wrap(build_report)` looks like a function you can call whenever you want a
+report, and it is a function you can call until the coroutine behind it runs out. After
+that every call raises. Code that wants a fresh run each time calls `coroutine.wrap()`
+again to get a fresh wrapper — which is cheap, and is why the pattern is usually a small
+factory function that returns a new wrapper, like `words_of` above.
+</Gotcha>
+
+<Gotcha title="A caught failure is not spelled the way the body raised it">
+The position of the call to the wrapper is added to a string error object on its way out,
+so a handler that matches the message against a pattern, or compares it against the string
+the body passed to [`error()`](/docs/standard-library/globals/error), is reading something
+longer than what was raised. Where the object has to survive the trip intact, raise a table
+and read a field off it — a table is handed on as it stands.
+</Gotcha>
+
+## See also
+
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — the same transfer, with a status instead of a raised failure
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — the same coroutine, handed out as a handle
+- [`coroutine.yield()`](/docs/standard-library/coroutine/yield) — how the body hands values back through this call
+- [`coroutine.close()`](/docs/standard-library/coroutine/close) — closing a coroutine a resume left standing
+- [`pcall()`](/docs/standard-library/globals/pcall) — turning the failure this raises back into a value
+- [Generic `for`](/docs/language/statements/generic-for) — the loop a wrapper feeds directly
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

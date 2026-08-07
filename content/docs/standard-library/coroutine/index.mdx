@@ -1,8 +1,95 @@
 ---
 title: coroutine
-description: ""
+description: Lua's collaborative multitasking — making a line of execution that can stop part-way through, handing control in and out of it, asking where it stands, and ending it.
+lua-compat: coroutine.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.3
 ---
 
-{/* Not yet written. */}
+A coroutine is a line of execution that can stop in the middle of what it is doing, hand
+control back, and later be picked up from exactly where it stopped, with its locals and its
+call stack still standing. This is the library that makes them and drives them, and its
+functions live in the table `coroutine`. A coroutine is handed out as a value of type
+`thread` — the same type the main line of execution has, which is why
+[`type()`](/docs/standard-library/globals/type) answers `"thread"` rather than anything with
+the word *coroutine* in it.
+
+The manual's own word for this is *collaborative* multitasking, and the first half of it is
+the part worth reading twice. One line of execution runs at a time, and a coroutine gives
+that up when its own code says so, by calling
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield) — never because something
+outside it decided the moment had come. It starts again when something calls
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides).
+The suspension works however deep in its own helpers the coroutine happens to be: the
+resume returns immediately, and every frame between the yield and the body is left standing
+for the next resume to carry on from.
+
+Nothing here is a scheduler. There is no queue of runnable coroutines, no clock, and no call
+that picks whichever one is ready — a program that wants several of them to take turns
+writes that loop itself, out of the calls below. The same coroutines are reachable from a C
+host too, through `lua_newthread`, `lua_resume` and `lua_yield`.
+
+<RunnableExample code={`local sentences = { "the parcel arrived", "the seal was broken", "we have refunded you" }\n\nlocal narrator = coroutine.create(function()\n  for index = 1, #sentences do\n    coroutine.yield(sentences[index])\n  end\n  return "the end"\nend)\n\nrepeat\n  print(select(2, coroutine.resume(narrator)))\nuntil coroutine.status(narrator) == "dead"\n-- Expected output:\n-- the parcel arrived\n-- the seal was broken\n-- we have refunded you\n-- the end`} />
+
+The body is written as though it ran straight through, and the loop around it drives it one
+step at a time. All four resumes report success — three because the body suspended and the
+fourth because it finished, a distinction the status does not draw, which is why the loop
+asks [`coroutine.status()`](/docs/standard-library/coroutine/status) instead of trying to
+read the answer off the values.
+
+<Note>
+A coroutine cannot suspend from wherever it happens to be standing. A function written in C
+that makes no provision for being interrupted is a wall: a yield inside a comparison handed
+to [`table.sort()`](/docs/standard-library/table/sort), or inside a replacement function
+handed to [`string.gsub()`](/docs/standard-library/string/gsub), raises rather than
+suspending. So does a yield on the main line of execution, which nothing resumed and which
+therefore has nowhere to suspend to.
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield#where-a-coroutine-may-not-suspend)
+sets out where the boundary falls, including the Lua-side constructs it has not always been
+transparent to.
+</Note>
+
+Which names this table holds has grown twice and shrunk never. Each entry's own version
+support says where its line falls, and the sidebar dims what your selected version does not
+have.
+
+## Making a coroutine
+
+Two ways to turn a function into one. They differ in what they hand back, and that choice
+decides how the rest of the code reads.
+
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — a function turned into a coroutine and handed back as a handle, with nothing run yet
+- [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) — the same, handed back as a plain function that resumes the coroutine each time it is called
+
+## Passing control across
+
+The handover itself, from each of the two sides. One call sends control into the coroutine;
+the other sends it back out. Values cross in both directions each time.
+
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — control handed to a coroutine, and a status plus whatever it hands over when it stops
+- [`coroutine.yield()`](/docs/standard-library/coroutine/yield) — the running coroutine stopped where it stands, with its arguments handed to whoever resumed it
+
+## Asking where a coroutine stands
+
+Three questions with three different subjects: what a coroutine is doing, which one is
+executing, and whether a suspension would be accepted from where the code is.
+
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — what a coroutine is doing, as one of four words
+- [`coroutine.running()`](/docs/standard-library/coroutine/running) — which coroutine is executing, asked from inside it
+- [`coroutine.isyieldable()`](/docs/standard-library/coroutine/isyieldable) — whether a suspension would be accepted from where the code is standing, on the lines that have it
+
+## Ending one deliberately
+
+A coroutine that stops in a yield and is never resumed again has left none of the scopes it
+is standing in, so what it is still holding is not released. One call ends it on purpose.
+
+- [`coroutine.close()`](/docs/standard-library/coroutine/close) — a stopped coroutine put into the dead state, with whatever its body still held released, on the lines that have it
+
+## See also
+
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms
+- [`thread`](/docs/language/values-and-types/thread) — the value type a coroutine handle is
+- [Generic `for`](/docs/language/statements/generic-for) — the loop a wrapped coroutine feeds directly
+- [`pcall()`](/docs/standard-library/globals/pcall) — protection that a suspension does not break, and the way to catch what a wrapper raises
+- [To-be-closed variables](/docs/language/statements/to-be-closed-variables) — what a coroutine holds on to when it stops part-way through
+- [`type()`](/docs/standard-library/globals/type) — the call that names a coroutine handle `"thread"`
