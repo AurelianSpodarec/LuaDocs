@@ -7,13 +7,11 @@ import {
   DocsDescription,
   DocsPage,
   DocsTitle,
-  MarkdownCopyButton,
-  ViewOptionsPopover,
   // Paired with the notebook layout below — `DocsPage` reads a context its layout
   // provides, and the `docs` build of it throws under a notebook `DocsLayout`.
 } from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from '@/lib/layout.shared';
-import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
+import { encodeMarkdownUrl } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense, use, useMemo, useState } from 'react';
@@ -76,13 +74,11 @@ const loader = createServerFn({
 
 function Content({
   path,
-  markdownUrl,
   luaCompat,
   sourceUrl,
   reviewed,
 }: {
   path: string;
-  markdownUrl: string;
   luaCompat: string | null;
   sourceUrl: string | null;
   reviewed: string | null;
@@ -113,19 +109,33 @@ function Content({
     <DocsPage toc={fullToc} footer={{ enabled: false }} breadcrumb={{ enabled: false }}>
       <DocsTitle className={entryTitleClass}>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
-      {/* Above the copy row and the strip, because it is not a detail about the entry —
-          it invalidates it. Everything below describes something the reader cannot call,
-          and the further down this sits the more of that they read first. */}
+      {/* Above the strip, because it is not a detail about the entry — it invalidates
+          it. Everything below describes something the reader cannot call, and the
+          further down this sits the more of that they read first. */}
       {node && <VersionUnavailable node={node} />}
       {/* The version switcher used to sit here. It moved to the header, where it is
           visible on every page rather than only on entries (ADR 0007). */}
-      <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
-        <MarkdownCopyButton markdownUrl={markdownUrl} />
-        <ViewOptionsPopover
-          markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
-        />
-      </div>
+      {/*
+        Fumadocs's page-actions row sat here — Copy Markdown, plus a popover holding
+        View as Markdown, Open in GitHub and four AI deep links. It is removed until
+        the content pipeline (slice 3) fixes what it was serving.
+
+        Every item but one pointed at `/docs/**.md`, which `getLLMText` builds from the
+        MDX body alone. That body is not a degraded copy of the page, it is a
+        contradictory one: both arms of an `<Only before/since>` pair arrive adjacent
+        and unlabelled, so `error()` exports one sentence saying `nil` reaches a catcher
+        as `nil` and the next saying it does not. Examples arrive as `code={`…\n…`}`
+        attributes, and the version matrix and the manual citation are rendered here
+        rather than authored, so neither reaches the export — the citation being an
+        attribution the licence requires (ADR 0003).
+
+        Handing that to a model, on a site whose whole premise is being right about
+        versions, is worse than offering nothing: the reader cannot see what was
+        exported, and there is no way to caveat a clipboard.
+
+        The remaining item, Open in GitHub, is sound but duplicates "Improve this page"
+        in the provenance panel at the foot, which resolves to the same file.
+      */}
       {node && (
         <div className="flex flex-col gap-3">
           <VersionSupportStrip node={node} />
@@ -223,7 +233,6 @@ function Page() {
         <Suspense>
           <Content
             path={path}
-            markdownUrl={markdownUrl}
             luaCompat={luaCompat}
             sourceUrl={sourceUrl}
             reviewed={reviewed}

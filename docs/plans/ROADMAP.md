@@ -106,6 +106,30 @@ specifically because "the prerendered page, the `.md` route, and `llms.txt` are 
 read", and one of those three is now unreadable. Slice 3 owns it, alongside the CI
 verification that every runnable example still runs.
 
+**Amended 2026-08-07: it is contradictory, not merely incomplete, and the UI exposing it
+has been removed.** Reading a real body rather than reasoning about the pipeline turned
+up the sharper failure: `<Only before="…">` and `<Only since="…">` both survive into the
+export, adjacent and unlabelled. So `error()`'s markdown states that `nil` reaches a
+catcher as `nil` and then states that it does not, with nothing saying which version
+either sentence belongs to. "No version data" understates it — a reader or a model gets
+version data that is false.
+
+Fumadocs's page-actions row — Copy Markdown, plus a popover holding View as Markdown,
+Open in GitHub and four AI deep links — is therefore **deleted from the entry page**
+rather than left pointing at that. Handing a model a self-contradictory export, on a
+site whose premise is being right about versions, is worse than offering nothing:
+nothing on screen tells the reader what was exported, and a clipboard cannot carry a
+caveat. Open in GitHub was the one sound item and duplicated "Improve this page" in the
+provenance panel ([ADR 0011](../adr/0011-the-foot-of-an-entry.md)).
+
+**Slice 3 restores Copy Markdown when the export is trustworthy, and only that.** It is
+the item worth having, and worth more here than on most documentation sites — version
+confusion is exactly what a model gets wrong about Lua, so an export that carries the
+deltas is the fix for a real failure. The four vendor deep-links do not come back:
+Copy Markdown does the same job without betting the page's chrome on which AI products
+still exist in two years. The `.md` route and `llms.txt` themselves stay live throughout
+— this removes the affordance, not the surface, and slice 4 still needs them.
+
 **Owed to CI: the link check must run against build output, not the dev server.** The
 dev server answers every path with the same 200 SPA shell — nonsense routes included —
 so a crawl of it can never 404 and would pass over a wholly broken set of links. The
