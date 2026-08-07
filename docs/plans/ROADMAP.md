@@ -239,6 +239,16 @@ the sidebar, search index and `llms.txt` first.
 - **Blog** — optional, explicitly deferred.
 - **Sentiment metric (👍/👎)** — parked; did not clear the "is this worth a backend?"
   bar (ADR 0004).
+- **Translations, prioritised by analytics.** Once the site is deployed and there are
+  readership numbers, translate in the order the analytics support. The candidate
+  languages:
+
+  🇷🇺 Russian · 🇨🇳 Simplified Chinese · 🇧🇷 Portuguese · 🇵🇱 Polish · 🇮🇹 Italian ·
+  🇪🇸 Spanish · 🇯🇵 Japanese · 🇩🇪 German
+
+  The analytics decide the order and how far down the list to go. Locale routing does
+  not exist yet, so the content pipeline (slice 3) is the cheap moment to leave room
+  for it.
 
 ## `string` is finished (2026-08-05)
 
