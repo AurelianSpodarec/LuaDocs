@@ -1,5 +1,6 @@
 export const appName = 'LuaDocs';
 export const docsRoute = '/docs';
+export const blogRoute = '/blog';
 export const docsImageRoute = '/og/docs';
 
 export const gitConfig = {
