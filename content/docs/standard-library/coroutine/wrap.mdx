@@ -30,6 +30,7 @@ coroutine.wrap(f)
 <Errors>
 
 - Raises when `f` is anything other than a function. That check happens here, where the coroutine is made, rather than at the first call of the function handed back.
+- <Only before="5.2">Raises when `f` is a function written in C rather than one written in Lua, such as `print` or `string.format`.</Only>
 - Raises rather than reports. A failure inside the body travels out through this call instead of arriving as a value.
 - Raises when the coroutine has nothing left to run, or is one that could not be resumed anyway. There is no status here for a refusal to arrive as, so it takes the same route a failure does.
 - <Only before="5.2">Raises when the suspension would have to cross a metamethod, a generic `for` loop's iterator, or a protected call.</Only>
@@ -54,9 +55,10 @@ puts in front of those values is exactly what this call drops.
 
 The coroutine itself is not handed out. `coroutine.create()` gives you a `thread` you can
 ask about; this gives you a function, and the coroutine behind it is not part of what the
-call returns — so the calls that take a handle have nothing here to be pointed at. A body
-that needs its own handle can ask
-[`coroutine.running()`](/docs/standard-library/coroutine/running) for it.
+call returns. Code that needs the handle has to get it from somewhere else — a body can ask
+[`coroutine.running()`](/docs/standard-library/coroutine/running) for its own, and the
+[debug library](/docs/standard-library/debug) can read it back off the wrapper as an upvalue,
+which is a debugging tool rather than a design.
 
 Dropping the status is what makes a wrapper usable where a plain function is expected, and
 a [generic `for`](/docs/language/statements/generic-for) loop is the case that comes up
@@ -67,22 +69,26 @@ adapter in between.
 
 ## How a failure reaches the caller
 
-This is the difference from `coroutine.resume()` that decides which of the two to reach
-for, and it runs in both directions. A resume catches a failure and reports it: the call returns `false` and the
+This is the difference from `coroutine.resume()` that decides which of the two to reach for,
+and it runs in both directions. A resume catches a failure and reports it: the call returns
+`false` and the
 [error object](/docs/standard-library/globals/error#what-an-error-carries), and the code
 around it carries on. A wrapper does not catch it. The failure keeps travelling, out of the
 coroutine and on past the call, and stops wherever the next
 [protected call](/docs/standard-library/globals/pcall) is — which may be nowhere, in which
 case it ends the program. Code that wants a failure as a value puts the wrapper call inside
-a `pcall()` and gets back the same two values a resume would have handed it.
+a `pcall()`, which reports it as a status and one value, in the shape a resume reports it.
 
-The error object arriving at the caller is the one the body raised, with one adjustment:
-when it is a string, the position of the *call to the wrapper* is written on the front of
-it. The message the body raised usually carries a position already, so what a handler
-receives has two of them in it — the line inside the coroutine where the error was raised,
-and the line outside it where the wrapper was called. An error object of another type
-travels through unchanged, which is one reason for raising a table rather than a string
-where a program is going to read the object rather than print it.
+What that one value holds is not always what a resume would have handed over. A string
+error object has the position of the *call to the wrapper* written on the front of it on its
+way out. The message the body raised usually carries a position already, so a handler can
+receive a message with two of them in it — the line inside the coroutine where the error was
+raised, and the line outside it where the wrapper was called — where the same body through a
+resume gives one. Which position is added depends on what called the wrapper: called straight
+from `pcall()` it picks up nothing, a function written in C having no line to name, and
+called from a function that `pcall()` is protecting it picks up that function's line.
+Raising a table rather than a string is the way to have a program read the object back
+exactly as the body raised it.
 
 Once a failure has passed through, the coroutine is finished, and the closing methods of
 anything a [to-be-closed variable](/docs/language/statements/to-be-closed-variables) in the
@@ -116,9 +122,19 @@ total written without a variable outside the function to keep it in.
 <RunnableExample code={`local read_reading = coroutine.wrap(function()\n  coroutine.yield(12)\n  error("sensor stopped responding")\nend)\n\nprint(read_reading())\nlocal completed, reason = pcall(read_reading)\nprint(completed)\nprint(type(reason))\nlocal resumed_again = pcall(read_reading)\nprint(resumed_again)\n-- Expected output:\n-- 12\n-- false\n-- string\n-- false`} />
 
 The first call returns the yielded value as an ordinary result. The second raises, and the
-`pcall()` around it is what turns the failure back into the pair a resume would have
-handed over. The third is refused, because the coroutine stopped when it failed — and that
-refusal is raised too, so it needs the same `pcall()` to be seen as a value.
+`pcall()` around it is what turns the failure back into a status and a value. The third is
+refused, because the coroutine stopped when it failed — and that refusal is raised too, so
+it needs the same `pcall()` to be seen as a value.
+
+### Where the caught message differs from the reported one
+
+<RunnableExample code={`local function fail()\n  error("sensor stopped responding")\nend\n\nlocal reported = select(2, coroutine.resume(coroutine.create(fail)))\nlocal raised_from_pcall = select(2, pcall(coroutine.wrap(fail)))\nlocal raised_from_lua = select(2, pcall(function() return coroutine.wrap(fail)() end))\n\nprint(raised_from_pcall == reported)\nprint(raised_from_lua == reported)\nprint(#raised_from_lua > #reported)\n-- Expected output:\n-- true\n-- false\n-- true`} />
+
+Three routes out of the same body. The resume reports the message the `error()` built. A
+wrapper handed straight to `pcall()` produces the same string, because there is no Lua line
+at the call site to name. A wrapper called from inside a protected function produces a
+longer one — that function's position, in front of everything the resume would have given
+you.
 
 ## Gotchas
 

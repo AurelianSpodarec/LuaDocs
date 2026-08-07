@@ -27,7 +27,7 @@ coroutine.resume(co [, val1, ···])
 
 <Returns>
   <Return type="boolean">The status: `true` when the coroutine suspended or finished, `false` when it failed or could not be resumed at all.</Return>
-  <Return type="any">On the `true` path, the values the coroutine handed over — those passed to [`coroutine.yield()`](/docs/standard-library/coroutine/yield) if it suspended, or those its body returned if it finished, as many as there were or none at all. On the `false` path, exactly one value — the [error object](/docs/standard-library/globals/error#what-an-error-carries) the failure carried, or a description of why the coroutine could not be resumed — and nothing after it.</Return>
+  <Return type="any">On the `true` path, the values the coroutine handed over — those passed to [`coroutine.yield()`](/docs/standard-library/coroutine/yield) if it suspended, or those its body returned if it finished, as many as there were or none at all. A coroutine that ended by closing itself hands over nothing and arrives on this same path. On the `false` path, exactly one value — the [error object](/docs/standard-library/globals/error#what-an-error-carries) the failure carried, or a description of why the coroutine could not be resumed — and nothing after it.</Return>
 </Returns>
 
 <Errors>
@@ -40,15 +40,18 @@ coroutine.resume(co [, val1, ···])
 
 ## Description
 
-A resume that actually reaches the coroutine ends in one of three ways, and the status is
-the first thing that tells them apart. The coroutine suspended, and `true` comes back with
-the values it passed to [`coroutine.yield()`](/docs/standard-library/coroutine/yield). Or its
-body returned, and `true` comes back with the values it returned. Or something inside it
-raised, and `false` comes back with the error object.
+A resume that actually reaches the coroutine comes back in one of three shapes, and the
+status is the first thing that tells them apart. The coroutine suspended, and `true` comes
+back with the values it passed to
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield). Or the coroutine stopped for
+good without failing, and `true` comes back with whatever it handed over on the way — the
+values its body returned, or none at all. Or something inside it raised, and `false` comes
+back with the error object.
 
 The first two are both `true`, deliberately: from the resuming side a suspension and a
-finish look alike, because in both cases the coroutine handed over some values and stopped
-running. What separates them is whether the coroutine can be resumed again, and
+finish look alike, because in both cases the coroutine stopped running and whatever it had
+for the resuming side arrived after the status. What separates them is whether the coroutine
+can be resumed again, and
 [`coroutine.status()`](/docs/standard-library/coroutine/status) is what answers that.
 
 A resume that never reaches the coroutine — because it is finished, or because it is not
@@ -79,6 +82,14 @@ after the status. A suspension can happen at any depth: the body may be six call
 helpers of its own when it yields, and the whole of that stack stays frozen exactly as it
 was. Nothing is unwound and nothing is re-run; the next resume continues from inside that
 sixth call as though `coroutine.yield()` had simply returned.
+
+There is a fourth way out of the body, and it makes no fourth shape here. A body that calls
+[`coroutine.close()`](/docs/standard-library/coroutine/close) on the coroutine it is itself
+running never returns from that call: the coroutine is closed where it stands, and this
+resume returns `true` with nothing after it — which is what a body returning no values
+produces as well, so the resuming side cannot tell the two apart. Should a closing method
+raise on the way out, it arrives here as `false` and that error object, in the shape a
+failure takes.
 
 Two values, then, cross in opposite directions at each handover, and neither has anything to
 do with the other. The arguments to a resume are read by the yield inside the coroutine; the
@@ -124,10 +135,11 @@ value the caller can recognise as its last.
 </Gotcha>
 
 <Gotcha title="There is no way to restart one">
-A coroutine that has returned or failed stays finished, and resuming it again reports the
-refusal rather than running the body a second time. Repeating the work means building a new
-coroutine from the same function — which is cheap, and is why producer functions are usually
-kept around and turned into coroutines on demand rather than stored as coroutines.
+A coroutine that has returned, failed or been closed stays finished, and resuming it again
+reports the refusal rather than running the body a second time. Repeating the work means
+building a new coroutine from the same function — which is cheap, and is why producer
+functions are usually kept around and turned into coroutines on demand rather than stored as
+coroutines.
 </Gotcha>
 
 ## See also

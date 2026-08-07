@@ -6,11 +6,11 @@ entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.close
 ---
 
-Ends a coroutine that has stopped. Anything the body was still holding through a
-[to-be-closed variable](/docs/language/statements/to-be-closed-variables) is closed, the
-coroutine moves to the `"dead"` state, and a status comes back saying whether that went
-cleanly. A coroutine parked in a yield that nothing will resume again does not release what
-it is still holding on its own, which is what this call is for.
+Ends a coroutine. Anything its body was still holding through a
+[to-be-closed variable](/docs/language/statements/to-be-closed-variables) is closed and the
+coroutine moves to the `"dead"` state, with a status coming back to say whether that went
+cleanly. What it is for is a coroutine that has stopped: one parked in a yield that nothing
+will resume again does not release what it is still holding on its own.
 
 <RunnableExample code={`local stock_take = coroutine.create(function()\n  coroutine.yield("shelves counted")\n  return "stockroom counted"\nend)\n\nprint(select(2, coroutine.resume(stock_take)))\nprint(coroutine.close(stock_take))\nprint(coroutine.status(stock_take))\n-- Expected output:\n-- shelves counted\n-- true\n-- dead`} />
 
@@ -52,6 +52,7 @@ coroutine.close([co])
 - Raises when the coroutine named is waiting on another one it resumed. It is on the stack in the middle of its own [`coroutine.resume()`](/docs/standard-library/coroutine/resume) rather than stopped.
 - Raises when the coroutine named is the main line of execution.
 - <Only before="5.5">Raises when the coroutine named is the one making the call.</Only>
+- <Only before="5.5">Raises when no argument is given at all. There is no coroutine this call defaults to.</Only>
 
 </Errors>
 
@@ -83,6 +84,8 @@ says so, and [`coroutine.resume()`](/docs/standard-library/coroutine/resume) rep
 refusal it reports for any other dead coroutine, so a suspended coroutine closed part-way
 through never runs the rest of its body.
 
+<Only since="5.5">
+
 Named the coroutine that is making the call, this does not return at all. The coroutine is
 closed where it stands, and the
 [resume that started it](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
@@ -90,6 +93,8 @@ returns instead, in the shape it would have taken had the body simply run out wi
 to hand over. A closing method that raises on the way out is reported to that resume rather
 than here, since there is no *here* left to report it to. The statement after the call is
 not reached.
+
+</Only>
 
 ## Examples
 
@@ -128,11 +133,10 @@ going to get. Where the outcome matters, keep what the first close said.
 </Gotcha>
 
 <Gotcha title="It is not a way to stop another coroutine mid-flight">
-This ends a coroutine that has already stopped; it is not an interruption of one that has
-not. A coroutine waiting on another one it resumed is refused, and so is the main line of
-execution. Nothing in this library reaches into a coroutine part-way through a statement and
-unwinds it — a coroutine that should be able to be cancelled has to yield often enough to
-be told so, and stop itself.
+A coroutine that is still going cannot be stopped from outside it. One waiting on another it
+resumed is refused, and so is the main line of execution, so there is no reaching into a
+coroutine part-way through a statement and unwinding it. A coroutine that should be able to
+be cancelled has to yield often enough to be told so, and stop itself.
 </Gotcha>
 
 ## See also

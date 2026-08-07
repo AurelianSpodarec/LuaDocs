@@ -2,7 +2,7 @@
   "support": { "lua": { "version_added": "5.1" } },
   "changed_in": {
     "5.2": "Accepts a function written in C as the body, where 5.1 tests for one written in Lua and refuses `coroutine.wrap(print)`. The same release stops refusing a suspension from inside a protected call, a metamethod or a generic `for` loop's iterator: on 5.1 a body that yields from one of those makes the call to the wrapper raise, and from here on it returns the yielded values like any other suspension.",
-    "5.3": "A number raised as the error object arrives at the caller as a number. Before this a number is turned into a string on its way out, with the position of the call to the wrapper written on the front of it, exactly as a string error object still is. A value of any other type travels through untouched on every line.",
+    "5.3": "A number raised as the error object arrives at the caller as a number. Before this a number is turned into a string on its way out, with the position of the call to the wrapper written on the front of it, exactly as a string error object still is. A table has travelled through untouched on every line.",
     "5.4": "Closes the coroutine before the error travels on. A body that fails with a to-be-closed variable still in scope has its closing method run here, where `coroutine.resume()` leaves it pending and `coroutine.close()` is what runs it.",
     "5.5": "An error object of `nil` is replaced by a string before it propagates, so a body that calls `error()` with no argument at all raises a string here where earlier versions raise `nil`."
   }
