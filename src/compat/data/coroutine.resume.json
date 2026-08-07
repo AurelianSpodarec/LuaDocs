@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Reports `true` for bodies that used to fail. A coroutine that suspends from inside a protected call, a metamethod or a generic `for` loop's iterator is refused in 5.1, so the resume that started it comes back `false` with an error object; from here on the same body suspends and the yielded values arrive after the status."
+  }
+}

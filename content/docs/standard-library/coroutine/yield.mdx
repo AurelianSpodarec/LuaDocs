@@ -1,8 +1,127 @@
 ---
 title: coroutine.yield()
-description: ""
+description: Suspend the running coroutine and hand values to whoever resumed it.
+lua-compat: coroutine.yield
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.yield
 ---
 
-{/* Not yet written. */}
+Stops the coroutine that is running and hands its arguments back to the
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume) waiting on it. The call has
+not finished, though: everything the coroutine was in the middle of stays exactly as it is,
+and when the coroutine is resumed again this call returns, handing back whatever that resume
+passed in.
+
+<RunnableExample code={`local weather_log = coroutine.create(function()\n  coroutine.yield("monday", 14)\n  coroutine.yield("tuesday", 17)\n  return "week so far"\nend)\n\nprint(coroutine.resume(weather_log))\nprint(coroutine.resume(weather_log))\nprint(coroutine.resume(weather_log))\n-- Expected output:\n-- true\tmonday\t14\n-- true\ttuesday\t17\n-- true\tweek so far`} />
+
+## Syntax
+
+```lua
+coroutine.yield(···)
+```
+
+<Parameters>
+  <Param name="···">Values to hand to the waiting [`coroutine.resume()`](/docs/standard-library/coroutine/resume), which receives them after its status. As many as wanted, or none.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The values the *next* resume passes after the coroutine — in the order given, as many as there were, or none at all.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when there is nothing waiting to receive control. Code on the main line of execution was never resumed by anybody, so it has nowhere to suspend to.
+- Raises when suspending would mean abandoning a C function part-way through that makes no provision for being interrupted — a comparison handed to [`table.sort()`](/docs/standard-library/table/sort), or a replacement function handed to [`string.gsub()`](/docs/standard-library/string/gsub).
+- <Only before="5.2">Raises when the suspension would have to cross a metamethod, a generic `for` loop's iterator, or a protected call.</Only>
+
+</Errors>
+
+## Description
+
+A yield is not a return. The coroutine's whole call stack survives it — every frame, every
+local, every argument, however deep in helpers of its own the body happened to be. Control
+leaves, and the coroutine sits stopped at this exact point until somebody resumes it, at
+which point this call returns and the body carries on with the next statement as though
+nothing had happened in between.
+
+The values crossing in the two directions are unrelated. What this call hands *out* reaches
+the waiting `coroutine.resume()`, arriving after its `true` status. What it later hands
+*back* is written by whichever resume revives the coroutine, which may be a different call
+site entirely and may happen much later. A yield that passes three values can return none,
+and a yield that passes none can return three; the two counts have nothing to do with each
+other. [`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
+covers the full round trip.
+
+## Where a coroutine may not suspend
+
+What decides whether a suspension is possible is what lies between this call and the resume
+that started the coroutine. Lua's own machinery is transparent to it: nested function calls,
+a metamethod standing in for an operator or an index, the iterator driving a generic `for`
+loop, and a [protected call](/docs/standard-library/globals/pcall) are all crossed without
+complaint, and a body wrapped end to end in `pcall()` can still suspend with its protection
+intact.
+
+What is not crossable is a C function that was not written to be interrupted and picked up
+again. Several library functions call back into Lua code — [`table.sort()`](/docs/standard-library/table/sort)
+asks a comparison function which of two values comes first,
+[`string.gsub()`](/docs/standard-library/string/gsub) asks a replacement function what a
+match becomes — and a yield inside one of those callbacks has to abandon the library
+function's own half-finished work to get out, which it refuses to do. The way round it is to
+keep the suspension out of the callback: collect what is needed first, suspend after the
+library call has returned, and act on the result then.
+
+One case sits outside that rule entirely: the main line of execution cannot suspend at all.
+Nothing resumed it, so there is nowhere for control to go, and a call here raises no matter
+what it is nested inside.
+
+## Examples
+
+### Suspending from deep inside the body
+
+<RunnableExample code={`local function checkpoint(label)\n  coroutine.yield(label)\nend\n\nlocal function run_migration()\n  checkpoint("schema")\n  checkpoint("data")\n  return "migration complete"\nend\n\nlocal migration = coroutine.create(run_migration)\nprint(select(2, coroutine.resume(migration)))\nprint(select(2, coroutine.resume(migration)))\nprint(select(2, coroutine.resume(migration)))\n-- Expected output:\n-- schema\n-- data\n-- migration complete`} />
+
+Neither `run_migration` nor `checkpoint` knows it is inside a coroutine, and the suspension
+happens two frames below the body. Both frames are still there when the next resume arrives.
+
+### Values travelling back in
+
+<RunnableExample code={`local negotiation = coroutine.create(function()\n  local offer = coroutine.yield("what is your offer?")\n  local deadline = coroutine.yield("you said " .. offer .. ", and your deadline?")\n  return "offer " .. offer .. ", deadline " .. deadline\nend)\n\nprint(select(2, coroutine.resume(negotiation)))\nprint(select(2, coroutine.resume(negotiation, "40")))\nprint(select(2, coroutine.resume(negotiation, "friday")))\n-- Expected output:\n-- what is your offer?\n-- you said 40, and your deadline?\n-- offer 40, deadline friday`} />
+
+Each question is handed out by a yield; each answer arrives as that same yield's return value
+one resume later. The result is a conversation written as straight-line code, with no state
+machine and no callbacks.
+
+### Suspending from inside a protected call
+
+<RunnableExample code={`local risky_import = coroutine.create(function()\n  local completed, outcome = pcall(function()\n    coroutine.yield("halfway through the import")\n    return "import finished"\n  end)\n  return completed, outcome\nend)\n\nprint(select(2, coroutine.resume(risky_import)))\nprint(select(2, coroutine.resume(risky_import)))\n-- Expected output:\n-- halfway through the import\n-- true\timport finished`} />
+
+The protection is still in place across the suspension: the second resume re-enters the same
+protected call, and it reports `true` when the function inside it finally returns.
+
+## Gotchas
+
+<Gotcha title="What comes back is not what went out">
+`local answer = coroutine.yield(question)` looks like a function that transforms its
+argument, and it is nothing of the kind. `question` goes to the resuming side; `answer` is
+written later, by whoever resumes next, and can be a different count and different types
+entirely. A resume that passes nothing leaves `answer` holding `nil`, which is the usual way
+this reads as a bug rather than as a design.
+</Gotcha>
+
+<Gotcha title="A function that yields can only be used inside a coroutine">
+Once a helper calls `coroutine.yield()` anywhere in it, every caller of that helper inherits
+the requirement, all the way up. A utility written for a producer coroutine and later reused
+from ordinary code raises at the yield, at a point that has nothing obviously to do with
+coroutines. Where a helper has to work in both settings,
+[`coroutine.isyieldable()`](/docs/standard-library/coroutine/isyieldable) answers whether a
+suspension would be accepted from where it is standing.
+</Gotcha>
+
+## See also
+
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — the other half, from outside the coroutine
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — making the coroutine that suspends here
+- [`coroutine.isyieldable()`](/docs/standard-library/coroutine/isyieldable) — asking whether a suspension is possible from here
+- [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) — receiving these values through a plain function call
+- [`pcall()`](/docs/standard-library/globals/pcall) — protection that a suspension does not break
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

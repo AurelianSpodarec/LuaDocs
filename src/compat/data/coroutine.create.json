@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Accepts a function written in C as the body, not only one written in Lua. 5.1 tests for a Lua function specifically, so `coroutine.create(print)` raises there and succeeds from here on."
+  }
+}

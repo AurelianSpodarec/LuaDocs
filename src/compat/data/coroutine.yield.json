@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Suspension is no longer refused from inside a metamethod, a generic `for` loop's iterator, or a protected call. 5.1 allows a yield only where nothing written in C sits between it and the resume that started the coroutine; the barrier that remains from here on is narrower — a C function that makes no provision for being interrupted, such as the comparison handed to `table.sort()`."
+  }
+}

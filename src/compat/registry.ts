@@ -101,6 +101,9 @@ import globalsLoadstring from './data/globals.loadstring.json';
 import globalsModule from './data/globals.module.json';
 import globalsRequire from './data/globals.require.json';
 import globalsLibrary from './data/globals.library.json';
+import coroutineCreate from './data/coroutine.create.json';
+import coroutineResume from './data/coroutine.resume.json';
+import coroutineYield from './data/coroutine.yield.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -485,6 +488,46 @@ const raw: Record<string, unknown> = {
   // And there is no 5.5 note: nothing joins or leaves the section there, even though several
   // members change what they accept.
   'globals.library': globalsLibrary,
+  // The `coroutine` section, keyed on the library prefix the manual itself uses
+  // (`pdf-coroutine.create`), like `string.*`, `table.*` and `math.*`. `globals.*` is the
+  // odd one out only because a global carries no prefix in the manual at all.
+  //
+  // All three are present from 5.1 and none is named in any Incompatibilities chapter —
+  // the only coroutine entries in all four are C API signature changes (`lua_resume` gains
+  // `from` at 5.2 and an out parameter at 5.4; `lua_resetthread` is deprecated at 5.5).
+  // What did move is where a yield is allowed *from*, and it moved once, at 5.2. The 5.1
+  // manual's `coroutine.yield` passage states the restriction outright — a coroutine may
+  // not be running a C function, a metamethod or an iterator — and 5.2 drops that sentence
+  // and documents the narrower C-API rule in its place (5.2 §4.7: an error whenever Lua
+  // tries to yield across an API call, bar `lua_yieldk`, `lua_callk` and `lua_pcallk`).
+  // A dropped sentence is not on its own a behaviour change, on the ruling `math.huge`
+  // set, so it is corroborated from the source: `luaV_finishOp` does not exist in 5.1 and
+  // arrives in v5.2.0's `lvm.c` handling `OP_TFORCALL`, `OP_CALL` and the metamethod-bearing
+  // opcodes, and `luaB_pcall`/`luaB_xpcall` switch from `lua_pcall` to `lua_pcallk` with a
+  // continuation in the same release. That is the same fact `globals.pcall` records from
+  // the protected-call side, dated identically.
+  //
+  // The fact is carried on **both** `yield` and `resume` because it is observable from
+  // either side: the body refuses on 5.1, and the resume that started it therefore comes
+  // back `false`. It is deliberately absent from `create`, which runs nothing.
+  //
+  // `create`'s own note is the one place the manual and the code disagree. Every 5.1 and
+  // 5.2 passage says `f` "must be a Lua function" and 5.3 onwards says "must be a
+  // function", but 5.1's `luaB_cocreate` is the only one that enforces the stronger claim
+  // (`lua_isfunction(L, 1) && !lua_iscfunction(L, 1)`); v5.2.0 and 5.2.4 already spell it
+  // `luaL_checktype(L, 1, LUA_TFUNCTION)`, which a C function satisfies. The note is dated
+  // where the behaviour moved rather than where the manual caught up, on the ruling
+  // `globals.require` set for exactly this shape.
+  //
+  // What has *not* changed, checked rather than assumed: a comparison handed to
+  // `table.sort` is invoked with a bare `lua_call` at v5.2.0 and v5.3.0 as well as later,
+  // so that barrier stands on every line; and a coroutine's stack being left standing
+  // rather than unwound after a failure is documented on `lua_resume` from 5.1 onwards,
+  // which makes 5.4 §2.6 restating it in the Lua-level chapter a documentation move and
+  // not a `changed_in`.
+  'coroutine.create': coroutineCreate,
+  'coroutine.resume': coroutineResume,
+  'coroutine.yield': coroutineYield,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

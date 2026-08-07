@@ -1,8 +1,96 @@
 ---
 title: coroutine.create()
-description: ""
+description: Turn a function into a coroutine, without starting it.
+lua-compat: coroutine.create
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.create
 ---
 
-{/* Not yet written. */}
+Turns a function into a coroutine — a line of execution that can stop part-way through,
+hand control back, and later be picked up from exactly where it stopped. Nothing runs
+here: what comes back is a handle to a coroutine suspended before its first instruction,
+and [`coroutine.resume()`](/docs/standard-library/coroutine/resume) is what sets it going.
+
+<RunnableExample code={`local function brew_tea()\n  print("water on")\n  coroutine.yield()\n  print("leaves in")\nend\n\nlocal tea_break = coroutine.create(brew_tea)\nprint(type(tea_break))\nprint(coroutine.status(tea_break))\ncoroutine.resume(tea_break)\nprint(coroutine.status(tea_break))\n-- Expected output:\n-- thread\n-- suspended\n-- water on\n-- suspended`} />
+
+## Syntax
+
+```lua
+coroutine.create(f)
+```
+
+<Parameters>
+  <Param name="f">The function the new coroutine runs — its body. Once that function returns, the coroutine is finished and cannot be started again.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="thread">A handle to the new coroutine, suspended and yet to run.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is anything other than a function — a string, a table, or no argument at all. It is the value's *type* that is checked, so a table carrying a `__call` metamethod is refused here even though calling it would have worked.
+
+</Errors>
+
+## Description
+
+What comes back is a value of type `thread` — the same type the main line of execution has,
+which is why [`type()`](/docs/standard-library/globals/type) answers `"thread"` rather than
+anything with the word *coroutine* in it. It is a handle and not a function: the coroutine
+library accepts it, and calling it directly raises.
+[`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) is the call to reach for when
+something callable is what is wanted.
+
+A coroutine carries a position in its body and its own set of local variables, so two
+coroutines made from the same function run it independently: each keeps its own place and
+its own locals, and neither notices the other. What they are not given is a private copy of
+what the function reaches *outside* itself — an upvalue or a global read from both bodies is
+one value, and a write from either is visible to the other.
+
+Arguments to the body do not belong here. `coroutine.create()` takes the function and
+nothing else; whatever the body's parameters are, they are filled in by the first
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides),
+along with every later value that travels in the same direction.
+
+## Examples
+
+### Two coroutines from one function
+
+<RunnableExample code={`local function count_down(from)\n  for step = from, 1, -1 do\n    coroutine.yield(step)\n  end\n  return "lift off"\nend\n\nlocal first_rocket = coroutine.create(count_down)\nlocal second_rocket = coroutine.create(count_down)\nprint(select(2, coroutine.resume(first_rocket, 3)))\nprint(select(2, coroutine.resume(first_rocket, 3)))\nprint(select(2, coroutine.resume(second_rocket, 10)))\n-- Expected output:\n-- 3\n-- 2\n-- 10`} />
+
+The first rocket has moved on to its second step; the second one is still at its first, with
+its own `from` and its own place in the loop. Only the first resume of a coroutine fills in
+the body's parameters: the `3` repeated on the second call becomes the result of the
+`coroutine.yield()` the body is sitting in, which that body never reads.
+
+### What counts as a body
+
+<RunnableExample code={`local callable_table = setmetatable({}, { __call = function() return "hello" end })\n\nlocal from_function = pcall(coroutine.create, function() end)\nlocal from_string = pcall(coroutine.create, "buy cocoa")\nlocal from_callable = pcall(coroutine.create, callable_table)\nprint(from_function)\nprint(from_string)\nprint(from_callable)\n-- Expected output:\n-- true\n-- false\n-- false`} />
+
+The table can be called and still is not a function, which is the distinction this call draws.
+
+## Gotchas
+
+<Gotcha title="Creating one runs nothing">
+A body that prints, opens a file or increments a counter does none of it at
+`coroutine.create()` time. The function is stored, not called, and the first line of it waits
+until something resumes the handle. Code that creates a coroutine for its side effects and
+never resumes it does nothing at all, silently and with no error to say so.
+</Gotcha>
+
+<Gotcha title="The handle is not a function">
+`local ticker = coroutine.create(tick)` followed by `ticker()` raises: a `thread` is not
+callable. The two ways forward are
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume), which takes the handle as its
+first argument, and [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap), which hands
+back a function instead of a handle and is what most producer-style code actually wants.
+</Gotcha>
+
+## See also
+
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — starting the coroutine this made, and continuing it
+- [`coroutine.yield()`](/docs/standard-library/coroutine/yield) — how the body hands control back
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — asking a handle what it is doing
+- [`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) — the same thing, as a callable function
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms
