@@ -147,9 +147,11 @@ function Content({
       {sourceUrl && <EntrySource url={sourceUrl} />}
       {/* Provenance sits together: what the entry was rewritten from, and whether a
           person has since read it. */}
-      {/* How vetted, and how old — two different questions, answered side by side.
-          The date sits right so it reads as a stamp rather than as a sentence. */}
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
+      {/* How vetted, and how old — two different questions, and one provenance block.
+          Both sit left, on the text's own margin: pinning the date to the far right
+          left it stranded across a gap that grew with the viewport, reading as chrome
+          belonging to the page frame rather than as a fact about this entry. */}
+      <div className="mt-3 flex flex-wrap items-start gap-x-6 gap-y-2">
         <ReviewStatus date={reviewed} path={path} />
         <LastUpdated at={lastModified} />
       </div>

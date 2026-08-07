@@ -16,12 +16,21 @@ export function LastUpdated({ at }: { at?: Date | string | null }) {
   if (Number.isNaN(date.getTime())) return null;
 
   return (
-    <p data-last-updated={date.toISOString().slice(0, 10)} className="ms-auto text-sm text-fd-muted-foreground">
+    <p data-last-updated={date.toISOString().slice(0, 10)} className="text-sm text-fd-muted-foreground">
       Last updated on{' '}
       <time dateTime={date.toISOString()}>
+        {/*
+          Spelled out, as MDN spells it: `03/08/2026` is two different days
+          depending on which side of the Atlantic reads it, and a stamp whose whole
+          job is to say how old a page is cannot afford to be ambiguous about it.
+          The month name costs a few characters and removes the question.
+
+          Not the ordinal form — `Intl` will not produce "6th", so it would mean
+          carrying a suffix table for a line of metadata.
+        */}
         {date.toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
+          day: 'numeric',
+          month: 'long',
           year: 'numeric',
           timeZone: 'UTC',
         })}
