@@ -1,8 +1,142 @@
 ---
 title: os.tmpname()
-description: ""
+description: A file name a temporary file can be given — a name, not an open file.
+lua-compat: os.tmpname
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.tmpname
 ---
 
-{/* Not yet written. */}
+Answers with a *file name* that a temporary file can be given. What comes back is a string
+and not a handle: opening the file is a separate step, and removing it afterwards is the
+caller's job.
+
+<RunnableExample code={`local scratch = os.tmpname()\n\nlocal writing = assert(io.open(scratch, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nfor line in io.lines(scratch) do\n  print(line)\nend\n\nos.remove(scratch)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+A name that came back is not a name to predict, so it is the file's contents the card
+prints rather than the path. Four steps, and the fourth is the one that is easy to forget.
+
+## Syntax
+
+```lua
+os.tmpname()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="string">A file name suitable for a temporary file, in whatever place the system keeps them. Whether a file of that name exists yet depends on the system — see [Whether there is a file there already](#whether-there-is-a-file-there-already).</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the system cannot produce a name to hand back.
+
+</Errors>
+
+## Description
+
+A program that needs somewhere to put a few megabytes on the way through — a sorted
+spill, a download it is about to check, a file it means to hand to another program — needs
+a path it can have to itself, in a directory it is allowed to write to. That is the
+question this answers, and it answers only that question.
+
+Everything after the name is ordinary file work.
+[`io.open()`](/docs/standard-library/io/open) opens it,
+[`os.remove()`](/docs/standard-library/os/remove) deletes it, and between the two it
+behaves like any other file: it can be read back, appended to, handed to
+[`io.lines()`](/docs/standard-library/io/lines), or named in a command given to
+[`os.execute()`](/docs/standard-library/os/execute).
+
+## Whether there is a file there already
+
+The manual splits the answer by system, and the split is worth knowing because it decides
+what an existence check tells you. On POSIX systems the call also creates a file with the
+name it hands back. Elsewhere the manual describes what comes back as a name, and says
+nothing about a file existing at it.
+
+The reason for creating it is a race. Between the moment a name is handed out and the
+moment the program opens it, something else on the machine can create a file with that
+name — with permissions of its choosing — and the program then opens somebody else's file
+believing it made it. Creating the file as part of handing the name out closes that window.
+Where the file is not created, the window is open, and the name is a name that was unused a
+moment ago rather than one reserved for the caller.
+
+What this costs a program is a test it might otherwise have reached for. Opening the name
+for reading does not report whether anything has been written to it: on a system that
+created the file the open succeeds on an empty file, and on one that did not it fails on a
+name that is perfectly usable. A program that needs to know whether it wrote anything has
+to remember that itself.
+
+## Nothing removes it for you
+
+The file is the program's to delete, and that holds even when the program never opened it:
+on a system that created the file, a name taken and then abandoned leaves an empty file
+behind. A long-running program that takes a name per request and forgets the removal fills
+the system's temporary directory at exactly the rate it serves requests.
+
+[`io.tmpfile()`](/docs/standard-library/io/tmpfile) is the call for when nothing else needs
+to know the path. It hands back an open handle instead of a name, and the file it opened
+goes away when the program ends without anything having to remember. What brings a program
+back to this call instead is the *path* being the point — because another process has to be
+told where the data is, or because the file has to outlive the handle that wrote it.
+
+## Examples
+
+### Two calls, two names
+
+<RunnableExample code={`local first_scratch = os.tmpname()\nlocal second_scratch = os.tmpname()\n\nprint(type(first_scratch))\nprint(first_scratch == second_scratch)\n\nos.remove(first_scratch)\nos.remove(second_scratch)\n-- Expected output:\n-- string\n-- false`} />
+
+Two calls, two names — which is why a program can take one per job without coordinating,
+and why the name has to be carried from the call that produced it rather than reconstructed
+later. The two removals at the end are there because both names were taken, and a name that
+was taken is a name to clean up.
+
+### Removing it whatever happens
+
+<RunnableExample code={`local function with_scratch_file(use)\n  local path = os.tmpname()\n  local completed, result = pcall(use, path)\n  local removed = os.remove(path)\n  return completed, result, removed\nend\n\nlocal completed, complaint, removed = with_scratch_file(function(path)\n  local writing = assert(io.open(path, "w"))\n  writing:write("half a row")\n  writing:close()\n  error("the import gave up", 0)\nend)\n\nprint(completed)\nprint(complaint)\nprint(removed)\n-- Expected output:\n-- false\n-- the import gave up\n-- true`} />
+
+The work failed halfway through writing, and the file went away anyway. Removal written on
+the line after the work runs only when the work returns; putting it after a
+[protected call](/docs/standard-library/globals/pcall) is what makes it run down the failing
+path too, which is the path that leaves files behind in practice.
+
+### Handing the name to something else
+
+<RunnableExample code={`local function spill_to_disk(rows)\n  local path = os.tmpname()\n  local writing = assert(io.open(path, "w"))\n  for index = 1, #rows do\n    writing:write(rows[index], "\\n")\n  end\n  writing:close()\n  return path\nend\n\nlocal spilled = spill_to_disk({ "cocoa", "flour", "sugar" })\n\nlocal counted = 0\nfor line in io.lines(spilled) do\n  counted = counted + 1\nend\n\nprint(counted)\nprint(os.remove(spilled))\n-- Expected output:\n-- 3\n-- true`} />
+
+The path is the return value, so the writing and the reading do not have to happen in the
+same function — which is the case a handle cannot cover and this call can. It also moves
+the removal away from the code that created the file, which is where the leak gets in.
+
+## Gotchas
+
+<Gotcha title="A name is not an open file">
+The call hands back a string. Nothing is open, no handle exists, and the next line has to
+be [`io.open()`](/docs/standard-library/io/open) before anything can be written. Code that
+takes the name and treats it as a file — `scratch:write("…")`, or passing it where a handle
+is wanted — fails at that point rather than here, and complains about calling a method the
+value does not have, which says nothing about temporary files.
+</Gotcha>
+
+<Gotcha title="A taken name still has to be cleaned up">
+Taking a name and then deciding not to use it does not undo anything: on a system that
+creates the file, one is now sitting there empty, and it will sit there after the program
+exits. `os.remove()` on the name is the tidy-up, and it is worth running even on the path
+where nothing was written — where there is no file to remove, it simply reports that it
+could not remove one.
+</Gotcha>
+
+<Gotcha title="The directory it names is shared">
+Temporary files usually land in a directory other programs on the machine can write to, and
+often read. A name that is hard to guess is not a permission, so anything private going
+through a temporary file wants the permissions on it set deliberately — which is outside
+what this library reaches. [`io.tmpfile()`](/docs/standard-library/io/tmpfile) sidesteps
+part of the problem by not handing out a path at all.
+</Gotcha>
+
+## See also
+
+- [`io.tmpfile()`](/docs/standard-library/io/tmpfile) — a temporary file as an open handle, removed for you
+- [`io.open()`](/docs/standard-library/io/open) — turning the name into something that can be written
+- [`os.remove()`](/docs/standard-library/os/remove) — deleting the file when it has served its purpose
+- [`io.lines()`](/docs/standard-library/io/lines) — reading a file back a line at a time

@@ -1,8 +1,147 @@
 ---
 title: os.getenv()
-description: ""
+description: Look up an environment variable by name and read its value as text.
+lua-compat: os.getenv
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.getenv
 ---
 
-{/* Not yet written. */}
+Looks up a name in the environment the program is running with, and hands back that
+variable's value as text. A name the environment does not define answers with a false value
+instead, which is what makes a fallback the usual second half of the line.
+
+<RunnableExample code={`local cache_directory = os.getenv("PHOTOSORT_CACHE") or "/var/tmp/photosort"\nprint(cache_directory)\n-- Expected output: /var/tmp/photosort`} />
+
+<Note>
+Nothing here defines `PHOTOSORT_CACHE`, so the card falls through to its default — and the
+cards below do the same, deliberately. What any given name holds depends on the environment
+the program was started with, which differs between one machine and the next; printing a
+real value would show you this page's environment rather than yours.
+</Note>
+
+## Syntax
+
+```lua
+os.getenv(varname)
+```
+
+<Parameters>
+  <Param name="varname">The name of the environment variable to look up, as it is spelled in the environment.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string or nil">The variable's value, as text — or `nil` in its place when the environment has no variable of that name.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `varname` is neither a string nor a number. A number is accepted and looked up as the text it prints as, so `os.getenv(42)` asks about a variable named `42` rather than complaining.
+
+</Errors>
+
+<Note>
+Writing the test as `if os.getenv(name) then` asks the question that was meant — *is there
+a value here* — and keeps working whichever false value stands in for *not defined*.
+`os.getenv(name) == nil` commits to one particular spelling of failure, which is a narrower
+thing to depend on. The same reasoning puts `or` in the card above rather than an `if` on
+the following line.
+</Note>
+
+## Description
+
+An environment is a set of names paired with values that a process is handed when it starts
+— by the shell that launched it, by whatever service is running it, or by the system itself.
+It is the channel a program is configured through when a command line would be awkward:
+credentials, a cache location, a log level, the flags a build system wants every tool to
+see.
+
+This call is how Lua reads that set, and the reading is one-way. The library offers no
+companion that defines a variable, changes one, or lists what is there — a program asks
+about a name it thought of, and gets an answer about that name.
+
+## Everything comes back as text
+
+A value is a string, whatever it looks like. `"8080"` is a string of four digits, `"true"`
+is a five-letter word, and `"/usr/bin:/bin"` is one string rather than a list of two paths.
+Turning a value into something else is the caller's job:
+[`tonumber()`](/docs/standard-library/globals/tonumber) for a number, a comparison against
+known words for a flag, [`string.gmatch()`](/docs/standard-library/string/gmatch) or
+[`string.find()`](/docs/standard-library/string/find) for a list with a separator in it.
+
+The conversion is also where a bad value gets caught. `tonumber()` on a variable somebody
+set to `"lots"` answers `nil`, and a program that reaches for its default there behaves
+sensibly on input it did not write.
+
+## What the environment holds is not up to the program
+
+No name is guaranteed to be there. The variables a program finds are the ones its
+environment happened to carry, which is decided outside the program and can differ between
+a developer's shell, a service manager and a build machine — for the same program, on the
+same day. So a read without a fallback or a check is a read that can hand `nil` onward into
+a concatenation or a file path, several lines from where the variable was missing.
+
+Values are outside input in the same sense. A path, a host name or a count taken from the
+environment arrived from somewhere the program does not control, and deserves the checking
+any other outside value gets before it reaches a file operation or a command.
+
+## Examples
+
+### Branching on whether a name is defined
+
+<RunnableExample code={`local log_level = os.getenv("PHOTOSORT_LOG_LEVEL")\n\nif log_level then\n  print("logging at " .. log_level)\nelse\n  print("logging at the default level")\nend\n-- Expected output: logging at the default level`} />
+
+The value is worth keeping in a local when both branches want it: reading twice asks the
+environment twice for something that will answer the same way, and it separates the test
+from the value it was testing.
+
+### Reading a number out of the environment
+
+<RunnableExample code={`local worker_count = tonumber(os.getenv("PHOTOSORT_WORKERS")) or 4\n\nprint(worker_count)\nprint(worker_count * 2)\n-- Expected output:\n-- 4\n-- 8`} />
+
+[`tonumber()`](/docs/standard-library/globals/tonumber) answers `nil` both for a variable
+that is not defined and for one holding something that is not a numeral, so a single `or`
+covers the missing case and the nonsense case together. What comes out is a number ready
+for arithmetic, where the value read was a string that only looked like one.
+
+### A block of settings with defaults
+
+<RunnableExample code={`local defaults = {\n  PHOTOSORT_CACHE = "/var/tmp/photosort",\n  PHOTOSORT_WORKERS = "4",\n  PHOTOSORT_LOG_LEVEL = "warn",\n}\n\nlocal settings = {}\nfor name, fallback in pairs(defaults) do\n  settings[name] = os.getenv(name) or fallback\nend\n\nprint(settings.PHOTOSORT_CACHE)\nprint(settings.PHOTOSORT_WORKERS)\nprint(settings.PHOTOSORT_LOG_LEVEL)\n-- Expected output:\n-- /var/tmp/photosort\n-- 4\n-- warn`} />
+
+Collecting the reads into one table, once, gives the rest of the program a settled set of
+values to work from and one place to look when a setting is wrong. It also fixes the moment
+the environment is read, which is worth doing on purpose rather than by accident.
+
+## Gotchas
+
+<Gotcha title="A variable set to nothing is still defined">
+An environment variable can hold an empty string, and an empty string is true in Lua. So
+`os.getenv("PHOTOSORT_LOG_LEVEL") or "warn"` keeps the empty value and skips the default,
+which is rarely what whoever set it that way meant. Code that treats *set to nothing* as
+*not set* has to say so — testing the value against `""` as well as testing whether the
+variable is there at all.
+</Gotcha>
+
+<Gotcha title="There is no way to set one from here">
+The library reads the environment and offers nothing that writes to it, so a value cannot
+be published through the environment for another part of the program to pick up later, and
+a variable cannot be arranged for a child process by assigning it first. Passing something
+to a child means putting it in the command handed to
+[`os.execute()`](/docs/standard-library/os/execute), in whatever form the shell there
+understands.
+</Gotcha>
+
+<Gotcha title="The environment is fixed at the point the program started">
+A variable exported in the shell after the program is already running does not reach it: a
+program is handed its own copy of the environment when it starts, and a change made outside
+afterwards lands in somebody else's copy. So a long-running program is not reconfigured by
+editing the environment around it, and re-reading a name in a loop is work with no answer
+waiting at the end of it — which is one reason reading everything once, up front, is the
+tidier arrangement.
+</Gotcha>
+
+## See also
+
+- [`os.execute()`](/docs/standard-library/os/execute) — handing a command to a shell, which is where a child process's environment is arranged
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — turning a value read here into a number
+- [`os.setlocale()`](/docs/standard-library/os/setlocale) — the program's locale, which the system can take from the environment on its own
+- [`io.open()`](/docs/standard-library/io/open) — opening a path a variable named

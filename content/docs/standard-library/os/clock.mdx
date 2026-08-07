@@ -1,8 +1,133 @@
 ---
 title: os.clock()
-description: ""
+description: An approximation of the processor time the program has used, in seconds.
+lua-compat: os.clock
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.clock
 ---
 
-{/* Not yet written. */}
+Answers with an approximation of the seconds of *processor time* the program has used. It
+is what a timing loop reads, and it measures something narrower than a stopwatch: work a
+processor did on this program's behalf, rather than the time that went by while it ran.
+
+<RunnableExample code={`local started = os.clock()\n\nlocal report_lines = {}\nfor index = 1, 20000 do\n  report_lines[index] = "row " .. index\nend\n\nlocal finished = os.clock()\n\nprint(#report_lines)\nprint(finished >= started)\n-- Expected output:\n-- 20000\n-- true`} />
+
+The reading itself depends on the machine and on everything the program had already done,
+so what this card prints is what does not move: how many lines were built, and that the
+second reading is not behind the first. The figure a program keeps is `finished - started`.
+
+## Syntax
+
+```lua
+os.clock()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="float">Seconds of processor time used, approximately. Where the counting started from is the system's business, so a reading is worth having beside another one rather than on its own — see [What the number is measured from](#what-the-number-is-measured-from).</Return>
+</Returns>
+
+## Description
+
+Processor time is time a processor spent executing this program. It answers *how much work
+was this*, and it moves at its own pace: a program sitting on a network read or waiting for
+a disk gathers very little of it while the wall clock carries on regardless.
+
+The word the manual uses is *approximation*, and it is doing real work in that sentence.
+The figure comes from the C library's own processor clock and inherits whatever step size
+that clock counts in, which is why two readings taken a few instructions apart can come
+back equal. How close the approximation is, the manual declines to say.
+
+## What the number is measured from
+
+The manual says what the figure counts — processor time used by the program — and hands the
+reading itself to the C library, without pinning down the point the count starts from. What
+that leaves is a number whose zero the system chose: a reading of `0.4` is not four tenths
+of a second past a moment a program could name, and a figure from anywhere else has no
+common ground with it.
+
+Two readings from the same run *can* be compared, and that is what the call is for. Take
+one, do the work, take another, and subtract: the difference is seconds of processor time
+the work in between cost. A reading written to a log and read back tomorrow has lost the
+partner it needed.
+
+## Elapsed time is a different measurement
+
+The question *how long did the user wait* is not this one, and this call answers it badly:
+time spent waiting is time a processor is not working on the program, so it barely
+registers here. That question belongs to [`os.time()`](/docs/standard-library/os/time),
+which names a moment, and [`os.difftime()`](/docs/standard-library/os/difftime), which
+measures in seconds between two of them. Those two are also what to reach for when the answer
+has to survive the program that produced it, since
+[a time value names something outside the run](/docs/standard-library/os/time#what-a-time-value-is)
+and a processor-time reading does not.
+
+## Examples
+
+### Timing a piece of work
+
+<RunnableExample code={`local function seconds_spent(work)\n  local started = os.clock()\n  work()\n  return os.clock() - started\nend\n\nlocal shelf\nlocal spent = seconds_spent(function()\n  shelf = { "pears", "apples", "cherries" }\n  table.sort(shelf)\nend)\n\nprint(table.concat(shelf, ", "))\nprint(type(spent))\nprint(spent >= 0)\n-- Expected output:\n-- apples, cherries, pears\n-- number\n-- true`} />
+
+Wrapping the pair of readings in a helper is the shape most timing code ends up in: the
+subtraction happens in one place, and what comes back is a duration rather than a reading.
+The duration is a number like any other, so it adds up across calls, sorts, and divides by
+a count to give a per-item figure.
+
+### Holding a piece of work to a budget
+
+<RunnableExample code={`local function within_budget(work, seconds_allowed)\n  local started = os.clock()\n  work()\n  return (os.clock() - started) <= seconds_allowed\nend\n\nlocal finished_in_time = within_budget(function()\n  local total = 0\n  for index = 1, 100000 do\n    total = total + index\n  end\nend, 60)\n\nprint(finished_in_time)\n-- Expected output: true`} />
+
+A budget is the honest way to assert something about a timing in a test: the exact figure
+moves from machine to machine and from run to run, and a generous ceiling is a claim that
+survives both. Summing a hundred thousand numbers against a minute of processor time is
+about as generous as a ceiling gets.
+
+<Only since="5.3">
+
+### The reading is a float
+
+<RunnableExample code={`print(math.type(os.clock()))\n-- Expected output: float`} />
+
+Seconds with a fraction is the point of the call, so the answer comes back with a
+fractional part available whether or not this particular reading needed one. That matters
+at the far end: a duration handed to
+[`string.format()`](/docs/standard-library/string/format) wants `%.3f` rather than `%d`,
+and one passed where a whole number is required — a
+[`string.rep()`](/docs/standard-library/string/rep) count, say — wants
+[`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) first.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="It does not measure how long you waited">
+A program that spends ten seconds waiting for a reply and a tenth of a second parsing it
+has used roughly a tenth of a second of processor time, and that is what the difference
+between two readings here will show. Timing an operation that waits — a request, a read
+from a slow disk, a pause — with this call reports the work done rather than the delay
+suffered, and the two figures can be orders of magnitude apart.
+</Gotcha>
+
+<Gotcha title="One reading on its own is not a measurement">
+`print(os.clock())` prints a number that means very little: it is counted from a point the
+system chose, so it is not seconds since the program started in any way the manual
+guarantees, and it is not seconds since anything a reader can name. Code that logs a bare
+reading, or compares one against a figure from a different run, is working against a scale
+the manual leaves the system to choose. Subtract two readings taken in the same run and
+the scale cancels out.
+</Gotcha>
+
+<Gotcha title="Two readings taken close together can be equal">
+The clock underneath counts in steps, and an approximation with a step size can report the
+same figure twice in a row. So a difference of zero does not establish that no time passed
+— it establishes that the work fitted inside one step. Timing something very short means
+repeating it enough times that the total clears the step, then dividing.
+</Gotcha>
+
+## See also
+
+- [`os.time()`](/docs/standard-library/os/time) — the moment on the calendar, rather than the work done
+- [`os.difftime()`](/docs/standard-library/os/difftime) — the seconds between two moments
+- [`os.date()`](/docs/standard-library/os/date) — rendering a moment for a person to read
+- [`string.format()`](/docs/standard-library/string/format) — printing a duration to a fixed number of decimals

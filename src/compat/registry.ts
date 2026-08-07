@@ -119,6 +119,9 @@ import coroutineLibrary from './data/coroutine.library.json';
 import osTime from './data/os.time.json';
 import osDate from './data/os.date.json';
 import osDifftime from './data/os.difftime.json';
+import osClock from './data/os.clock.json';
+import osGetenv from './data/os.getenv.json';
+import osTmpname from './data/os.tmpname.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -754,6 +757,40 @@ const raw: Record<string, unknown> = {
   'os.time': osTime,
   'os.date': osDate,
   'os.difftime': osDifftime,
+
+  // `os.clock`, `os.getenv` and `os.tmpname` carry **no `changed_in` at all**, and that is
+  // a result rather than an omission. `os_clock`, `os_getenv` and `os_tmpname` are
+  // byte-for-byte identical in `loslib.c` at v5.1.1, 5.1.5, v5.2.3, 5.2.4, v5.3.0, v5.3.6,
+  // v5.4.0, v5.4.8 and v5.5.0, apart from an `l_unlikely` annotation on `os_tmpname`'s
+  // error branch from 5.4 — a branch-prediction hint with no observable effect. Each has
+  // exactly one `return 1;`, so none of them is the green-and-wrong arity hazard
+  // `os.execute` is. None is named in any Incompatibilities chapter (5.2, 5.3, 5.4 and
+  // 5.5's §8 sliced to end of file and searched).
+  //
+  // Three manual edits *look* like deltas and are documentation catching up with code
+  // that had not moved:
+  //
+  //   * **`os.clock`** gains "as returned by the underlying ISO C function `clock`" at
+  //     5.4. The implementation has been `clock() / CLOCKS_PER_SEC` since 5.1; the added
+  //     clause names the C function the manual was already deferring to. No version
+  //     documents where the count starts from, which is why the entry says so rather than
+  //     promising seconds-since-program-start.
+  //   * **`os.getenv`** changes "or `nil` if the variable is not defined" to "or *fail* if
+  //     the variable is not defined" at 5.4, where §6 introduces *fail* as "a false value
+  //     representing some kind of failure. (Currently, fail is equal to nil…)". The C is
+  //     `lua_pushstring(L, getenv(...))`, which pushes `nil` for a `NULL` in every
+  //     release. So the *promise* loosened and the behaviour did not; a `changed_in` here
+  //     would mark 5.4 "Changed" on four surfaces for a function that did not change. The
+  //     entry states the falsity reading as advice instead, undated.
+  //   * **`os.tmpname`** says "On some systems (POSIX)" in 5.1 and "On/In POSIX systems"
+  //     from 5.2. Wording only: `lua_tmpnam` is `mkstemp` under `LUA_USE_MKSTEMP` (5.1's
+  //     `luaconf.h`, 5.2's `loslib.c`) or `LUA_USE_POSIX` (5.3+), and plain `tmpnam`
+  //     otherwise, in every release. Whether a file exists at the name is therefore a
+  //     build-and-platform fact and never a version one, which is why the entry splits it
+  //     by system rather than by line.
+  'os.clock': osClock,
+  'os.getenv': osGetenv,
+  'os.tmpname': osTmpname,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
