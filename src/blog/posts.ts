@@ -29,6 +29,33 @@ export function sortPostsByDate<T extends { date: string; title: string }>(posts
 }
 
 /**
+ * The index, grouped into years, newest first.
+ *
+ * Year headings are what let the index stay one page as the archive grows: they give an
+ * unfamiliar reader somewhere to stop, without hiding posts behind pagination that costs
+ * a click and keeps them out of a crawler's reach.
+ *
+ * The year is sliced off the ISO string rather than read from a `Date`, for the same
+ * timezone reason `sortPostsByDate` avoids one — near midnight on 31 December a parsed
+ * date can land in the wrong year.
+ */
+export function groupPostsByYear<T extends { date: string; title: string }>(
+  posts: T[],
+): { year: string; posts: T[] }[] {
+  const groups: { year: string; posts: T[] }[] = [];
+
+  for (const post of sortPostsByDate(posts)) {
+    const year = post.date.slice(0, 4);
+    const current = groups.at(-1);
+
+    if (current?.year === year) current.posts.push(post);
+    else groups.push({ year, posts: [post] });
+  }
+
+  return groups;
+}
+
+/**
  * `7 August 2026`. Matches how `LastUpdated` renders a date, and for the same reason:
  * `03/08/2026` is two different days depending on which side of the Atlantic reads it.
  *

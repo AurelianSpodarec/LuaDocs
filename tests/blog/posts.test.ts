@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPostDate, sortPostsByDate } from '@/blog/posts';
+import { formatPostDate, groupPostsByYear, sortPostsByDate } from '@/blog/posts';
 
 describe('sortPostsByDate', () => {
   it('puts the newest post first', () => {
@@ -29,6 +29,41 @@ describe('sortPostsByDate', () => {
     sortPostsByDate(posts);
 
     expect(posts.map((p) => p.title)).toEqual(['Older', 'Newer']);
+  });
+});
+
+describe('groupPostsByYear', () => {
+  it('groups posts under their year, newest year first', () => {
+    const groups = groupPostsByYear([
+      { date: '2025-03-02', title: 'Older' },
+      { date: '2026-08-07', title: 'Newer' },
+    ]);
+
+    expect(groups.map((group) => group.year)).toEqual(['2026', '2025']);
+  });
+
+  it('orders posts inside a year newest first', () => {
+    const groups = groupPostsByYear([
+      { date: '2026-01-04', title: 'January' },
+      { date: '2026-08-07', title: 'August' },
+      { date: '2026-05-01', title: 'May' },
+    ]);
+
+    expect(groups[0].posts.map((p) => p.title)).toEqual(['August', 'May', 'January']);
+  });
+
+  it('returns a single group when every post shares a year', () => {
+    const groups = groupPostsByYear([
+      { date: '2026-08-06', title: 'One' },
+      { date: '2026-08-07', title: 'Two' },
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].year).toBe('2026');
+  });
+
+  it('has no groups when there are no posts', () => {
+    expect(groupPostsByYear([])).toEqual([]);
   });
 });
 
