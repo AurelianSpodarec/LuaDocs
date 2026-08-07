@@ -98,38 +98,74 @@ export function VersionPanel({ node }: { node: CompatNode }) {
       data-tone={tone}
       className={`not-prose rounded-xl border p-4 text-sm ${toneClass[tone]}`}
     >
-      <p className="flex items-start gap-2 text-fd-muted-foreground">
-        <Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${toneIconClass[tone]}`} />
-        {reason ? (
-          <span data-note="unavailable">
-            <strong className="text-fd-foreground">{unavailableLead(reason, version)}</strong>{' '}
-            {unavailableText(reason)}
-          </span>
-        ) : note ? (
-          <span data-note="changed">
-            <strong className="text-fd-foreground">Changed in Lua {version}:</strong>{' '}
-            {renderChangeNote(note)}
-          </span>
-        ) : (
-          <span data-note="available">
-            <strong className="text-fd-foreground">{availabilityLead(node)}</strong>
-          </span>
-        )}
-      </p>
-      {/* Indented to the status text's column, not the icon's — `ps-6` is the icon's
-          `size-4` plus the `gap-2` beside it. */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 ps-6">
-        <VersionSupportStrip node={node} />
-        {/* Only where the matrix renders. It is suppressed on an entry no version
-            differs on, and a link to a section that is not there is worse than none. */}
-        {varies(node) && (
-          <a
-            href="#version-support"
-            className="text-xs text-fd-muted-foreground underline decoration-fd-muted-foreground/40 underline-offset-2 hover:text-fd-primary"
-          >
-            See full version support
-          </a>
-        )}
+      {/*
+        Status left, chips right, on one row — which is how MDN's panel uses its width,
+        and the reason theirs looks composed where a stacked version does not. Everything
+        on the left leaves the right half of a full-width box empty, and the wider the
+        window the emptier it gets.
+
+        `justify-between` with `flex-wrap`, so the chips drop under the status on a narrow
+        column instead of squeezing it.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        {/* `basis-64` is what makes the wrap actually happen. With `flex-1` alone the
+            status block just shrinks — on a 375px screen it collapsed to 90px of
+            three-word lines beside 195px of chips. Given a 16rem basis it cannot fit
+            alongside them in a narrow column, so the chips drop to their own row. */}
+        <div
+          data-note={tone}
+          className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-fd-muted-foreground"
+        >
+          <Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${toneIconClass[tone]}`} />
+          <div>
+            <strong className="text-fd-foreground">
+              {reason
+                ? unavailableLead(reason, version)
+                : note
+                  ? `Changed in Lua ${version}:`
+                  : availabilityLead(node)}
+            </strong>
+            {/* The second line only exists where there is something more to say. An
+                entry available everywhere gets a one-row panel, which is the shape the
+                majority of pages should have. */}
+            {reason ? (
+              <p className="mt-1">{unavailableText(reason)}</p>
+            ) : note ? (
+              <p className="mt-1">{renderChangeNote(note)}</p>
+            ) : null}
+          </div>
+        </div>
+        {/* The link rides with the chips rather than sitting on a row of its own at the
+            bottom. Alone under the sentence it read as a stray — one small underlined
+            thing with nothing beside it, after the block had already closed. Here it is
+            part of the right-hand group, where "the short version" and "the long
+            version" of the same fact belong together.
+
+            It renders only where the matrix does: `VersionMatrix` suppresses itself when
+            no version differs, and a link to a section that is not on the page is worse
+            than no link. */}
+        <div className="flex items-center gap-x-3">
+          {varies(node) && (
+            <>
+              <a
+                href="#version-support"
+                className="text-xs text-fd-muted-foreground underline decoration-fd-muted-foreground/40 underline-offset-2 hover:text-fd-primary"
+              >
+                See full version support
+              </a>
+              {/* The same middot `EntryProvenance` separates its two exits with. Without
+                  it the link sits close enough to the pills to read as their label
+                  rather than as a peer of them. */}
+              <span aria-hidden className="text-fd-muted-foreground/50">
+                ·
+              </span>
+            </>
+          )}
+          {/* This group does not wrap, so the separator can never end up dangling at the
+              end of a line with nothing after it. The strip wraps internally instead —
+              five pills over two rows is fine, an orphaned middot is not. */}
+          <VersionSupportStrip node={node} />
+        </div>
       </div>
     </section>
   );

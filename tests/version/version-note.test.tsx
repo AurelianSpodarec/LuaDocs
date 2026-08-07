@@ -27,6 +27,11 @@ function renderAt(node: CompatNode, version: LuaVersion) {
 }
 
 const note = () => document.querySelector('[data-note="unavailable"]');
+/** The lead and the sentence are separate lines in the panel, so assert them apart. */
+const says = (lead: string, rest: string) => {
+  expect(note()).toHaveTextContent(lead);
+  expect(note()).toHaveTextContent(rest);
+};
 
 describe('the unavailable callout', () => {
   it('renders nothing where the entry exists', () => {
@@ -36,16 +41,12 @@ describe('the unavailable callout', () => {
 
   it('tells a reader below version_added which version to want', () => {
     renderAt(notYetAdded, '5.1');
-    expect(note()).toHaveTextContent(
-      'Not in Lua 5.1. Everything below describes Lua 5.2, where it was introduced.',
-    );
+    says('Not in Lua 5.1.', 'Everything below describes Lua 5.2, where it was introduced.');
   });
 
   it('points a reader past a removed entry at the last version that had it', () => {
     renderAt(removed, '5.5');
-    expect(note()).toHaveTextContent(
-      'Not in Lua 5.5. Everything below describes Lua 5.1, the last version that had it.',
-    );
+    says('Not in Lua 5.5.', 'Everything below describes Lua 5.1, the last version that had it.');
   });
 
   it('never promises a removed entry survives into the reader’s version', () => {
@@ -69,9 +70,7 @@ describe('the unavailable callout', () => {
   it('tells a reader inside the gap that the entry comes back, and where', () => {
     // The branch that had no dataset able to reach it until `version_restored` existed.
     renderAt(cameBack, '5.4');
-    expect(note()).toHaveTextContent(
-      'Not in Lua 5.4. Everything below describes Lua 5.5, where it returns after a gap.',
-    );
+    says('Not in Lua 5.4.', 'Everything below describes Lua 5.5, where it returns after a gap.');
   });
 
   it('renders nothing on either side of the gap', () => {
