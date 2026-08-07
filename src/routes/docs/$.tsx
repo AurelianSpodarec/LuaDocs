@@ -16,8 +16,7 @@ import { baseOptions } from '@/lib/layout.shared';
 import { encodeMarkdownUrl, gitConfig } from '@/lib/shared';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
-import { Suspense, use, useMemo, useState, type FC } from 'react';
-import type { BreadcrumbProps } from 'fumadocs-ui/layouts/notebook/page';
+import { Suspense, use, useMemo, useState } from 'react';
 import { useMDXComponents } from '@/components/mdx';
 import { compatNodeFor } from '@/compat/registry';
 import { varies } from '@/compat/resolve';
@@ -29,14 +28,13 @@ import { VersionSupportStrip } from '@/version/VersionSupportStrip';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { VersionChangeNote, VersionUnavailable } from '@/version/VersionNote';
 import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
-import { buildFullToc } from '@/entry/pageToc';
+import { buildFullToc, entryTitleClass } from '@/entry/pageToc';
 import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
 import { scopeToDestination } from '@/sidebar/destinations';
 import { countEntries, filterPageTree } from '@/sidebar/filterPageTree';
 import { DestinationsBlock, SidebarFilter } from '@/sidebar/SidebarHeader';
 import { ThemeSwitch } from 'fumadocs-ui/layouts/shared/slots/theme-switch';
-import { createBreadcrumb } from '@/sidebar/Breadcrumb';
 
 export const Route = createFileRoute('/docs/$')({
   component: Page,
@@ -82,14 +80,12 @@ function Content({
   luaCompat,
   sourceUrl,
   reviewed,
-  Breadcrumb,
 }: {
   path: string;
   markdownUrl: string;
   luaCompat: string | null;
   sourceUrl: string | null;
   reviewed: string | null;
-  Breadcrumb: FC<BreadcrumbProps>;
 }) {
   const page = docs.getPage(path);
   if (!page) throw new Error(`unknown page: ${path}`);
@@ -110,10 +106,12 @@ function Content({
   });
 
   return (
-    // `footer` is Fumadocs's previous/next pair, and a reference has no sequence for it
-    // to describe — see ADR 0011. It comes back scoped to Learn, which does.
-    <DocsPage toc={fullToc} footer={{ enabled: false }} slots={{ breadcrumb: Breadcrumb }}>
-      <DocsTitle>{page.title}</DocsTitle>
+    // Two of Fumadocs's page furniture pieces are off, both under ADR 0007/0011.
+    // `footer` is the previous/next pair, and a reference has no sequence for it to
+    // describe; it comes back scoped to Learn, which does. `breadcrumb` restated a path
+    // the reader had just clicked, above the one heading that says where they are.
+    <DocsPage toc={fullToc} footer={{ enabled: false }} breadcrumb={{ enabled: false }}>
+      <DocsTitle className={entryTitleClass}>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
       {/* Above the copy row and the strip, because it is not a detail about the entry —
           it invalidates it. Everything below describes something the reader cannot call,
@@ -169,10 +167,6 @@ function Page() {
     () => filterPageTree(groupPageTree(scopeToDestination(pageTree, pathname)), query),
     [pageTree, pathname, query],
   );
-  // The breadcrumb reads the ungrouped, unscoped tree: a group is not a level of
-  // hierarchy, and a crumb must resolve whichever destination you are in.
-  const Breadcrumb = useMemo(() => createBreadcrumb(pageTree), [pageTree]);
-
   const options = baseOptions();
 
   return (
@@ -233,7 +227,6 @@ function Page() {
             luaCompat={luaCompat}
             sourceUrl={sourceUrl}
             reviewed={reviewed}
-            Breadcrumb={Breadcrumb}
           />
         </Suspense>
       </DocsLayout>

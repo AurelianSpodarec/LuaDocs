@@ -17,6 +17,21 @@ import type { TableOfContents } from 'fumadocs-core/toc';
 export const sectionHeadingClass = 'mb-3 text-2xl font-semibold text-fd-foreground';
 
 /**
+ * The entry title, one step up from fumadocs's default.
+ *
+ * The scale was 28 / 24 / 16 — an `<h1>` four pixels above an `<h2>` at the same
+ * weight, and then an eight-pixel drop from `<h2>` to `<h3>`. A 1.17 ratio at the top
+ * of a page does not read as a level, it reads as the same heading twice, and the
+ * biggest gap in the scale was in the wrong place. 36 / 24 / 16 is a flat 1.5 at each
+ * step, which is regular enough that a reader stops having to work it out.
+ *
+ * `em`, matching what it replaces, so it still tracks the article's own font size.
+ * `leading-tight` because fumadocs's default line height is prose-sized and 36px text
+ * set at 1.5 leaves a hole between the title and the description under it.
+ */
+export const entryTitleClass = 'text-[2.25em] leading-tight';
+
+/**
  * Assembles the right-rail "In this article" TOC for an entry page.
  *
  * The rail is specified as flat, H2-only (`docs/research/page-structure.md`). The

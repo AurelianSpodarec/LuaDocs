@@ -18,8 +18,9 @@ Five rules govern it:
 5. **One full-width navbar, and it holds controls rather than navigation** —
    wordmark and selected version on the left, search in the middle, theme, language
    and GitHub on the right.
-6. **There is no context bar.** The breadcrumb goes in the article column, above the
-   `<h1>`.
+6. **There is no context bar, and no breadcrumb at all.** *Amended 2026-08-07 — this
+   rule originally read "there is no context bar; the breadcrumb goes in the article
+   column, above the `<h1>`". Both halves changed; see below.*
 
 ## Why
 
@@ -144,11 +145,48 @@ the whole site is showing you.
 ### No context bar
 
 MDN carries a second bar under its header: breadcrumb on the left, Theme and Language
-on the right. It is a clean arrangement and we do not copy it, because our page is not
-MDN's page — under the `<h1>` we carry a **version support** strip that MDN has no
-equivalent of. Header, plus context bar, plus strip, and the prose starts a long way
-down. Moving the breadcrumb into the article column buys that row back, and theme and
-language are perfectly at home in the header.
+on the right. It is a clean arrangement and we do not copy it.
+
+**The original reason given here was vertical budget** — header, plus context bar, plus
+the version support strip MDN has no equivalent of, and the prose starts a long way
+down. That argument does not survive inspection and is recorded as withdrawn: while the
+breadcrumb existed it already cost a row, so moving it into a bar *relocated* a band
+rather than adding one. The cost was roughly a wash.
+
+**The reason that holds is crowding, and it is MDN's problem rather than ours.** MDN's
+top row is HTML · CSS · JavaScript · Web APIs · All · Learn · Tools · About · Blog, plus
+search and sign-in, because MDN is five reference sites wearing one hat. There is no
+room left up there for Theme and Language, so they are pushed to a second row. Our
+navbar carries no navigation at all — rule 5, one product, destinations live in the
+sidebar — so those controls fit in the header with room to spare. A context bar here
+would relieve a pressure that does not exist, and it would break rule 1: destinations in
+the sidebar, controls in the header, two homes. A third home for two of them is how that
+taxonomy stops meaning anything.
+
+### No breadcrumb either
+
+*Added 2026-08-07.* The breadcrumb sat in the article column above the `<h1>` and is now
+removed outright.
+
+It restated a path the reader had just clicked, immediately above the one heading that
+already says where they are. Everything it carried is on screen and stays on screen: the
+sidebar highlights the active entry inside its own tree, and the right rail holds
+position within the page. The breadcrumb is the only one of the three that answers a
+question by repeating the answer to a question nobody asked.
+
+It also had the worst placement on the page for what it was — the first thing under the
+navbar, above the title, so the densest, least useful line came first.
+
+**The accepted cost is narrow and real.** A reader landing cold from a search engine on
+a phone, where the sidebar is behind a hamburger, has no positional context beyond the
+title and the URL. That is the case the breadcrumb was worth something for, and it is
+being given up deliberately rather than overlooked. The title is fully qualified
+(`string.format()`, not `format()`) precisely because it is expected to travel alone, so
+it carries more of that weight than a bare heading would.
+
+The bar and the breadcrumb are one entry in this ADR because removing the second forecloses
+the first: a context bar with no breadcrumb in it is a bar holding two preferences that
+already have a home.
 
 ### The tree belongs to the active destination
 
@@ -158,6 +196,12 @@ active destination is the only bold row in it.
 
 ## Consequences
 
+- **`DocsPage` takes `breadcrumb={{ enabled: false }}`**, alongside the
+  `footer={{ enabled: false }}` that [ADR 0011](0011-the-foot-of-an-entry.md) sets.
+  `src/sidebar/Breadcrumb.tsx` is deleted rather than left unrendered — it read the
+  ungrouped, unscoped tree for reasons that were subtle enough to be worth a comment,
+  and dead code carrying subtle reasoning is how a later reader concludes it must still
+  matter. Git has it if the mobile case above ever changes the answer.
 - **ADR 0006's area order is amended.** Learn and Guides become destinations, so the
   Reference tree is `Standard Library · Language · Standalone interpreter · C API`.
   The reasoning for that order is untouched — lookups outnumber learning, so Standard
