@@ -3,9 +3,6 @@
     "index",
     "learn",
     "guides",
-    "standard-library",
-    "language",
-    "standalone",
-    "c-api"
+    "standard-library"
   ]
 }

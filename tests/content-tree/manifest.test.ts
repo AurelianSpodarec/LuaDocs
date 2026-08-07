@@ -332,7 +332,26 @@ describe('the remaining sections', () => {
   });
 
   it('orders the areas the same way in ROOT_PAGES', () => {
-    expect(ROOT_PAGES).toEqual(['index', ...CONTENT_TREE.map((s) => s.slug)]);
+    const shown = CONTENT_TREE.filter((s) => !s.hidden).map((s) => s.slug);
+    expect(ROOT_PAGES).toEqual(['index', ...shown]);
+  });
+
+  it('hides the three areas that are still entirely stubs', () => {
+    expect(CONTENT_TREE.filter((s) => s.hidden).map((s) => s.slug)).toEqual([
+      'language',
+      'standalone',
+      'c-api',
+    ]);
+    expect(ROOT_PAGES).toEqual(['index', 'learn', 'guides', 'standard-library']);
+  });
+
+  it('keeps hidden areas scaffolded and routable', () => {
+    // Hiding is a sidebar decision, not a deletion: the files stay owned by the
+    // manifest and the URLs stay prerendered, so an existing link still resolves.
+    const urls = contentTreeUrls(CONTENT_TREE);
+    expect(urls).toContain('/docs/language/statements/goto');
+    expect(urls).toContain('/docs/standalone/arg');
+    expect(urls).toContain('/docs/c-api/calling');
   });
 
   it('orders the standard library by how often a reader reaches for it', () => {

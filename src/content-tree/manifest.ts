@@ -49,6 +49,19 @@ export interface Section {
   sections: Section[];
   /** Cross-linked rows, shown last, under a "Related globals" group. */
   related?: CrossLink[];
+  /**
+   * Kept out of the sidebar, and nothing else. An Area whose entries are all still
+   * stubs is noise in the tree — it offers a reader nine sections of "Not yet
+   * written" — but its files, routes and prerendered pages stay exactly as they are,
+   * so an existing link into it still resolves and the scaffold still owns it.
+   *
+   * The flag lives here rather than in `content/docs/meta.json` because the manifest
+   * is what regenerates that file. Hiding by hand-editing the generated `meta.json`
+   * would survive until the next `content:scaffold` and then quietly not.
+   *
+   * Unhiding is deleting the line.
+   */
+  hidden?: true;
 }
 
 const MANUAL_BASE = 'https://www.lua.org/manual';
@@ -327,7 +340,7 @@ export const CONTENT_TREE: Section[] = [
       ...fnsFrom('5.1', 'debug', 'getfenv setfenv'),
     ]),
   ]),
-  section('language', 'Language', '3', [
+  { ...section('language', 'Language', '3', [
     construct('coroutines', 'Coroutines', '2.6'),
   ], [
     section('values-and-types', 'Values and types', '2.1', [
@@ -409,19 +422,19 @@ export const CONTENT_TREE: Section[] = [
       construct('weak-tables', 'Weak tables', '2.5.4'),
       construct('finalizers', 'Finalizers', '2.5.3'),
     ]),
-  ]),
-  section('standalone', 'Standalone interpreter', '7', [
+  ]), hidden: true },
+  { ...section('standalone', 'Standalone interpreter', '7', [
     construct('command-line-options', 'Command-line options', '7'),
     construct('script-execution', 'Script execution', '7'),
     entry('arg', 'arg', 'constant', '7'),
     entry('lua-cpath', 'LUA_CPATH', 'constant', '6.4'),
     entry('lua-init', 'LUA_INIT', 'constant', '7'),
     entry('lua-path', 'LUA_PATH', 'constant', '6.4'),
-  ]),
+  ]), hidden: true },
   // Entries, not folders: none of these has content yet, and a folder wrapping a
   // lone overview is an accordion that opens onto itself (ADR 0006). They become
   // sections again when their entries are authored.
-  section('c-api', 'C API', '4', [
+  { ...section('c-api', 'C API', '4', [
     construct('types-and-values', 'Types and values', '4.6'),
     construct('stack-manipulation', 'Stack manipulation', '4.1'),
     construct('calling', 'Calling', '4.5'),
@@ -432,8 +445,15 @@ export const CONTENT_TREE: Section[] = [
     construct('debug-interface', 'Debug interface', '4.7'),
     construct('auxiliary-library', 'Auxiliary library', '5'),
     construct('constants', 'Constants', '4.6'),
-  ]),
+  ]), hidden: true },
 ];
 
-/** The areas, in sidebar order, plus the authored site root. */
-export const ROOT_PAGES = ['index', ...CONTENT_TREE.map((s) => s.slug)];
+/**
+ * The areas Fumadocs builds a tree from, in sidebar order, plus the authored site
+ * root. Hidden areas are absent: this list is the root `meta.json`'s `pages`, and a
+ * folder it does not name is left out of the page tree entirely.
+ */
+export const ROOT_PAGES = [
+  'index',
+  ...CONTENT_TREE.filter((s) => !s.hidden).map((s) => s.slug),
+];
