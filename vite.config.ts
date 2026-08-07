@@ -24,6 +24,8 @@ export default defineConfig({
 
       pages: [
         { path: '/docs' },
+        // Individual posts are reached from here by `crawlLinks`.
+        { path: '/blog' },
         { path: '/api/search' },
         { path: 'llms-full.txt' },
         { path: 'llms.txt' },

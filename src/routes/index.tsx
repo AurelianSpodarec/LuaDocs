@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
-import { baseOptions } from '@/lib/layout.shared';
+import { marketingOptions } from '@/lib/layout.shared';
+import { Footer } from '@/marketing/Footer';
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -8,7 +9,7 @@ export const Route = createFileRoute('/')({
 
 function Home() {
   return (
-    <HomeLayout {...baseOptions()}>
+    <HomeLayout {...marketingOptions()}>
       <div className="flex flex-col items-center justify-center text-center flex-1">
         <h1 className="font-medium text-xl mb-4">LuaDocs — an MDN-style reference for Lua.</h1>
         <Link
@@ -21,6 +22,7 @@ function Home() {
           Open Docs
         </Link>
       </div>
+      <Footer />
     </HomeLayout>
   );
 }
