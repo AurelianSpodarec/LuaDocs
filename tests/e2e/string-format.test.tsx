@@ -57,18 +57,20 @@ describe('the assembled string.format entry', () => {
     const note = document.querySelector('[data-note="changed"]');
     expect(note).not.toBeNull();
     expect(note).toHaveTextContent(/Changed in Lua 5\.3/);
-    expect(note).toHaveTextContent(/integer representation/i);
+    expect(document.querySelector('[data-note-detail]')).toHaveTextContent(
+      /integer representation/i,
+    );
   });
 
   it('swaps the note when the selected version changes again', () => {
     render(<Entry />);
     selectVersion('5.3');
-    expect(document.querySelector('[data-note="changed"]')).toHaveTextContent(
+    expect(document.querySelector('[data-note-detail]')).toHaveTextContent(
       /integer representation/i,
     );
 
     selectVersion('5.4');
-    expect(document.querySelector('[data-note="changed"]')).toHaveTextContent(/%q/);
+    expect(document.querySelector('[data-note-detail]')).toHaveTextContent(/%q/);
   });
 
   it('marks a version the entry predates as unavailable, with an availability note', () => {
@@ -92,7 +94,9 @@ describe('the assembled string.format entry', () => {
     expect(note).toHaveTextContent(/Not in Lua 5\.1/);
     // The callout names the version the prose below belongs to, rather than reciting
     // an added/removed history the strip beside it already shows.
-    expect(note).toHaveTextContent(/describes Lua 5\.3, where it was introduced/);
+    expect(document.querySelector('[data-note-detail]')).toHaveTextContent(
+      /describes Lua 5\.3, where it was introduced/,
+    );
   });
 });
 

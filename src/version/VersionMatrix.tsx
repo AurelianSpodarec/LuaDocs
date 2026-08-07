@@ -2,7 +2,7 @@ import { changeNoteFor, supportRow, varies } from '@/compat/resolve';
 import type { CompatNode } from '@/compat/schema';
 import { sectionHeadingClass } from '@/entry/pageToc';
 import { VersionChip, type ChipState } from './VersionChip';
-import { renderChangeNote } from './changeNote';
+import { renderInlineCode } from '@/entry/inlineCode';
 
 /** The word behind the colour. A row that only differs by hue says nothing. */
 const statusText: Record<Exclude<ChipState, 'since'>, string> = {
@@ -43,7 +43,7 @@ export function VersionMatrix({ node }: { node: CompatNode }) {
                 <td className="px-4 py-2 text-fd-muted-foreground">
                   {(() => {
                     const note = changeNoteFor(node, version);
-                    return note ? renderChangeNote(note) : '—';
+                    return note ? renderInlineCode(note) : '—';
                   })()}
                 </td>
               </tr>

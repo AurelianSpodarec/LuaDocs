@@ -27,10 +27,11 @@ function renderAt(node: CompatNode, version: LuaVersion) {
 }
 
 const note = () => document.querySelector('[data-note="unavailable"]');
-/** The lead and the sentence are separate lines in the panel, so assert them apart. */
+/** The lead and the sentence are separate rows in the panel, so assert them apart. */
+const detail = () => document.querySelector('[data-note-detail]');
 const says = (lead: string, rest: string) => {
   expect(note()).toHaveTextContent(lead);
-  expect(note()).toHaveTextContent(rest);
+  expect(detail()).toHaveTextContent(rest);
 };
 
 describe('the unavailable callout', () => {
@@ -53,7 +54,7 @@ describe('the unavailable callout', () => {
     // The original defect: every unavailable entry closed with "as it exists from then
     // on", which on a removed one asserts a present tense the symbol does not have.
     renderAt(removed, '5.5');
-    expect(note()).not.toHaveTextContent('from then on');
+    expect(detail()).not.toHaveTextContent('from then on');
   });
 
   it('names each version once', () => {
@@ -62,7 +63,7 @@ describe('the unavailable callout', () => {
     // the reader's version repeated from the lead and the target named twice. The
     // support strip below carries the history, in colour and clickable.
     renderAt(removed, '5.2');
-    const text = note()!.textContent!;
+    const text = note()!.textContent! + ' ' + detail()!.textContent!;
     expect(text.match(/5\.2/g)).toHaveLength(1);
     expect(text.match(/5\.1/g)).toHaveLength(1);
   });
@@ -84,7 +85,7 @@ describe('the unavailable callout', () => {
     // and there is no version worth naming for a symbol no version has.
     expect(note()).toHaveTextContent('Not part of any documented Lua version.');
     expect(note()).not.toHaveTextContent('Not in Lua 5.5');
-    expect(note()).not.toHaveTextContent('Everything below');
+    expect(detail()).toBeNull();
   });
 
   it('offers no button — the support strip is where a version is chosen', () => {

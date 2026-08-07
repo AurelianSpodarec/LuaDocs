@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { renderChangeNote } from '@/version/changeNote';
+import { renderInlineCode } from '@/entry/inlineCode';
 import { compatNodes } from '@/compat/registry';
 
 /** Renders a note and hands back the container, so markup can be asserted on. */
 function noteHtml(text: string): HTMLElement {
-  const { container } = render(<p>{renderChangeNote(text)}</p>);
+  const { container } = render(<p>{renderInlineCode(text)}</p>);
   return container;
 }
 

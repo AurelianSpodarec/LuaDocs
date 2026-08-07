@@ -22,6 +22,7 @@ import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
 import { EntryProvenance } from '@/entry/EntryProvenance';
 import { parseManualUrl } from '@/entry/manualSource';
+import { renderInlineCode } from '@/entry/inlineCode';
 import { VersionPanel } from '@/version/VersionPanel';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
 import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
@@ -107,7 +108,11 @@ function Content({
     // the reader had just clicked, above the one heading that says where they are.
     <DocsPage toc={fullToc} footer={{ enabled: false }} breadcrumb={{ enabled: false }}>
       <DocsTitle className={entryTitleClass}>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
+      {/* Through `renderInlineCode`, because frontmatter is not MDX and gets no markdown
+          pass of its own — so a description naming `__len` used to set the identifier in
+          the same face as the prose around it. The raw string stays the frontmatter's,
+          which is what a search index and a meta tag will want. */}
+      <DocsDescription>{renderInlineCode(page.description ?? '')}</DocsDescription>
       {/* The version switcher used to sit here. It moved to the header, where it is
           visible on every page rather than only on entries (ADR 0007). */}
       {/*

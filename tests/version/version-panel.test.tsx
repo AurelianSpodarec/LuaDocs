@@ -48,7 +48,10 @@ describe('VersionPanel', () => {
   it('takes the tone of whatever it is reporting', () => {
     renderAt(changedIn54, '5.4');
     expect(panel()).toHaveAttribute('data-tone', 'changed');
-    expect(panel()).toHaveTextContent('Changed in Lua 5.4');
+    // A full stop, like its two siblings — the colon used to point at a sentence that
+    // followed it inline, and the note is its own row now.
+    expect(panel()).toHaveTextContent('Changed in Lua 5.4.');
+    expect(panel()).not.toHaveTextContent('Changed in Lua 5.4:');
   });
 
   it('reports absence in its own tone', () => {

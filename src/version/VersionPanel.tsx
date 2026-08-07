@@ -2,7 +2,7 @@ import { CircleAlert, CircleCheck, Info } from 'lucide-react';
 import { availabilityRanges, changeNoteFor, unavailableIn, varies } from '@/compat/resolve';
 import { LUA_VERSIONS, type CompatNode } from '@/compat/schema';
 import { VersionSupportStrip } from './VersionSupportStrip';
-import { renderChangeNote } from './changeNote';
+import { renderInlineCode } from '@/entry/inlineCode';
 import { unavailableLead, unavailableText } from './VersionNote';
 import { useSelectedVersion } from './SelectedVersionProvider';
 
@@ -90,6 +90,15 @@ export function VersionPanel({ node }: { node: CompatNode }) {
   const note = reason ? null : changeNoteFor(node, version);
   const tone: Tone = reason ? 'unavailable' : note ? 'changed' : 'available';
 
+  // Keyed off the text rather than the reason: `never` has a reason and no sentence —
+  // its lead already says the whole thing — and guarding on the reason rendered an
+  // empty paragraph with a margin on it.
+  const detail = reason
+    ? unavailableText(reason) || null
+    : note
+      ? renderInlineCode(note)
+      : null;
+
   const Icon = toneIcon[tone];
 
   const panel = (
@@ -117,23 +126,18 @@ export function VersionPanel({ node }: { node: CompatNode }) {
           className="flex min-w-0 flex-1 basis-64 items-start gap-2 text-fd-muted-foreground"
         >
           <Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${toneIconClass[tone]}`} />
-          <div>
-            <strong className="text-fd-foreground">
-              {reason
-                ? unavailableLead(reason, version)
-                : note
-                  ? `Changed in Lua ${version}:`
-                  : availabilityLead(node)}
-            </strong>
-            {/* The second line only exists where there is something more to say. An
-                entry available everywhere gets a one-row panel, which is the shape the
-                majority of pages should have. */}
-            {reason ? (
-              <p className="mt-1">{unavailableText(reason)}</p>
-            ) : note ? (
-              <p className="mt-1">{renderChangeNote(note)}</p>
-            ) : null}
-          </div>
+          {/* A full stop, not a colon. The colon was pointing at a sentence that used to
+              follow it inline; the note is a row of its own now, so it pointed off the
+              end of a line at nothing. A stop also matches its two siblings — "Not in
+              Lua 5.2." and "Available in every documented version." — which makes the
+              three leads one kind of thing rather than three. */}
+          <strong className="text-fd-foreground">
+            {reason
+              ? unavailableLead(reason, version)
+              : note
+                ? `Changed in Lua ${version}.`
+                : availabilityLead(node)}
+          </strong>
         </div>
         {/* The link rides with the chips rather than sitting on a row of its own at the
             bottom. Alone under the sentence it read as a stray — one small underlined
@@ -167,6 +171,26 @@ export function VersionPanel({ node }: { node: CompatNode }) {
           <VersionSupportStrip node={node} />
         </div>
       </div>
+      {/*
+        A row of its own, spanning the panel, rather than a third thing inside the
+        left-hand column. Kept there it inherited that column's `basis-64` width, so a
+        longer change note — `module()`'s runs to three lines — broke into short
+        measures against the left edge while the area under the chips stayed empty.
+
+        This is MDN's shape as well: label and per-target detail on one row, prose
+        underneath spanning the width.
+
+        It only exists where there is something more to say. An entry available
+        everywhere gets a one-row panel, which is the shape most pages should have.
+
+        `ps-6` sets it in the label's column — the icon's `size-4` plus its `gap-2` —
+        so the two lines share a left edge rather than the prose starting under the icon.
+      */}
+      {detail && (
+        <p data-note-detail={tone} className="mt-2 ps-6 text-fd-muted-foreground">
+          {detail}
+        </p>
+      )}
     </section>
   );
 
