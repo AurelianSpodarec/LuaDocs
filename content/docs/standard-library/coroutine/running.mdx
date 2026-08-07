@@ -1,8 +1,98 @@
 ---
 title: coroutine.running()
-description: ""
+description: Find out which coroutine is executing, from inside it.
+lua-compat: coroutine.running
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.running
 ---
 
-{/* Not yet written. */}
+Answers which coroutine is executing. A body is never handed its own handle — it was called
+like any other function — so this is how code running inside a coroutine finds out what it
+is part of, and how a helper written for several coroutines tells which one it is serving
+this time.
+
+<RunnableExample code={`local courier = coroutine.create(function()\n  return coroutine.running()\nend)\n\nlocal reported_handle = select(2, coroutine.resume(courier))\nprint(type(reported_handle))\nprint(reported_handle == courier)\n-- Expected output:\n-- thread\n-- true`} />
+
+## Syntax
+
+```lua
+coroutine.running()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Only before="5.2">
+    <Return type="thread or nil">The coroutine that is executing, and `nil` on the main line of execution — which this call does not treat as a coroutine at all, and for which it therefore has no handle to give.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="thread">The coroutine that is executing. The main line of execution counts as one, and has a handle like any other.</Return>
+    <Return type="boolean">`true` when that coroutine is the main line of execution, `false` when it is one built by [`coroutine.create()`](/docs/standard-library/coroutine/create). The boolean answers *is this the main one*, which is the reverse of the question most code has in mind: a body checking whether it is inside a coroutine of its own wants this value to be `false`.</Return>
+  </Only>
+</Returns>
+
+## Description
+
+The handle that comes back is the same value
+[`coroutine.create()`](/docs/standard-library/coroutine/create) handed out, so it compares
+equal to it, stores in a table, and works as a table key. That is most of what this call is
+for: attaching something — a name, a log prefix, a buffer, a deadline — to the coroutine it
+belongs to, from code that was never told which one it is in.
+
+It answers at any depth. A helper six frames below the body gets the same handle the body
+would, because the question it asks is about the line of execution rather than about the
+call stack. That makes it usable from library code that has no idea whether its caller is
+inside a coroutine or on the main line of execution.
+
+Where one coroutine has resumed another, the answer names the innermost one — the coroutine
+actually executing. The ones above it are on the stack and are not running;
+[`coroutine.status()`](/docs/standard-library/coroutine/status#the-states-a-coroutine-can-be-in)
+is what describes them, and
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
+covers how control got there.
+
+The call takes no arguments, and anything passed to it is ignored rather than refused.
+There is nothing it can fail on.
+
+## Examples
+
+### Tagging output by the coroutine it came from
+
+<RunnableExample code={`local job_names = {}\n\nlocal function log_step(step)\n  local here = coroutine.running()\n  print(job_names[here] .. ": " .. step)\nend\n\nlocal function start_job(name)\n  local job = coroutine.create(function()\n    log_step("opened the file")\n    coroutine.yield()\n    log_step("closed the file")\n  end)\n  job_names[job] = name\n  return job\nend\n\nlocal import_job = start_job("import")\nlocal export_job = start_job("export")\ncoroutine.resume(import_job)\ncoroutine.resume(export_job)\ncoroutine.resume(import_job)\ncoroutine.resume(export_job)\n-- Expected output:\n-- import: opened the file\n-- export: opened the file\n-- import: closed the file\n-- export: closed the file`} />
+
+`log_step` takes no argument saying which job it is logging for, and there is no global
+holding the answer either — the two jobs are interleaved, so a global would be wrong half
+the time. The handle is the key, and the table beside it turns the handle into a name.
+
+### The innermost coroutine, not the outermost
+
+<RunnableExample code={`local outer_job\nlocal inner_job\ninner_job = coroutine.create(function()\n  local here = coroutine.running()\n  print(here == inner_job)\n  print(here == outer_job)\nend)\nouter_job = coroutine.create(function()\n  coroutine.resume(inner_job)\nend)\n\ncoroutine.resume(outer_job)\n-- Expected output:\n-- true\n-- false`} />
+
+The outer job is still in the middle of its own resume and has not gone anywhere, but it is
+not the one executing, so it is not the one this answers with.
+
+## Gotchas
+
+<Gotcha title="Nothing points back at whoever resumed you">
+This answers *where the code is*, and Lua offers no matching call for *who sent it here*.
+A body that needs to know which coroutine — or which call site — resumed it has to be told,
+and the natural place is the arguments of the resume itself, which arrive as the body's
+parameters the first time and as the results of a
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield) every time after that.
+</Gotcha>
+
+<Gotcha title="A handle is an identity, not a label">
+Two coroutines built from the same function are different values and compare unequal, which
+is what makes the handle usable as a key. What it is not is readable: turning one into text
+gives an address that differs between runs and says nothing about what the coroutine is
+for. Anything a person is meant to read has to be mapped from the handle by the program,
+the way the example above maps it to a job name.
+</Gotcha>
+
+## See also
+
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — what the coroutine this names is doing
+- [`coroutine.isyieldable()`](/docs/standard-library/coroutine/isyieldable) — whether a suspension would be accepted from where it stands
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — where the handle this answers with comes from
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — how control reached the coroutine this names
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

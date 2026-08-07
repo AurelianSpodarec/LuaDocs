@@ -1,8 +1,129 @@
 ---
 title: coroutine.status()
-description: ""
+description: Ask a coroutine what it is doing, as one of four words.
+lua-compat: coroutine.status
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.status
 ---
 
-{/* Not yet written. */}
+Reports what a coroutine is doing, as a plain string. It is how the resuming side tells a
+coroutine that stopped part-way through from one that has finished for good — a distinction
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume) does not draw, since both of
+those come back `true`.
+
+<RunnableExample code={`local function stock_take()\n  coroutine.yield("shelves")\n  coroutine.yield("stockroom")\nend\n\nlocal audit = coroutine.create(stock_take)\nprint(coroutine.status(audit))\ncoroutine.resume(audit)\nprint(coroutine.status(audit))\ncoroutine.resume(audit)\ncoroutine.resume(audit)\nprint(coroutine.status(audit))\n-- Expected output:\n-- suspended\n-- suspended\n-- dead`} />
+
+## Syntax
+
+```lua
+coroutine.status(co)
+```
+
+<Parameters>
+  <Param name="co">The coroutine to ask about. It may be the coroutine doing the asking.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">One of `"running"`, `"suspended"`, `"normal"` or `"dead"` — where the coroutine stands at the moment of the call.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `co` is not a coroutine — a missing argument, `nil`, or a value of any other type. The argument is checked before there is a state to describe, so this failure escapes rather than coming back as one of the four words.
+
+</Errors>
+
+## Description
+
+The answer is an ordinary string, which is what makes it usable: it compares with `==`, it
+reads in a log line, and it keys a table. Four words cover every situation a coroutine can
+be in, and the interesting part is not what each word means on its own but which situations
+share a word and which do not.
+
+Two of them matter most in practice. `"suspended"` is the state a coroutine can be resumed
+from, and `"dead"` is the state it cannot — everything else is a coroutine that is already
+executing, or waiting on one that is. Code that has a handle and wants to know whether there
+is work left asks for one of those two and ignores the rest.
+
+## The states a coroutine can be in
+
+A coroutine is in one of four states, decided by where control currently is.
+
+*Suspended* is where a coroutine begins and where it spends most of its life.
+[`coroutine.create()`](/docs/standard-library/coroutine/create) hands back a suspended
+coroutine that has not run a line of its body, and a body parked in
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield) is suspended too. The word
+does not separate them, and for the question it is usually asked — can this be resumed? —
+there is nothing to separate.
+
+*Running* is the coroutine that is executing. One thing executes at a time, so this call
+answers `"running"` exactly when the coroutine asked about is the one doing the asking. A
+handle held by anybody else does not read as running: if the coroutine behind it were
+running, the code holding the handle would not be.
+
+*Normal* is the state readers predict least often, and it is the one a coroutine enters as
+soon as it resumes another. It has not stopped and it has not finished — it is sitting
+inside its own [`coroutine.resume()`](/docs/standard-library/coroutine/resume#how-control-passes-between-the-two-sides)
+call, waiting for the coroutine it started to hand control back. It is alive, it is on the
+stack, and it is not the one running. A chain of resumes leaves every coroutine along it
+normal except the last, which is the running one, and each goes back to running as the
+chain unwinds.
+
+*Dead* is the end. A body that returned and a body that raised are both dead, and the two
+are indistinguishable here. A dead coroutine stays dead: resuming it again reports the
+refusal rather than running the body a second time, and repeating the work means building
+another coroutine from the same function.
+
+## Examples
+
+### The coroutine that resumed another one
+
+<RunnableExample code={`local dispatcher\nlocal worker\nworker = coroutine.create(function()\n  print(coroutine.status(worker))\n  print(coroutine.status(dispatcher))\nend)\ndispatcher = coroutine.create(function()\n  coroutine.resume(worker)\nend)\n\ncoroutine.resume(dispatcher)\nprint(coroutine.status(dispatcher))\n-- Expected output:\n-- running\n-- normal\n-- dead`} />
+
+Asked from inside the worker, the worker is `"running"` and the dispatcher — stopped in the
+middle of a call it has not returned from — is `"normal"`. Once the worker finishes and the
+dispatcher's own body runs out, the dispatcher is `"dead"` like any other.
+
+### A coroutine that failed
+
+<RunnableExample code={`local double_reading = coroutine.create(function(text)\n  return tonumber(text) * 2\nend)\n\nlocal completed = coroutine.resume(double_reading, "twelve")\nprint(completed)\nprint(coroutine.status(double_reading))\n-- Expected output:\n-- false\n-- dead`} />
+
+Arithmetic on the `nil` that [`tonumber()`](/docs/standard-library/globals/tonumber) hands
+back raises inside the body, which ends the coroutine. Nothing here records *how* it ended:
+a body that returned normally leaves the same `"dead"` behind, and the status the resume
+handed back is what told the two apart.
+
+### Asking before resuming
+
+<RunnableExample code={`local countdown = coroutine.create(function()\n  coroutine.yield("two")\n  coroutine.yield("one")\n  return "go"\nend)\n\nfor attempt = 1, 4 do\n  if coroutine.status(countdown) == "dead" then\n    print("nothing left to run")\n  else\n    print(select(2, coroutine.resume(countdown)))\n  end\nend\n-- Expected output:\n-- two\n-- one\n-- go\n-- nothing left to run`} />
+
+The fourth round asks and finds nothing to do. Without the question it would have resumed a
+finished coroutine, and the refusal would have arrived as a `false` and an error object
+sitting where two ordinary results were expected.
+
+## Gotchas
+
+<Gotcha title="`suspended` does not mean started">
+A coroutine that has never run a line and one parked half-way through its body report the
+same word. Nothing here says whether the body has begun, which matters because the first
+resume of a coroutine fills in the body's parameters and every later one does not. Code
+that needs to know the difference has to track it itself — usually by having the body yield
+something recognisable on its way past the first checkpoint.
+</Gotcha>
+
+<Gotcha title="`normal` is not resumable either">
+A coroutine waiting on one it resumed looks stopped and is not: it is `"normal"`, and
+[`coroutine.resume()`](/docs/standard-library/coroutine/resume) refuses it exactly as it
+refuses a dead one. A guard written as *anything but dead can be resumed* passes it through
+and then reads the refusal as a result. The test that matches what `resume()` will accept is
+`== "suspended"`, not `~= "dead"`.
+</Gotcha>
+
+## See also
+
+- [`coroutine.resume()`](/docs/standard-library/coroutine/resume) — the call whose refusal this predicts
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — where a coroutine starts out suspended
+- [`coroutine.running()`](/docs/standard-library/coroutine/running) — which coroutine is the running one
+- [`coroutine.isyieldable()`](/docs/standard-library/coroutine/isyieldable) — whether a suspension would be accepted from where a coroutine stands
+- [`coroutine.close()`](/docs/standard-library/coroutine/close) — putting a suspended coroutine into the dead state deliberately
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

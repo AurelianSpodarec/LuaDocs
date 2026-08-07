@@ -1,8 +1,117 @@
 ---
 title: coroutine.isyieldable()
-description: ""
+description: Ask whether a suspension would be accepted from where the code is standing.
+lua-compat: coroutine.isyieldable
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-coroutine.isyieldable
 ---
 
-{/* Not yet written. */}
+Answers whether [`coroutine.yield()`](/docs/standard-library/coroutine/yield) would suspend
+from here or raise. It is the guard a helper reaches for when it may be called from inside a
+coroutine or from ordinary code, and it is a narrower question than *am I in a coroutine* —
+a coroutine that has stepped into a C function with no provision for being interrupted
+answers `false` while still being one.
+
+<RunnableExample code={`local function checkpoint(label)\n  if coroutine.isyieldable() then\n    coroutine.yield(label)\n  else\n    print("no pause available at " .. label)\n  end\nend\n\nlocal reindex = coroutine.create(function()\n  checkpoint("before sorting")\n  local pages = { "gamma", "alpha", "beta" }\n  local asked = false\n  table.sort(pages, function(left, right)\n    if not asked then\n      asked = true\n      checkpoint("inside the comparison")\n    end\n    return left < right\n  end)\n  return table.concat(pages, ", ")\nend)\n\nprint(select(2, coroutine.resume(reindex)))\nprint(select(2, coroutine.resume(reindex)))\n-- Expected output:\n-- before sorting\n-- no pause available at inside the comparison\n-- alpha, beta, gamma`} />
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+coroutine.isyieldable()
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+coroutine.isyieldable([co])
+```
+
+</Only>
+
+<Parameters>
+  <Only since="5.4">
+    <Param name="co">The coroutine to ask about. Left out, it is the one that is running, which is what nearly every call wants.</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true` when a suspension from where the coroutine stands would be accepted, `false` when it would raise instead.</Return>
+</Returns>
+
+<Errors>
+
+- <Since v="5.4" /> Raises when `co` is given and is not a coroutine.
+
+</Errors>
+
+## Description
+
+Two things have to hold for the answer to be `true`, and they are different in kind. The
+coroutine has to be one something resumed, rather than the main line of execution, which was
+never resumed by anybody and has nowhere to suspend to. And it has to be standing outside
+any C function that was not written to be interrupted and picked up again.
+[`coroutine.yield()`](/docs/standard-library/coroutine/yield#where-a-coroutine-may-not-suspend)
+sets out which calls those are and why.
+
+That second condition is what makes this a different question from *am I in a coroutine*.
+The same coroutine gives both answers within a single body: `true` in its own code, `false`
+inside a comparison function it handed to [`table.sort()`](/docs/standard-library/table/sort)
+or a replacement function it handed to [`string.gsub()`](/docs/standard-library/string/gsub).
+The answer describes a position, not an identity, and it changes as the code walks into and
+back out of those calls. Which coroutine is running is a separate question, and
+[`coroutine.running()`](/docs/standard-library/coroutine/running) is what answers it.
+
+Named a coroutine to ask about, this reports on that one instead of on the caller, by the
+same two conditions. What it describes is still a position — where the coroutine named is
+currently standing — and not whether there is anything left in it to run, which is
+[`coroutine.status()`](/docs/standard-library/coroutine/status#the-states-a-coroutine-can-be-in)'s
+question.
+
+## Examples
+
+### One coroutine, two answers
+
+<RunnableExample code={`local shelve = coroutine.create(function()\n  local titles = { "gamma", "alpha", "beta" }\n  local in_the_comparison\n  table.sort(titles, function(left, right)\n    in_the_comparison = coroutine.isyieldable()\n    return left < right\n  end)\n  print(coroutine.isyieldable())\n  print(in_the_comparison)\nend)\n\ncoroutine.resume(shelve)\n-- Expected output:\n-- true\n-- false`} />
+
+Both readings are taken inside the same coroutine, a few lines apart. Nothing about the
+coroutine changed between them; what changed is what it was standing inside when it asked.
+
+### What does not change the answer
+
+<RunnableExample code={`local survey = coroutine.create(function()\n  local inside_a_protected_call\n  pcall(function()\n    inside_a_protected_call = coroutine.isyieldable()\n  end)\n\n  local inside_a_metamethod\n  local settings = setmetatable({}, {\n    __index = function()\n      inside_a_metamethod = coroutine.isyieldable()\n      return 30\n    end,\n  })\n  local timeout = settings.timeout\n\n  print(inside_a_protected_call)\n  print(inside_a_metamethod)\n  print(timeout)\nend)\n\ncoroutine.resume(survey)\n-- Expected output:\n-- true\n-- true\n-- 30`} />
+
+A [protected call](/docs/standard-library/globals/pcall) and a metamethod standing in for an
+index are both Lua's own machinery, and a suspension travels through them. Depth does not
+enter into it either — both readings above are taken a frame or two below the body.
+
+## Gotchas
+
+<Gotcha title="It is not a test for being inside a coroutine">
+The two questions agree almost everywhere and part company inside a callback handed to a
+library function written in C. A helper that uses this to decide *whether it is in a
+coroutine* concludes it is on the main line of execution while sitting several frames inside
+one, and takes the wrong branch for reasons nothing at the call site explains. When the
+question really is which line of execution the code is on,
+[`coroutine.running()`](/docs/standard-library/coroutine/running) is the call that answers
+it.
+</Gotcha>
+
+<Gotcha title="Asking about another coroutine says nothing about resuming it">
+A coroutine that has finished, or one that has not started, is not the main line of
+execution and is not standing inside anything — so the answer is `true`, including for one
+that will never run another line. This reports where a coroutine stands, and
+[`coroutine.status()`](/docs/standard-library/coroutine/status) reports whether it has
+anything left to do; a guard written before resuming wants the second one.
+</Gotcha>
+
+## See also
+
+- [`coroutine.yield()`](/docs/standard-library/coroutine/yield) — the call whose fate this predicts
+- [`coroutine.running()`](/docs/standard-library/coroutine/running) — which coroutine the code is executing in
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — whether a coroutine has anything left to run
+- [`table.sort()`](/docs/standard-library/table/sort) — one of the calls whose callbacks answer `false`
+- [Coroutines](/docs/language/coroutines) — the mechanism, in the language's own terms

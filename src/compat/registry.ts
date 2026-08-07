@@ -104,6 +104,9 @@ import globalsLibrary from './data/globals.library.json';
 import coroutineCreate from './data/coroutine.create.json';
 import coroutineResume from './data/coroutine.resume.json';
 import coroutineYield from './data/coroutine.yield.json';
+import coroutineStatus from './data/coroutine.status.json';
+import coroutineRunning from './data/coroutine.running.json';
+import coroutineIsyieldable from './data/coroutine.isyieldable.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -528,6 +531,43 @@ const raw: Record<string, unknown> = {
   'coroutine.create': coroutineCreate,
   'coroutine.resume': coroutineResume,
   'coroutine.yield': coroutineYield,
+  // The three that report on a coroutine rather than drive one. `status` is the flat
+  // one: `luaB_costatus` is behaviourally identical at 5.1.5, v5.2.0, 5.2.4, v5.3.0,
+  // 5.3.6, v5.4.0, 5.4.8 and v5.5.0 — the same four strings in the same four
+  // situations, and a type check on the argument that raises in every version. The
+  // 5.4 manual rewrites the `"running"` clause ("it called status" becomes "it is the
+  // one that called status") and 5.3 rewrites the library preamble; neither is a
+  // behaviour change, on the ruling `math.huge` set. So its node is availability and
+  // nothing else, and no matrix renders on the page.
+  //
+  // `running` is the section's real version fact and it moved once. 5.1's
+  // `luaB_corunning` lives in `lbaselib.c` and is `if (lua_pushthread(L))
+  // lua_pushnil(L); return 1;` — one value, and `nil` on the main thread, which it
+  // declines to treat as a coroutine ("main thread is not a coroutine", its own
+  // comment). From v5.2.0 onwards `lcorolib.c` has `int ismain = lua_pushthread(L);
+  // lua_pushboolean(L, ismain); return 2;`, byte-identical at every tag through
+  // v5.5.0 — two values, a thread in every case including the main one, and a boolean
+  // whose polarity is *is this the main one*, not *is this a coroutine*. Both halves
+  // of the change are observable from Lua and both are in the note: the count, and
+  // what the main line of execution gets. Neither the count nor the main-thread answer
+  // can be shown by a card here, because the harness runs every card inside a
+  // coroutine — see the authoring context — so both live in prose, in the dataset, and
+  // in a `<Only>`-scoped `<Return>` pair.
+  //
+  // `isyieldable` is a pure arrival at 5.3 with one later change. 5.3's
+  // `luaB_yieldable` reads no argument at all (`lua_isyieldable(L)`); v5.4.0's is
+  // `lua_isnone(L, 1) ? L : getco(L)` and v5.5.0's spells the same thing as
+  // `getoptco`. So the optional argument is 5.4, and with it the argument check that
+  // raises — before it, a value passed to this call is silently ignored. What it
+  // reports never changed: the manual's rule ("not the main thread and not inside a
+  // non-yieldable C function") is word-identical in all three versions that have it.
+  //
+  // None of the three is named in any Incompatibilities chapter; all four were read in
+  // full. The only coroutine-adjacent entries there are C API signature changes, as
+  // C1 already recorded.
+  'coroutine.status': coroutineStatus,
+  'coroutine.running': coroutineRunning,
+  'coroutine.isyieldable': coroutineIsyieldable,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

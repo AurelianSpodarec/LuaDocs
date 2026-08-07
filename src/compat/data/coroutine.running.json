@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Answers with two values where it used to answer with one, and answers on the main line of execution where it used to decline to. Before this the call hands back the running coroutine and nothing else, and hands back `nil` when nothing resumed the code asking — so code outside every coroutine gets no handle at all, and a test against `nil` is what tells the two situations apart. From here on a coroutine comes back in every case, the main line of execution included, followed by a boolean that is `true` exactly when that coroutine is the main one."
+  }
+}

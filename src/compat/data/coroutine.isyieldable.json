@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.3" } },
+  "changed_in": {
+    "5.4": "Takes an optional coroutine to ask about. Before this the call reads no arguments at all — anything passed is ignored rather than refused — and always reports on the coroutine that is running; from here on a coroutine may be named, leaving it out still means the running one, and a named value that is not a coroutine raises."
+  }
+}
