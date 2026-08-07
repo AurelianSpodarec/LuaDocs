@@ -12,8 +12,14 @@ export function Parameters({ children }: { children: ReactNode }) {
   const version = useSelectedVersionOrNull();
   // A heading over an empty list is a claim of its own — "this call takes parameters" —
   // and it is the claim that is false on the version that scoped every one of them away.
-  // Nothing without `<Only>` inside it can reach this branch: every `<Parameters>` in the
-  // tree holds `<Param>`s and nothing else.
+  //
+  // Two shapes reach this branch. One is a `<Parameters>` whose every `<Param>` is scoped
+  // out by `<Only>` on the selected version, which is what this was written for. The other
+  // is a `<Parameters>` an author wrote *empty*, because the call takes no arguments on any
+  // version — `coroutine.running()` is the first. That is deliberate and is the shape every
+  // zero-argument function entry takes: `entry-anatomy.test.ts` requires the element on
+  // every function entry, and rendering nothing is the honest answer for a call with
+  // nothing to list.
   if (inScope(children, version).length === 0) return null;
 
   return (

@@ -27,7 +27,7 @@ coroutine.running()
   </Only>
   <Only since="5.2">
     <Return type="thread">The coroutine that is executing. The main line of execution counts as one, and has a handle like any other.</Return>
-    <Return type="boolean">`true` when that coroutine is the main line of execution, `false` when it is one built by [`coroutine.create()`](/docs/standard-library/coroutine/create). The boolean answers *is this the main one*, which is the reverse of the question most code has in mind: a body checking whether it is inside a coroutine of its own wants this value to be `false`.</Return>
+    <Return type="boolean">`true` when that coroutine is the main line of execution, and `false` for every other coroutine — one built by [`coroutine.create()`](/docs/standard-library/coroutine/create) among them. The boolean answers *is this the main one*, which is the reverse of the question most code has in mind: a body checking whether it is inside a coroutine of its own wants this value to be `false`.</Return>
   </Only>
 </Returns>
 

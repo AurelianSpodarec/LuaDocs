@@ -50,10 +50,10 @@ coroutine.isyieldable([co])
 
 ## Description
 
-Two things have to hold for the answer to be `true`, and they are different in kind. The
-coroutine has to be one something resumed, rather than the main line of execution, which was
-never resumed by anybody and has nowhere to suspend to. And it has to be standing outside
-any C function that was not written to be interrupted and picked up again.
+Two things have to hold for the answer to be `true`, and they are different in kind. It has
+to be a coroutine rather than the main line of execution — which nothing resumed, and so has
+nowhere to suspend to. And it has to be standing outside any C function that was not written
+to be interrupted and picked up again.
 [`coroutine.yield()`](/docs/standard-library/coroutine/yield#where-a-coroutine-may-not-suspend)
 sets out which calls those are and why.
 
