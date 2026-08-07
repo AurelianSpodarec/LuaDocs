@@ -1,5 +1,5 @@
 import { changeNoteFor, isAvailable, unavailableIn, type Unavailable } from '@/compat/resolve';
-import type { CompatNode } from '@/compat/schema';
+import type { CompatNode, LuaVersion } from '@/compat/schema';
 import { Callout } from '@/entry/Callout';
 import { renderChangeNote } from './changeNote';
 import { useSelectedVersion } from './SelectedVersionProvider';
@@ -40,11 +40,40 @@ export function unavailableText(reason: Unavailable): string {
   }
 }
 
+/**
+ * The version the prose below is actually written about — the callout's own promise,
+ * as a value.
+ *
+ * Each sentence in `unavailableText` ends by naming what the body describes, and this
+ * returns exactly that version, which is what makes the two impossible to drift apart:
+ * "as it exists from then on" is `addedIn`, "as it was, up to Lua X" is `lastAvailable`,
+ * and "as it exists there" is `restoredIn`. A symbol no version documents has no such
+ * version, and gets no offer.
+ *
+ * **`restored` resolves forward, not back.** A reader in the gap could be sent either
+ * way, and the body settles it: it is written about the version the symbol came back in,
+ * so sending them to `lastAvailable` would hand them prose describing a different one.
+ */
+export function targetVersion(reason: Unavailable): LuaVersion | null {
+  switch (reason.kind) {
+    case 'never':
+      return null;
+    case 'not-yet':
+      return reason.addedIn;
+    case 'removed':
+      return reason.lastAvailable;
+    case 'restored':
+      return reason.restoredIn;
+  }
+}
+
 /** Renders only when the entry does not exist in the selected version. */
 export function VersionUnavailable({ node }: { node: CompatNode }) {
-  const { version } = useSelectedVersion();
+  const { version, setVersion } = useSelectedVersion();
   const reason = unavailableIn(node, version);
   if (!reason) return null;
+
+  const target = targetVersion(reason);
 
   return (
     /* Sticky, not merely first. Moving it to the top only helps a reader who has not
@@ -62,6 +91,29 @@ export function VersionUnavailable({ node }: { node: CompatNode }) {
               directly above the callout anyway. */}
           <strong>Not in Lua {version}.</strong> {unavailableText(reason)}
         </span>
+        {/* The way out, next to the sentence that creates the need for one.
+            A reader arriving here from a search engine is on the wrong version by
+            accident, and everything they came for is one click away behind a control
+            in the header they have no reason to have noticed.
+
+            A button rather than linkified version names: the sentence names the
+            version the symbol *left* as well as the one it works in — "removed in Lua
+            5.2" — so making version names clickable would offer the one place worth
+            not going. And an explicit label states the destination, which
+            "5.1" inside a sentence does not.
+
+            The support strip above is deliberately not clickable for the mirror-image
+            reason: only its available chips could lead anywhere useful, and five
+            identical pills where one is a control is worse than none. */}
+        {target && (
+          <button
+            type="button"
+            onClick={() => setVersion(target)}
+            className="mt-2 inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fd-ring dark:text-amber-300"
+          >
+            View as Lua {target}
+          </button>
+        )}
       </Callout>
     </div>
   );

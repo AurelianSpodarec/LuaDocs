@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import { unavailableText, VersionUnavailable } from '@/version/VersionNote';
+import { targetVersion, unavailableText, VersionUnavailable } from '@/version/VersionNote';
 import type { CompatNode, LuaVersion } from '@/compat/schema';
 
 /** The four shapes of absence. Only the first had a branch of its own. */
@@ -82,6 +82,70 @@ describe('the unavailable callout', () => {
     // The same trailing clause used to be appended here too, describing an existence
     // the sentence before it had just denied.
     expect(note()).not.toHaveTextContent('from then on');
+  });
+});
+
+describe('the way out of a version the entry is not in', () => {
+  const offer = () => screen.queryByRole('button', { name: /view as lua/i });
+
+  it('offers the version the entry arrived in, to a reader who is early', () => {
+    renderAt(notYetAdded, '5.1');
+    expect(offer()).toHaveTextContent('View as Lua 5.2');
+  });
+
+  it('offers the last version that had it, to a reader who is late', () => {
+    renderAt(removed, '5.5');
+    expect(offer()).toHaveTextContent('View as Lua 5.1');
+  });
+
+  it('sends a reader in the gap forward, to where the body is written about', () => {
+    // Either direction is defensible from availability alone; the prose is not. It
+    // says "as it exists there", meaning the version it came back in.
+    renderAt(cameBack, '5.4');
+    expect(offer()).toHaveTextContent('View as Lua 5.5');
+  });
+
+  it('offers nothing for a symbol no documented version has', () => {
+    renderAt(never, '5.5');
+    expect(offer()).toBeNull();
+  });
+
+  it('offers nothing where the entry exists — there is no callout to hold it', () => {
+    renderAt(removed, '5.1');
+    expect(offer()).toBeNull();
+  });
+
+  it('actually switches the selected version, and dismisses itself by doing so', () => {
+    renderAt(removed, '5.5');
+    fireEvent.click(offer()!);
+
+    expect(screen.getByLabelText(/lua version/i)).toHaveValue('5.1');
+    // The entry exists in 5.1, so the callout that carried the button is gone.
+    expect(note()).toBeNull();
+    expect(offer()).toBeNull();
+  });
+
+  it('names the same version the sentence promises the body describes', () => {
+    // The pair that must never drift: `unavailableText` ends by naming what is
+    // described below, and the button is where it sends you.
+    const gap = {
+      kind: 'restored',
+      addedIn: '5.1',
+      removedIn: '5.3',
+      lastAvailable: '5.2',
+      restoredIn: '5.5',
+    } as const;
+    expect(unavailableText(gap)).toContain('back in Lua 5.5');
+    expect(targetVersion(gap)).toBe('5.5');
+
+    const gone = {
+      kind: 'removed',
+      addedIn: '5.1',
+      removedIn: '5.2',
+      lastAvailable: '5.1',
+    } as const;
+    expect(unavailableText(gone)).toContain('up to Lua 5.1');
+    expect(targetVersion(gone)).toBe('5.1');
   });
 });
 
