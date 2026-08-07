@@ -185,9 +185,13 @@ export function VersionPanel({ node }: { node: CompatNode }) {
 
         `ps-6` sets it in the label's column — the icon's `size-4` plus its `gap-2` —
         so the two lines share a left edge rather than the prose starting under the icon.
+
+        `mt-1`, not `mt-2`: at 8px the two lines sat 30px apart baseline to baseline
+        against a 20px line pitch — half again as loose as ordinary prose, for two lines
+        that are one statement. 4px reads as a break without reading as a gap.
       */}
       {detail && (
-        <p data-note-detail={tone} className="mt-2 ps-6 text-fd-muted-foreground">
+        <p data-note-detail={tone} className="mt-1 ps-6 text-fd-muted-foreground">
           {detail}
         </p>
       )}
