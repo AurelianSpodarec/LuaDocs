@@ -22,9 +22,8 @@ import { VersionMatrix } from '@/version/VersionMatrix';
 import { EntrySource } from '@/entry/EntrySource';
 import { EntryProvenance } from '@/entry/EntryProvenance';
 import { parseManualUrl } from '@/entry/manualSource';
-import { VersionSupportStrip } from '@/version/VersionSupportStrip';
+import { VersionPanel } from '@/version/VersionPanel';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import { VersionChangeNote, VersionUnavailable } from '@/version/VersionNote';
 import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
 import { buildFullToc, entryTitleClass } from '@/entry/pageToc';
 import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
@@ -109,10 +108,6 @@ function Content({
     <DocsPage toc={fullToc} footer={{ enabled: false }} breadcrumb={{ enabled: false }}>
       <DocsTitle className={entryTitleClass}>{page.title}</DocsTitle>
       <DocsDescription>{page.description}</DocsDescription>
-      {/* Above the strip, because it is not a detail about the entry — it invalidates
-          it. Everything below describes something the reader cannot call, and the
-          further down this sits the more of that they read first. */}
-      {node && <VersionUnavailable node={node} />}
       {/* The version switcher used to sit here. It moved to the header, where it is
           visible on every page rather than only on entries (ADR 0007). */}
       {/*
@@ -136,12 +131,10 @@ function Content({
         The remaining item, Open in GitHub, is sound but duplicates "Improve this page"
         in the provenance panel at the foot, which resolves to the same file.
       */}
-      {node && (
-        <div className="flex flex-col gap-3">
-          <VersionSupportStrip node={node} />
-          <VersionChangeNote node={node} />
-        </div>
-      )}
+      {/* One panel rather than three floating bands — an alert stripe, a bare row of
+          pills and sometimes a second stripe, none of which said they were about the
+          same subject. Modelled on MDN's Baseline block; see `VersionPanel`. */}
+      {node && <VersionPanel node={node} />}
       {/* The body needs to know too: a runnable example that fires on its own and prints
           a result is a demonstration, and a demonstration outweighs a notice the reader
           has already scrolled past. */}

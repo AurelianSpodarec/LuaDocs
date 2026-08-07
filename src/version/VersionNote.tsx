@@ -1,19 +1,17 @@
-import { changeNoteFor, isAvailable, unavailableIn, type Unavailable } from '@/compat/resolve';
-import type { CompatNode, LuaVersion } from '@/compat/schema';
-import { Callout } from '@/entry/Callout';
-import { renderChangeNote } from './changeNote';
-import { useSelectedVersion } from './SelectedVersionProvider';
+import type { Unavailable } from '@/compat/resolve';
+import type { LuaVersion } from '@/compat/schema';
 
 /**
- * The two inline deltas are split because they are not the same kind of fact.
+ * The words an absence gets. `VersionPanel` is what renders them.
  *
- * A change note *qualifies* the entry: everything below it still applies, with one
- * detail different. "Not in Lua 5.1" *invalidates* it — the syntax, the parameters, the
- * examples and the gotchas below all describe something the reader cannot call. So the
- * first belongs beside the version strip it elaborates, and the second belongs above
- * everything, before the reader has invested in reading.
+ * The two inline deltas remain different kinds of fact, which is why the panel gives
+ * them different tones rather than one shared "notice" treatment. A change note
+ * *qualifies* the entry: everything below it still applies, with one detail different.
+ * "Not in Lua 5.1" *invalidates* it — the syntax, the parameters, the examples and the
+ * gotchas below all describe something the reader cannot call. Only the second is worth
+ * pinning to the top of the viewport.
  *
- * `data-note` is what `tests/e2e/string-format.test.tsx` queries; both keep theirs.
+ * `data-note` is what `tests/e2e/string-format.test.tsx` queries.
  */
 
 /**
@@ -82,54 +80,4 @@ const because: Record<Unavailable['kind'], string> = {
 export function unavailableText(reason: Unavailable): string {
   const target = targetVersion(reason);
   return target ? `Everything below describes Lua ${target}, ${because[reason.kind]}.` : '';
-}
-
-/** Renders only when the entry does not exist in the selected version. */
-export function VersionUnavailable({ node }: { node: CompatNode }) {
-  const { version } = useSelectedVersion();
-  const reason = unavailableIn(node, version);
-  if (!reason) return null;
-
-  return (
-    /* Sticky, not merely first. Moving it to the top only helps a reader who has not
-       scrolled — and an entry a reader cannot use is a fact that stays true all the way
-       down, past the syntax, the parameters and every example. Pinned under the header,
-       it cannot be read once and left behind.
-       `bg-fd-background` is load-bearing: a translucent callout would let the entry
-       scroll visibly through the thing contradicting it. */
-    <div className="sticky top-(--fd-header-height) z-10 -mx-1 bg-fd-background px-1">
-      <Callout kind="unavailable">
-        {/* No button here, and there was one briefly.
-            It read "View as Lua 5.1" directly under a sentence ending "…up to Lua 5.1",
-            which named the version three times in two lines. It existed because the
-            support strip was inert; now that every chip in the strip selects a version,
-            the callout's job is to say *which* version to want, and the strip one row
-            below is where you act on it. */}
-        <span data-note="unavailable">
-          {/* Subject-free on purpose. Building the sentence from the entry's title read
-              "Format strings for pack and unpack was introduced in Lua 5.3" — the verb
-              cannot agree with a title it does not know the number of, and the title is
-              directly above the callout anyway. */}
-          <strong>{unavailableLead(reason, version)}</strong> {unavailableText(reason)}
-        </span>
-      </Callout>
-    </div>
-  );
-}
-
-/** Renders only when the entry exists here but behaves differently. */
-export function VersionChangeNote({ node }: { node: CompatNode }) {
-  const { version } = useSelectedVersion();
-  if (!isAvailable(node, version)) return null;
-
-  const note = changeNoteFor(node, version);
-  if (!note) return null;
-
-  return (
-    <Callout kind="changed">
-      <span data-note="changed">
-        <strong>Changed in Lua {version}:</strong> {renderChangeNote(note)}
-      </span>
-    </Callout>
-  );
 }

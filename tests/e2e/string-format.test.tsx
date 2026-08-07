@@ -4,8 +4,7 @@ import { createRootRoute, createRouter, createMemoryHistory, RouterProvider } fr
 import type * as PageTree from 'fumadocs-core/page-tree';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import { VersionSupportStrip } from '@/version/VersionSupportStrip';
-import { VersionChangeNote, VersionUnavailable } from '@/version/VersionNote';
+import { VersionPanel } from '@/version/VersionPanel';
 import { compatNodeFor } from '@/compat/registry';
 import { createSidebarItem } from '@/sidebar/Sidebar';
 
@@ -15,9 +14,7 @@ function Entry() {
   return (
     <SelectedVersionProvider>
       <VersionSwitcher />
-      <VersionSupportStrip node={node} />
-      <VersionUnavailable node={node} />
-      <VersionChangeNote node={node} />
+      <VersionPanel node={node} />
     </SelectedVersionProvider>
   );
 }
@@ -28,7 +25,7 @@ function selectVersion(version: string) {
 
 /** The strip and the switcher both render every version number — scope to the strip. */
 function chip(version: string) {
-  return within(screen.getByLabelText('Version support')).getByText(version);
+  return within(screen.getByLabelText('Choose a version')).getByText(version);
 }
 
 describe('the assembled string.format entry', () => {
@@ -41,10 +38,16 @@ describe('the assembled string.format entry', () => {
     expect(node.support.lua.version_added).toBe('5.1');
   });
 
-  it('shows no delta at the default version', () => {
+  it('shows no delta at the default version, and says so', () => {
+    // The panel always carries a status. Silence used to be how "nothing to report"
+    // was expressed, which meant the only time a reader saw anything was bad news.
     render(<Entry />);
     expect(chip('5.5')).toHaveAttribute('data-state', 'yes');
-    expect(document.querySelector('[data-note]')).toBeNull();
+    expect(document.querySelector('[data-note="changed"]')).toBeNull();
+    expect(document.querySelector('[data-note="unavailable"]')).toBeNull();
+    expect(document.querySelector('[data-note="available"]')).toHaveTextContent(
+      'Available in every documented version.',
+    );
   });
 
   it('surfaces the change note for the selected version', () => {
@@ -78,9 +81,7 @@ describe('the assembled string.format entry', () => {
     render(
       <SelectedVersionProvider>
         <VersionSwitcher />
-        <VersionSupportStrip node={introducedIn53} />
-        <VersionUnavailable node={introducedIn53} />
-        <VersionChangeNote node={introducedIn53} />
+        <VersionPanel node={introducedIn53} />
       </SelectedVersionProvider>,
     );
 

@@ -28,7 +28,9 @@ export function VersionSupportStrip({ node }: { node: CompatNode }) {
   const { version: selected, setVersion } = useSelectedVersion();
 
   return (
-    <div className="not-prose flex flex-wrap gap-1.5" aria-label="Version support">
+    /* "Choose a version", not "Version support" — that name belongs to the panel this
+       sits inside now (`VersionPanel`), and two nested regions cannot share one. */
+    <div role="group" aria-label="Choose a version" className="not-prose flex flex-wrap gap-1.5">
       {supportRow(node).map(({ version, state }) => (
         <VersionChip
           key={version}

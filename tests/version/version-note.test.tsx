@@ -2,12 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SelectedVersionProvider } from '@/version/SelectedVersionProvider';
 import { VersionSwitcher } from '@/version/VersionSwitcher';
-import {
-  targetVersion,
-  unavailableLead,
-  unavailableText,
-  VersionUnavailable,
-} from '@/version/VersionNote';
+import { targetVersion, unavailableLead, unavailableText } from '@/version/VersionNote';
+import { VersionPanel } from '@/version/VersionPanel';
 import type { CompatNode, LuaVersion } from '@/compat/schema';
 
 /** The four shapes of absence. Only the first had a branch of its own. */
@@ -24,7 +20,7 @@ function renderAt(node: CompatNode, version: LuaVersion) {
   render(
     <SelectedVersionProvider>
       <VersionSwitcher />
-      <VersionUnavailable node={node} />
+      <VersionPanel node={node} />
     </SelectedVersionProvider>,
   );
   fireEvent.change(screen.getByLabelText(/lua version/i), { target: { value: version } });
