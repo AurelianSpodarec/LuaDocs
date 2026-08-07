@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "`t1` is required. 5.1 and 5.2 take it as `0` when it is left out, so `os.difftime(stamp)` measures from whatever moment `0` names there. Both arguments also have to be whole numbers inside the range a time value can hold, where earlier versions accept any number and truncate a fraction."
+  }
+}

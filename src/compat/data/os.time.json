@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "The time value comes back as an integer; 5.1 and 5.2 have only one number type to return it in. The table's fields are read far more strictly: a field holding a value that is not a whole number raises, where earlier versions truncate a fraction and quietly fall back to the default for an optional field they cannot read at all, so `os.time{ year = 2024, month = 3, day = 15, hour = \"noon\" }` builds a time there and raises here. A field too large for the calendar fields underneath raises as well. A date the system cannot turn into a time value raises instead of answering `nil`. And the table handed in is written back, its fields normalised to the same moment with every value inside its ordinary range and `yday` and `wday` filled in beside them — earlier versions leave the table exactly as it was given."
+  }
+}

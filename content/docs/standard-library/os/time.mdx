@@ -1,8 +1,166 @@
 ---
 title: os.time()
-description: ""
+description: Read the system clock, or turn a date written out as fields into a time value.
+lua-compat: os.time
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.time
 ---
 
-{/* Not yet written. */}
+Answers with a *time value*: the moment the system clock is showing when called with
+nothing, or the moment a table of date fields describes. It is the way into this
+library — [`os.date()`](/docs/standard-library/os/date) and
+[`os.difftime()`](/docs/standard-library/os/difftime) both take what this call hands
+back.
+
+<RunnableExample code={`local backup_started = os.time{ year = 2024, month = 3, day = 15, hour = 9, min = 30, sec = 0 }\nprint(os.date("%Y-%m-%d %H:%M:%S", backup_started))\n-- Expected output: 2024-03-15 09:30:00`} />
+
+## Syntax
+
+```lua
+os.time([table])
+```
+
+<Parameters>
+  <Param name="table">The date to build a time value for, written out as fields. `year`, `month` and `day` have to be there; `hour`, `min` and `sec` are optional and have defaults, and `isdst` may be there as well. Left out altogether, the clock is read instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">A time value naming that moment. What the number itself means is the system's business — see [What a time value is](#what-a-time-value-is).</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the argument is present and is neither a table nor `nil`.
+- Raises when `year`, `month` or `day` is absent from the table, or holds a value that cannot be read as a number.
+- <Since v="5.3" /> Raises when a field holds a number carrying a fraction rather than an exact whole-number value. `day = 15.0` is accepted; `day = 15.5` is not.
+- <Since v="5.3" /> Raises when `hour`, `min` or `sec` holds a value that cannot be read as a number, rather than falling back to its default.
+- <Since v="5.3" /> Raises when a field's value is too large or too small for the range the underlying calendar fields are held in.
+- <Since v="5.3" /> Raises when the date described cannot be turned into a time value on this system.
+
+</Errors>
+
+## Description
+
+Two calls in one. With no argument it reads the clock and answers with the current
+moment. With a table it goes the other way: the fields describe a date and a time of
+day, and the call works out which moment that is.
+
+The second form is how a program builds a time value for a date it knows —
+a deadline, a record's timestamp, the start of the month — without knowing anything
+about how the system counts. Everything else in this library takes that value and works
+from it.
+
+## What a time value is
+
+The number this function answers with is the system's own name for a moment, and the
+manual promises less about it than most code assumes. On POSIX systems, on Windows and
+on many others it counts seconds from a fixed starting point — the *epoch* — which is
+why arithmetic on one so often works out. Where a system keeps time some other way the
+number's meaning is not specified at all, and the only use it is guaranteed to have is
+as an argument to [`os.date()`](/docs/standard-library/os/date) and
+[`os.difftime()`](/docs/standard-library/os/difftime).
+
+So the safe way to hold one is as a token rather than as a quantity: something to store,
+to pass around, and to hand back to the two functions that know how to read it. Turning
+it into a date means [`os.date()`](/docs/standard-library/os/date), and measuring the gap
+between two of them means
+[`os.difftime()`](/docs/standard-library/os/difftime), which is defined to answer in
+seconds however the system underneath happens to count.
+
+That is also why a literal number is a poor way to name a moment in source code. A time
+value written out by hand is only meaningful on systems that count the way the machine it
+was written on did; a table handed to this call says what it means everywhere.
+
+## The fields it reads
+
+`year`, `month` and `day` are required. `hour` defaults to `12`, `min` to `0` and `sec`
+to `0`, so a table naming only a date lands at noon rather than at midnight.
+
+`isdst` says whether daylight saving is in force at that moment. Left out, the system
+works it out for itself, which is usually what you want. It is read as a *boolean*,
+so any value other than `nil` or `false` means yes — `isdst = 0` asks for daylight saving
+rather than against it.
+
+Keys the call does not know about are ignored, so a table carrying a description or an
+identifier beside its date fields is read the same as one carrying the fields alone.
+
+The fields describe a *local* date and time — the system's own time zone, whatever that
+is. There is no argument that asks for them to be read as
+[Coordinated Universal Time](/docs/standard-library/os/date#coordinated-universal-time);
+that is a reading `os.date()` offers on the way out, not one this call offers on the way
+in.
+
+A field's value does not have to be inside its ordinary range. A `day` of `61` means
+sixty days past the first of the month named, a `sec` of `-10` means ten seconds before
+the rest of the table, and `month = 0` means December of the year before. That is what
+makes date arithmetic possible without a calendar: add to a field and let the call sort
+out the carrying. Afterwards the table itself holds the sorted-out values — the same
+moment, with each of the date fields inside its ordinary range and `yday` and `wday`
+filled in beside them.
+
+## Examples
+
+### A date with no time of day
+
+<RunnableExample code={`local without_a_clock = os.time{ year = 2024, month = 3, day = 15 }\nprint(os.date("%Y-%m-%d %H:%M:%S", without_a_clock))\n-- Expected output: 2024-03-15 12:00:00`} />
+
+The three required fields and nothing else, so the defaults decide the time of day. Noon,
+not midnight — which is the one default worth memorising.
+
+### Arithmetic by writing a field out of range
+
+<RunnableExample code={`local invoice_day = 31\nlocal invoice_sent = os.time{ year = 2024, month = 1, day = invoice_day, hour = 9 }\nlocal payment_due = os.time{ year = 2024, month = 1, day = invoice_day + 30, hour = 9 }\n\nprint(os.date("%Y-%m-%d", invoice_sent))\nprint(os.date("%Y-%m-%d", payment_due))\n-- Expected output:\n-- 2024-01-31\n-- 2024-03-01`} />
+
+Thirty days after the 31st of January is the 1st of March, and nothing here had to know
+that February was involved or that 2024 gave it an extra day.
+
+<Only since="5.3">
+
+### The table comes back sorted out
+
+<RunnableExample code={`local reminder = { year = 2024, month = 1, day = 61, hour = 9 }\nos.time(reminder)\n\nprint(reminder.year, reminder.month, reminder.day)\nprint(reminder.yday, reminder.wday)\n-- Expected output:\n-- 2024\t3\t1\n-- 61\t6`} />
+
+The table handed in is the table written back. Its `day` of `61` has become the 1st of
+March, and `yday` and `wday` — which were never there — now say it is the 61st day of the
+year and a Friday.
+
+</Only>
+
+### An incomplete table is refused
+
+<RunnableExample code={`local half_a_date = { year = 2024, month = 3 }\nlocal built = pcall(os.time, half_a_date)\nprint(built)\n-- Expected output: false`} />
+
+`day` is missing, and there is no default for it. The three fields that name the date have
+nothing to fall back on, so the call says so rather than guessing which day was meant.
+
+## Gotchas
+
+<Gotcha title="The hour defaults to noon">
+`os.time{ year = 2024, month = 3, day = 15 }` is noon on the 15th, not the start of it.
+The default is `12` for `hour` and `0` for the two below it, so a table meaning
+"the start of that day" has to say `hour = 0` outright. Code that builds a day boundary
+and forgets is out by half a day, in a direction that depends on which side of noon the
+comparison falls.
+</Gotcha>
+
+<Gotcha title="The fields are read in the system's own time zone">
+The same table can give different time values on two machines whose zones differ, and
+that is the intended reading — the fields describe a local date. A program that means a
+fixed instant regardless of where it runs cannot express it here; it has to carry the time
+value itself, which is zone-free, and render it with
+[`os.date()`](/docs/standard-library/os/date#coordinated-universal-time)'s `!` prefix when
+it needs to show one.
+</Gotcha>
+
+<Gotcha title="isdst = 0 means yes">
+`isdst` is tested for truth, not compared against a number, and `0` is true in Lua. So
+`isdst = 0` asserts that daylight saving *is* in force — the opposite of what a reader
+coming from C would expect it to say. Write `false` to assert it is not, and leave the
+field out to let the system decide.
+</Gotcha>
+
+## See also
+
+- [`os.date()`](/docs/standard-library/os/date) — turning a time value back into a date, as text or as fields
+- [`os.difftime()`](/docs/standard-library/os/difftime) — the seconds between two time values
+- [`os.clock()`](/docs/standard-library/os/clock) — processor time used, which is a different measurement entirely

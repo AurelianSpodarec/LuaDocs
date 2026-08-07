@@ -1,8 +1,202 @@
 ---
 title: os.date()
-description: ""
+description: Turn a time value into text, or into a table of its parts.
+lua-compat: os.date
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.date
 ---
 
-{/* Not yet written. */}
+Renders a moment as a person or a log file wants to read it. A format string of literal
+text and `%` conversions gives a string back; the format `"*t"` gives a table of the
+moment's parts instead. What it renders is either the current time or a time value from
+[`os.time()`](/docs/standard-library/os/time).
+
+<RunnableExample code={`local release_day = os.time{ year = 2024, month = 3, day = 15, hour = 9, min = 30, sec = 0 }\nprint(os.date("%Y-%m-%d", release_day))\nprint(os.date("%d/%m/%Y at %H:%M", release_day))\n-- Expected output:\n-- 2024-03-15\n-- 15/03/2024 at 09:30`} />
+
+## Syntax
+
+```lua
+os.date([format [, time]])
+```
+
+<Parameters>
+  <Param name="format">How to render the moment. Literal text is copied through and each `%` conversion is replaced by a piece of the date. Omitted, it is `"%c"`, a rendering the current locale chooses. A leading `!` asks for the reading in [Coordinated Universal Time](#coordinated-universal-time), and `"*t"` after it asks for [a table rather than a string](#reading-the-parts-instead).</Param>
+  <Param name="time">The moment to render, as a time value from [`os.time()`](/docs/standard-library/os/time). Omitted, the clock is read and the current moment is rendered.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">With a format that is not [the table form](#reading-the-parts-instead): the format with each conversion replaced, and everything else left as written.</Return>
+  <Return type="table">With the table form — `"*t"`, or `"!*t"` for the reading in [Coordinated Universal Time](#coordinated-universal-time) — a fresh table holding the moment's parts as separate fields.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `format` is a value that cannot be read as a string.
+- Raises when `time` is present and cannot be read as a number.
+- <Since v="5.2" /> Raises when a `%` in the format is followed by something the interpreter does not list as a conversion, a `%` at the very end of the string included.
+- <Since v="5.3" /> Raises when `time` is not a whole number, or lies outside the range a time value can hold on this system.
+- <Since v="5.3" /> Raises when `time` names a moment this system cannot work out a date for.
+
+</Errors>
+
+## Description
+
+The format string decides both *what* comes back and *how much* of it. Almost every
+format produces a string; the one that does not is `"*t"`, which produces a table, and
+is what code reaches for when it wants a field rather than a rendering.
+
+A leading `!` is read before either of those and changes which clock the moment is read
+against. It is a prefix rather than a conversion, so it applies to the whole format and
+has to be the first character — which is why `"!*t"` is the table form too.
+
+Nothing here modifies anything: a call renders a moment and hands back a new string or a
+new table, and the time value it was given is untouched.
+
+## The format string
+
+Everything that is not part of a conversion is copied through as written, so punctuation,
+words and spacing all survive intact. A conversion is a `%` and the letter that names it;
+a few forms take a second letter after the first. `%%` is how a literal `%` is written.
+
+The manual does not list the conversions itself. It says the format follows the same
+rules as C's `strftime`, and the set the interpreter accepts is a list fixed when it is
+built, following what the host C library offers. The ones below have been in ISO C since
+its first standard, and they are the portable ground:
+
+| Conversion | What it renders |
+|---|---|
+| `%Y` | the year, in full |
+| `%y` | the last two digits of the year, `00`–`99` |
+| `%m` | the month as a number, `01`–`12` |
+| `%d` | the day of the month, `01`–`31` |
+| `%H` | the hour on a 24-hour clock, `00`–`23` |
+| `%M` | the minute, `00`–`59` |
+| `%S` | the second, `00`–`61` |
+| `%I` | the hour on a 12-hour clock, `01`–`12` |
+| `%p` | the half of the day — `AM` or `PM` in the C locale |
+| `%a` | the weekday, abbreviated |
+| `%A` | the weekday, written out |
+| `%b` | the month, abbreviated |
+| `%B` | the month, written out |
+| `%j` | the day of the year, `001`–`366` |
+| `%w` | the weekday as a number, Sunday being `0` |
+| `%U` | the week of the year counting Sunday as its first day, `00`–`53` |
+| `%W` | the week of the year counting Monday as its first day, `00`–`53` |
+| `%c` | the date and time, arranged as the locale prefers |
+| `%x` | the date alone, arranged as the locale prefers |
+| `%X` | the time alone, arranged as the locale prefers |
+| `%%` | a literal `%` |
+
+Later C standards added more — `%F` for `%Y-%m-%d`, `%T` for `%H:%M:%S`, `%R`, `%e`, `%D`,
+`%u`, `%V`, and the `%E` and `%O` forms that ask the locale for its own numbering. A build
+whose list carries them accepts them and one whose list does not refuses them, so a format
+leaning on any of these is worth trying where it will run. The two conversions that name
+the time zone, `%z` and `%Z`, are on some of those lists and not others, which puts them
+in the same position despite one of them being as old as the table above.
+
+Eight of the conversions above can answer differently under a different locale: `%a`, `%A`,
+`%b` and `%B` name a weekday or a month, `%p` names the half of the day, and `%c`, `%x`
+and `%X` arrange dates and times. Those are for a person to read.
+[`os.setlocale()`](/docs/standard-library/os/setlocale) is what moves them.
+
+## Reading the parts instead
+
+When the format is exactly `"*t"` — nothing before it but an optional `!`, and nothing
+after it — a table comes back rather than a string, carrying the moment broken into
+fields:
+
+| Field | Holds |
+|---|---|
+| `year` | the year, in full |
+| `month` | `1`–`12` |
+| `day` | `1`–`31` |
+| `hour` | `0`–`23` |
+| `min` | `0`–`59` |
+| `sec` | `0`–`61`, the top of the range being there for leap seconds |
+| `wday` | the weekday, `1`–`7`, Sunday being `1` |
+| `yday` | the day of the year, `1`–`366` |
+| `isdst` | whether daylight saving was in force, as a boolean |
+
+`isdst` is the one that may not be there: a system that cannot say leaves the field out
+rather than guessing, so code that reads it should treat an absent field and a `false` one
+alike.
+
+Six of the fields — `year`, `month`, `day`, `hour`, `min` and `sec` — are spelled exactly
+as [`os.time()`](/docs/standard-library/os/time) expects to read them, and `isdst` is the
+seventh it understands. `wday` and `yday` are reported here and not read back:
+`os.time()` works the weekday and the day of the year out for itself and ignores them on
+the way in. So the round trip between the two forms is straightforward — take a moment
+apart, change a field, and hand the whole table back.
+
+## Coordinated Universal Time
+
+A `!` at the very front of the format reads the moment in Coordinated Universal Time
+instead of in the system's own time zone. Everything after the `!` is the format proper,
+so `"!%H:%M"` and `"!*t"` are the UTC readings of the two forms above.
+
+Without it the reading is local, so the same time value can render differently on two
+machines whose zones differ. That is usually what a person wants and rarely what a log
+file or a stored record wants — a rendering meant to be compared or parsed later is worth
+pinning to UTC, where there is one answer.
+
+In the UTC reading the daylight-saving flag has nothing to report, so `isdst` comes back
+`false`.
+
+## Examples
+
+### The parts of a date, as a table
+
+<RunnableExample code={`local release_day = os.time{ year = 2024, month = 3, day = 15, hour = 9, min = 30, sec = 0 }\nlocal parts = os.date("*t", release_day)\n\nprint(parts.year, parts.month, parts.day)\nprint(parts.hour, parts.min, parts.sec)\nprint(parts.wday, parts.yday)\n-- Expected output:\n-- 2024\t3\t15\n-- 9\t30\t0\n-- 6\t75`} />
+
+The same moment the opening example rendered as text, this time as fields. `wday` of `6`
+is a Friday, counting Sunday as `1`, and `yday` of `75` is the 75th day of the year.
+
+### Reading a stored time value as UTC
+
+<RunnableExample code={`local recorded_at = 1710495000\nprint(os.date("!%Y-%m-%d %H:%M:%S", recorded_at))\n\nlocal utc_parts = os.date("!*t", recorded_at)\nprint(utc_parts.hour, utc_parts.isdst)\n-- Expected output:\n-- 2024-03-15 09:30:00\n-- 9\tfalse`} />
+
+A time value that came from somewhere else — a log line, a database column — rendered in
+UTC, so the answer does not depend on where this program happens to be running. Drop the
+`!` and both calls start reporting the local reading, which moves with the machine.
+
+### Literal text alongside the conversions
+
+<RunnableExample code={`local recorded_at = 1710495000\nprint(os.date("!Day %j of %Y, %H%% through the hour", recorded_at))\nprint(os.date("!%A %d %B %Y", recorded_at))\n-- Expected output:\n-- Day 075 of 2024, 09% through the hour\n-- Friday 15 March 2024`} />
+
+Words, punctuation and spaces are copied through untouched, and `%%` puts a literal `%`
+among them. The second line's weekday and month names come from the locale, so they read
+as English here and need not elsewhere.
+
+## Gotchas
+
+<Gotcha title="The table form needs *t and nothing else">
+The table form is chosen by the format being exactly `"*t"`, not by it containing `*t`.
+`os.date("*t and more")` finds no conversion in that string and returns it as literal
+text, `*t` and all — a string where the code expected a table, and a `nil` from the first
+field it reads rather than an error at the call. The only thing allowed in front is the
+`!` prefix.
+</Gotcha>
+
+<Gotcha title="A locale-sensitive rendering is not a format to parse">
+`%c`, `%x`, `%X` and the five that name weekdays, months and the half of the day answer in
+whatever the current locale says, which can be a different string on a machine configured
+differently and a different string again after a call to
+[`os.setlocale()`](/docs/standard-library/os/setlocale). Anything written for a program to
+read back wants the numeric conversions spelled out — `"%Y-%m-%d %H:%M:%S"` says the same
+thing everywhere.
+</Gotcha>
+
+<Gotcha title="The conversions a build accepts are decided when it is built">
+A format is checked against a list the interpreter carries, not against whatever the C
+library would tolerate, and that list follows the standard the interpreter was built to.
+`%F` and `%T` are the usual casualties: they read as obvious shorthands and are absent
+from the oldest of those lists, so a format using them can raise on a build where the
+rest of the program runs fine. Where portability matters, spell the pieces out.
+</Gotcha>
+
+## See also
+
+- [`os.time()`](/docs/standard-library/os/time) — where a time value comes from, and what one means
+- [`os.difftime()`](/docs/standard-library/os/difftime) — the seconds between two time values
+- [`os.setlocale()`](/docs/standard-library/os/setlocale) — what moves the locale-sensitive conversions
+- [`string.format()`](/docs/standard-library/string/format) — the other `%`-directive template in the library, for values rather than dates

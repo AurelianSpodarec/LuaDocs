@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A `%` followed by something the interpreter does not list as a conversion raises, a `%` at the very end of the format included. 5.1 checks nothing: it hands each `%` and the character after it to the host C library as they stand, and copies a trailing `%` through as a literal.",
+    "5.3": "`time` has to be a whole number inside the range a time value can hold; earlier versions accept any number and truncate a fraction. A moment the system cannot work out a date for raises instead of answering `nil`."
+  }
+}

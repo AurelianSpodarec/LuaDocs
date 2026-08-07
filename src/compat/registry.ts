@@ -116,6 +116,9 @@ import coroutineIsyieldable from './data/coroutine.isyieldable.json';
 import coroutineWrap from './data/coroutine.wrap.json';
 import coroutineClose from './data/coroutine.close.json';
 import coroutineLibrary from './data/coroutine.library.json';
+import osTime from './data/os.time.json';
+import osDate from './data/os.date.json';
+import osDifftime from './data/os.difftime.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -705,6 +708,52 @@ const raw: Record<string, unknown> = {
   'coroutine.wrap': coroutineWrap,
   'coroutine.close': coroutineClose,
   'coroutine.library': coroutineLibrary,
+
+  // The `os` section, keyed on the manual's own prefix (`pdf-os.time`). Operating System
+  // Facilities is **§5.8 in 5.1, §6.9 in 5.2, 5.3 and 5.4, and §6.10 in 5.5** — the
+  // number moves twice, so `sect.py` needs the right one per version.
+  //
+  // All three of `time`, `date` and `difftime` are present in every line, and **none of
+  // them is named in any Incompatibilities chapter** — 5.2, 5.3, 5.4 and 5.5's §8 were
+  // sliced from `<a name="8">` to end of file and searched; the only `os` entry in any of
+  // them is `os.execute`'s changed return at 5.2, which belongs to that entry.
+  //
+  // Almost every delta the three carry is invisible in the manual and was established
+  // from `loslib.c`, read at v5.1.1, 5.1.5, v5.2.3, 5.2.4, v5.3.0, v5.3.2, v5.3.6,
+  // v5.4.0, v5.4.8 and v5.5.0 and diffed pairwise:
+  //
+  //   * The **invalid-conversion raise** on `os.date` arrives at 5.2, where `checkoption`
+  //     first appears. 5.1 hands each `%` and the character after it straight to
+  //     `strftime`. The accepted set is `LUA_STRFTIMEOPTIONS`, chosen at build time and
+  //     overridable by an embedder, so no version can be credited with a fixed list; the
+  //     C89 core (`a A b B c d H I j m M p S U w W x X y Y %`) is in every shipped
+  //     configuration of every line, and `%F`, `%T`, `%z`, `%Z` and the `%E`/`%O` forms
+  //     are not. The entry states the mechanism and the portable core rather than
+  //     inventing a per-version list, since the manual defers to `strftime` throughout.
+  //   * **`l_checktime` arrives at 5.3** and takes `luaL_checkinteger`, which is what
+  //     makes `os.date`'s `time` and both of `os.difftime`'s arguments integers-only from
+  //     there. 5.1 and 5.2 use `luaL_checknumber` and truncate.
+  //   * **`os.difftime`'s `t1` was optional** — `luaL_optnumber(L, 2, 0)` at 5.1.5 and
+  //     5.2.4 — and became required at 5.3.
+  //   * **`os.time` and `os.date` stopped answering `nil` on failure at 5.3.2**, and
+  //     **`os.time` began normalising its table in place at 5.3.3** (`setallfields`),
+  //     along with the `field '%s' is not an integer` and `is out-of-bound` checks. Both
+  //     are credited to 5.3 under the standing ruling that a line is credited with what
+  //     its final release has — 5.3.6 is what `lua.org/source/5.3` serves — and the patch
+  //     boundaries are recorded in `task-O1-report.md`. The 5.3 manual documents none of
+  //     this; the normalisation is documented only from 5.4, which is a documentation
+  //     change and not a behaviour one.
+  //   * 5.4 and 5.5 are **behaviourally identical** for all three. The only edits between
+  //     them are an error message's wording, `LUA_NUMTIME`, and internal casts.
+  //
+  // What did *not* change, despite reading as though it did: the required fields, the
+  // `hour = 12` / `min = 0` / `sec = 0` defaults (present in 5.1's C, documented only
+  // from 5.2), out-of-range fields being taken as offsets (in 5.1's C, documented only
+  // from 5.3), other keys being ignored, the `!` prefix, the `*t` form and its nine
+  // fields, and `os.difftime` answering with a float on every line.
+  'os.time': osTime,
+  'os.date': osDate,
+  'os.difftime': osDifftime,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

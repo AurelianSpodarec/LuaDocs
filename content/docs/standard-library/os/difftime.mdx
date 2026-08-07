@@ -1,8 +1,113 @@
 ---
 title: os.difftime()
-description: ""
+description: The number of seconds between two time values.
+lua-compat: os.difftime
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.difftime
 ---
 
-{/* Not yet written. */}
+Measures the gap between two time values, in seconds. It is the one operation the manual
+guarantees on a time value whatever the system underneath is counting — the later moment
+first, the earlier one second.
+
+<RunnableExample code={`local shift_start = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 0, sec = 0 }\nlocal shift_end = os.time{ year = 2024, month = 6, day = 12, hour = 17, min = 30, sec = 0 }\n\nprint(string.format("%d seconds", os.difftime(shift_end, shift_start)))\n-- Expected output: 30600 seconds`} />
+
+## Syntax
+
+```lua
+os.difftime(t2, t1)
+```
+
+<Parameters>
+  <Param name="t2">The moment measured *to*, as a time value from [`os.time()`](/docs/standard-library/os/time).</Param>
+  <Param name="t1">The moment measured *from*. Seconds are counted forwards from here to `t2`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="float">The seconds from `t1` to `t2` — positive when `t2` is the later of the two, negative when it is the earlier, and zero when they name the same moment.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when either argument is a value that cannot be read as a number.
+- <Since v="5.3" /> Raises when `t1` is left out.
+- <Since v="5.3" /> Raises when either argument is not a whole number, or lies outside the range a time value can hold on this system.
+
+</Errors>
+
+## Description
+
+A time value names a moment, and [what the number itself means is the system's
+business](/docs/standard-library/os/time#what-a-time-value-is). This call is what turns
+two of them into a quantity anybody can use: seconds, counted forwards from `t1` to `t2`.
+
+The sign is the other half of the answer. A negative result says `t2` came first, which
+makes a single call enough to order two moments as well as to measure between them.
+
+On POSIX systems, on Windows and on many others a time value counts seconds already, and
+there the result is exactly `t2 - t1`. Writing the subtraction out is not the same thing,
+though: it is arithmetic on a number whose meaning is only defined on those systems, where
+this call is defined everywhere. The two also differ in what they hand back — a difference
+worked out here is a *float* even when the moments are whole seconds apart, which shows
+the moment it is printed or concatenated. A figure meant for a person to read wants
+[`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) or a `%d` in
+[`string.format()`](/docs/standard-library/string/format) on the way out.
+
+## Examples
+
+### Which of two moments came first
+
+<RunnableExample code={`local order_placed = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 0, sec = 0 }\nlocal payment_cleared = os.time{ year = 2024, month = 6, day = 12, hour = 17, min = 30, sec = 0 }\n\nprint(string.format("%d", os.difftime(payment_cleared, order_placed)))\nprint(string.format("%d", os.difftime(order_placed, payment_cleared)))\n-- Expected output:\n-- 30600\n-- -30600`} />
+
+The same two moments, measured both ways. Swapping the arguments does not change the size
+of the gap, only its sign — which is exactly the test for whether the payment cleared
+after the order was placed.
+
+### Breaking a difference into days, hours and minutes
+
+<RunnableExample code={`local checked_out = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 5, sec = 0 }\nlocal checked_in = os.time{ year = 2024, month = 6, day = 14, hour = 11, min = 35, sec = 0 }\n\nlocal elapsed = os.difftime(checked_in, checked_out)\nlocal days = math.floor(elapsed / 86400)\nlocal hours = math.floor(elapsed % 86400 / 3600)\nlocal minutes = math.floor(elapsed % 3600 / 60)\n\nprint(string.format("%d days, %d hours, %d minutes", days, hours, minutes))\n-- Expected output: 2 days, 2 hours, 30 minutes`} />
+
+Seconds are the only unit this call answers in, so anything larger is arithmetic on the
+result. `86400` is a day's worth of seconds, `3600` an hour's.
+
+<Only since="5.3">
+
+### The result is a float, the time values are not
+
+<RunnableExample code={`local first_run = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 0, sec = 0 }\nlocal second_run = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 1, sec = 0 }\n\nprint(math.type(second_run))\nprint(math.type(os.difftime(second_run, first_run)))\nprint(os.difftime(second_run, first_run) == second_run - first_run)\n-- Expected output:\n-- integer\n-- float\n-- true`} />
+
+Sixty seconds either way, and the two answers compare equal — but one is a float and the
+other an integer, and that distinction survives into whatever the number is used for next.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="The later moment is the first argument">
+`os.difftime(finish, start)` is the way round that gives a positive number, and it reads
+backwards to most people: the argument written first is the one that happens second. The
+mistake is quiet, because the wrong order still returns a number — the right size with the
+wrong sign — so a duration comes out negative and a comparison against zero answers the
+opposite of what was meant.
+</Gotcha>
+
+<Gotcha title="Subtracting the two is not the same call">
+`finish - start` gives the same number on the systems whose time values count seconds, and
+nothing defines it anywhere else. It also gives a different *kind* of number: subtracting
+two time values is integer arithmetic and this call answers with a float, so one duration
+reads as `30600` and the other as `30600.0` the moment either is printed. Code that
+subtracts in one place and calls this in another gets both spellings of the same figure.
+</Gotcha>
+
+<Gotcha title="Seconds are the only unit">
+There is no argument for minutes, days or anything else, and no companion function that
+formats a duration. Everything above a second is arithmetic the caller does, with the
+awkward cases — months, years, a day that daylight saving made 23 hours long — awkward for
+the same reason they are awkward everywhere: they are not fixed numbers of seconds.
+</Gotcha>
+
+## See also
+
+- [`os.time()`](/docs/standard-library/os/time) — where a time value comes from, and what one means
+- [`os.date()`](/docs/standard-library/os/date) — rendering a time value rather than measuring between two
+- [`os.clock()`](/docs/standard-library/os/clock) — processor time used, for measuring how long code took
