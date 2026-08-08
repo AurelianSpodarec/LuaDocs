@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "The iterator now takes formats, so a step can read something other than a line — a numeral, a fixed number of bytes, everything left — and several formats in one call give the loop several variables. Earlier versions take no arguments here at all: a step reads a line, and whatever is written in the parentheses is passed over rather than refused, so `file:lines(1)` iterates over lines there where it iterates over bytes now. The list of formats also gained one that keeps the line's ending on what it hands back, `\"*L\"`.",
+    "5.3": "The leading `*` on a format name became optional, so a step's formats are now written `\"l\"`, `\"L\"`, `\"a\"` and `\"n\"`, with the starred spellings still accepted and the star read and thrown away. Earlier versions require the star and refuse a bare name — at the first step, since nothing looks at the formats before then. Two smaller changes arrived with it. A numeral is now read by Lua's own rules and comes back as an integer or a float, where before the C library's number scanner decided what counted and every answer was a float. And a format given as a number must now have an exact integer representation, where before a fraction was cut off and the whole part used."
+  }
+}

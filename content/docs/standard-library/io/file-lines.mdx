@@ -1,8 +1,242 @@
 ---
 title: file:lines()
-description: ""
+description: Walk the file a handle refers to with a for loop, one read at a time, and keep the handle afterwards.
+lua-compat: io.file-lines
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:lines
 ---
 
-{/* Not yet written. */}
+Hands back an *iterator function* over the file it is called on, so a `for` loop can walk
+it a piece at a time. Each step reads once, starting wherever the file's position has got
+to, and the loop ends at the step that finds nothing left. The handle's life is not this
+call's business: it is open when the loop ends, and the reading is left exactly where the
+loop stopped.
+
+<RunnableExample code={`local ledger_path = "io-file-lines-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal reading = assert(io.open(ledger_path, "r"))\nfor line in reading:lines() do\n  print(line)\nend\nprint(io.type(reading))\nreading:close()\n\nos.remove(ledger_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1\n-- file`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+<Only since="5.2">
+
+```lua
+file:lines(···)
+```
+
+</Only>
+
+<Only before="5.2">
+
+```lua
+file:lines()
+```
+
+</Only>
+
+<Parameters>
+  <Only since="5.2">
+    <Param name="···">Zero or more formats, each saying what one step should read: a string naming one of the shapes under [The formats](/docs/standard-library/io/file-read#the-formats), or a number of bytes. A step given no format at all reads one line.</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="function">An iterator function. Each call reads the file once and hands back what it read, in the order it was asked for; a call whose *first* answer is nothing hands back no values at all, which is what ends a `for` loop. See [What one step reads](#what-one-step-reads).</Return>
+</Returns>
+
+<Errors>
+
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: whatever was written first arrives where the file belongs, and when nothing was written, nothing does.
+- Raises when the handle has already been closed. That happens here, at this call, before any step is taken.
+- Raises when a step is taken after the handle has been closed, which is the same mistake noticed later: the iterator holds the file rather than a copy of what was in it.
+- <Since v="5.2" /> Raises when the call is handed more formats than one iterator can carry. There is a cap, it is generous, and how generous is a per-version detail; a step reading a handful of things is nowhere near it.
+- <Since v="5.2" /> Raises at the *first step*, not at this call, when a format is one the version does not recognise. Nothing here looks at the formats — they are carried along and handed to the read, and the read is what refuses them. Which strings are recognised is [the version's own list](/docs/standard-library/io/file-read#the-formats).
+- Raises when a step meets trouble with the stream rather than the end of the file — a handle opened for writing alone, read through here, is the everyday way to see it. This is where the iterator parts company with [`file:read()`](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble), which reports the same trouble through its return values instead.
+- Running out of file does not raise. The step hands back nothing and the loop ends.
+
+</Errors>
+
+## Description
+
+This is [`file:read()`](/docs/standard-library/io/file-read) arranged for a loop. What a
+step reads, the values it hands back and the position it reads from are all that call's, and
+the position in particular is the handle's own — so the two can be mixed, and a read taken
+in the middle of a loop moves the same position the next step will start from.
+
+What this call adds is the shape a `for` loop wants. A generic `for` calls its iterator once
+per turn and stops when the first value it gets back is `nil` or absent, and the iterator
+here hands back nothing once the read produces nothing. So a loop over a file needs no
+end-of-file test written into it.
+
+Nothing here opens or closes anything. The handle comes from somewhere else — usually
+[`io.open()`](/docs/standard-library/io/open) — and giving it back is the program's job, as
+described under [The handle is yours to close](#the-handle-is-yours-to-close).
+[`io.lines()`](/docs/standard-library/io/lines) is the call that does both of those for a
+file named rather than held.
+
+## What one step reads
+
+A step with no format reads a line, without its end-of-line character, which is what the
+loop in the first example gets. That is the default and the shape almost every loop over a
+text file wants.
+
+<Only since="5.2">
+
+A step can be told to read something else instead. The formats are the ones
+[`file:read()`](/docs/standard-library/io/file-read#the-formats) sets out — the line
+formats, the whole-file format, the numeral format, and a count of bytes — and they are
+given to this call once, when the iterator is made, rather than to each step.
+
+Several formats in one call give the loop several variables, in the order the formats were
+given — a numeral and the rest of the line together make a record out of a row, which one of
+the examples below does. What ends the loop is the *first* format reading nothing; a later
+one that reads nothing does not, so a step can hand back a row shorter than it was asked for
+and the loop turns again with the missing variables `nil`. That is
+[reading more than one format at a time](/docs/standard-library/io/file-read#reading-more-than-one-format-at-a-time)'s
+rule, seen one turn at a time.
+
+The whole-file format is worth thinking twice about here. It has no failing answer: at the
+end of the file it hands back the empty string rather than nothing, which is not what a
+`for` loop stops on. A loop given it turns forever.
+
+</Only>
+
+<Only before="5.2">
+
+A step reads a line, and that is the whole of it. This call takes no arguments here, and
+whatever is written in the parentheses is passed over rather than refused — so a call
+written with something in it goes on running and quietly reads lines, which is the harder
+failure of the two to notice.
+
+</Only>
+
+## The handle is yours to close
+
+The iterator holds the file, not a copy of what was in it, and it does nothing to the
+handle's life. When the loop ends the handle is open, its position is wherever the reading
+stopped, and the handle goes on working as it did before:
+[`file:read()`](/docs/standard-library/io/file-read) reads on from there,
+[`file:seek()`](/docs/standard-library/io/file-seek) moves the position about, and
+[`file:close()`](/docs/standard-library/io/file-close) gives the file back.
+
+That holds however the loop ends. A loop that runs out of file, one left by a `break` or a
+`return`, and one whose body raised all leave the same open handle behind. What differs is
+only whether the program gets as far as closing it: the first two do, and a raise carries
+past the close on its way out, which is what a
+[`pcall()`](/docs/standard-library/globals/pcall) around the loop is for.
+
+Two iterators made from one handle are two views of one position rather than two readings
+of one file: a step taken through either moves the file on for both. Reading a file twice
+means opening it twice, or moving the position back with
+[`file:seek()`](/docs/standard-library/io/file-seek) between the two loops.
+
+[`io.lines()`](/docs/standard-library/io/lines) is the other half of this. Handed a file
+name it opens the file and takes on closing it, which is the shorter code where a loop reads
+a file whole; this call is the one to reach for where the program already holds the handle,
+or wants it back afterwards.
+
+## Examples
+
+### Stopping early and going on from there
+
+<RunnableExample code={`local diary_path = "io-file-lines-example-diary.txt"\n\nlocal writing = assert(io.open(diary_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\nsugar,3\\n")\nwriting:close()\n\nlocal reading = assert(io.open(diary_path, "r"))\nlocal seen = 0\nfor line in reading:lines() do\n  seen = seen + 1\n  if seen == 2 then\n    break\n  end\nend\nprint(io.type(reading))\nprint(reading:read())\nreading:close()\n\nos.remove(diary_path)\n-- Expected output:\n-- file\n-- sugar,3`} />
+
+The loop stops on the second row, and the handle carries on from exactly there — the read
+after it produces the third. That is the property this call has and
+[`io.lines()`](/docs/standard-library/io/lines) does not: a loop left early leaves something
+the program can still use.
+
+### Two iterators, one position
+
+<RunnableExample code={`local roster_path = "io-file-lines-example-roster.txt"\n\nlocal writing = assert(io.open(roster_path, "w"))\nwriting:write("cocoa\\nflour\\nsugar\\n")\nwriting:close()\n\nlocal reading = assert(io.open(roster_path, "r"))\nlocal first_pass = reading:lines()\nlocal second_pass = reading:lines()\nprint(first_pass())\nprint(second_pass())\nprint(first_pass())\nreading:close()\n\nos.remove(roster_path)\n-- Expected output:\n-- cocoa\n-- flour\n-- sugar`} />
+
+Three steps taken through two iterators read three different rows. Both are reading one
+handle, and the handle has one position; making a second iterator does not start the file
+again.
+
+<Only since="5.2">
+
+### A row split into a numeral and the rest
+
+<Only since="5.3">
+
+<RunnableExample code={`local stock_path = "io-file-lines-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("42 cocoa\\n7 flour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(stock_path, "r"))\nfor quantity, item in reading:lines("n", "l") do\n  print(quantity)\n  print("[" .. item .. "]")\nend\nreading:close()\n\nos.remove(stock_path)\n-- Expected output:\n-- 42\n-- [ cocoa]\n-- 7\n-- [ flour]`} />
+
+</Only>
+
+<Only since="5.2" before="5.3">
+
+<RunnableExample code={`local stock_path = "io-file-lines-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("42 cocoa\\n7 flour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(stock_path, "r"))\nfor quantity, item in reading:lines("*n", "*l") do\n  print(quantity)\n  print("[" .. item .. "]")\nend\nreading:close()\n\nos.remove(stock_path)\n-- Expected output:\n-- 42\n-- [ cocoa]\n-- 7\n-- [ flour]`} />
+
+</Only>
+
+Two formats, two loop variables, one turn per row. The brackets show where the second value
+begins: the numeral format stops at the space and the line format takes everything after it,
+space included.
+
+### Walking a file a fixed number of bytes at a time
+
+<RunnableExample code={`local packet_path = "io-file-lines-example-packet.txt"\n\nlocal writing = assert(io.open(packet_path, "wb"))\nwriting:write("cocoa")\nwriting:close()\n\nlocal reading = assert(io.open(packet_path, "rb"))\nlocal pieces = {}\nfor piece in reading:lines(2) do\n  pieces[#pieces + 1] = piece\nend\nreading:close()\nprint(#pieces)\nprint(table.concat(pieces, "|"))\n\nos.remove(packet_path)\n-- Expected output:\n-- 3\n-- co|co|a`} />
+
+A count reads bytes rather than lines, which is how a file with no line structure gets
+walked. The last piece is short and that is a success, not a failure: a step that got
+nothing at all is what ends the loop.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="A dot where the colon belongs leaves the file out">
+`reading:lines()` and `reading.lines(reading)` are the same call; `reading.lines()` is not.
+The `:` is what puts the handle in front of the arguments, and without it the first thing
+written arrives where the file belongs — or, as here, nothing does.
+
+<RunnableExample code={`local invoice_path = "io-file-lines-example-invoice.txt"\n\nlocal writing = assert(io.open(invoice_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(invoice_path, "r"))\nlocal made_one, complaint = pcall(reading.lines)\nprint(made_one)\nprint(type(complaint))\nprint(reading:lines()())\nreading:close()\n\nos.remove(invoice_path)\n-- Expected output:\n-- false\n-- string\n-- cocoa,2`} />
+
+It raises rather than answering, which is the good outcome: the mistake is in the program
+rather than in the file, and it stops on the line that made it.
+</Gotcha>
+
+<Gotcha title="Closing the handle inside the loop breaks the next step">
+The iterator reads through the handle every turn, so closing the file in the loop body and
+then letting the loop go round again raises. A loop that has seen enough should `break`
+first and close afterwards, which is also the order that leaves the handle in a state the
+code after the loop can check with [`io.type()`](/docs/standard-library/io/type).
+</Gotcha>
+
+<Only since="5.2">
+
+<Gotcha title="The loop ends on nothing, not on the end of the file">
+What stops a `for` loop is the step whose first answer is nothing, and running out of file
+is the usual reason for that rather than the only one. A step whose first format came up
+empty ends the loop in the middle of a file that still has bytes in it, and the numeral
+format is where that happens: text that does not spell a numeral produces nothing, and takes
+some of the file with it on the way. A loop over rows that might be malformed is better
+written around [`file:read()`](/docs/standard-library/io/file-read), where each answer can be
+looked at before the next read is decided.
+</Gotcha>
+
+</Only>
+
+<Gotcha title="Trouble with the stream raises out of the loop rather than ending it">
+[`file:read()`](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble)
+tells the end of a file from trouble with the stream by what follows the `nil`. The iterator
+cannot: it has one way of saying *stop* and it means the end of the file, so trouble is
+raised instead. A loop written over a file that might go wrong under it needs a
+[`pcall()`](/docs/standard-library/globals/pcall) around it rather than a test inside it —
+and the handle is still open when the error arrives, so it can still be closed.
+</Gotcha>
+
+## See also
+
+- [`io.lines()`](/docs/standard-library/io/lines) — the same loop over a file named rather than held, opened and closed for you
+- [`file:read()`](/docs/standard-library/io/file-read) — the read each step performs, and where the formats are set out
+- [`io.open()`](/docs/standard-library/io/open) — where a readable handle comes from
+- [`file:close()`](/docs/standard-library/io/file-close) — giving the file back when the loop is done
+- [`file:seek()`](/docs/standard-library/io/file-seek) — moving the position the next step reads from
+- [`io.type()`](/docs/standard-library/io/type) — telling an open handle from a closed one
+- [`pairs()`](/docs/standard-library/globals/pairs) — the same `for` shape over a table

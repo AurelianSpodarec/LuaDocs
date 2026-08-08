@@ -137,6 +137,8 @@ import ioFileWrite from './data/io.file-write.json';
 import ioWrite from './data/io.write.json';
 import ioFileFlush from './data/io.file-flush.json';
 import ioFlush from './data/io.flush.json';
+import ioFileLines from './data/io.file-lines.json';
+import ioLines from './data/io.lines.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1190,6 +1192,68 @@ const raw: Record<string, unknown> = {
   'io.write': ioWrite,
   'io.file-flush': ioFileFlush,
   'io.flush': ioFlush,
+
+  // Looping over a file. This is the **one pair in `io` that is not two names for one
+  // operation**, and the datasets show it: `file:lines` carries two notes and `io.lines`
+  // carries three, because `io.lines` owns a whole subject — the file's life — that the
+  // method does not have. `f_lines` is `tofile(L); aux_lines(L, 0);` in all 26 releases;
+  // `io_lines` opens by name, passes `toclose = 1`, and from v5.4.0 returns four values.
+  // Both funnel each *step* through the same `io_readline`, which is why the two format
+  // notes are shared word for word with `io.file-read`/`io.read`.
+  //
+  // `liolib.c` read at the **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0
+  // through v5.2.3, v5.3.0 through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus
+  // the two shipped releases with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and
+  // `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). **Whole files were diffed
+  // consecutively across all 26**, not function bodies, because the cap below lives in a
+  // `#define` and a body diff cannot see one — the lesson `io.open`'s mode set cost.
+  //
+  //   * **Formats arrive at 5.2.** 5.1's `aux_lines(L, idx, toclose)` pushes the file and a
+  //     boolean and nothing else, and `io_readline` calls `read_line(L, f)` flat. Arguments
+  //     past the first are never read: `io_lines` does `aux_lines(L, lua_gettop(L), 1)` on
+  //     the handle it just pushed, and `f_lines` does `aux_lines(L, 1, 0)` on the receiver.
+  //     So on 5.1 `file:lines(1)` and `io.lines(name, "*l")` are accepted and **silently
+  //     ignored** — not refused. **v5.2.0** rewrites `aux_lines` to copy the arguments into
+  //     the closure's upvalues and `io_readline` to hand them to `g_read`.
+  //   * **The format spellings move with `io.read`'s**, through the same `g_read`: `"*L"`
+  //     joins at **5.2**, and the leading `*` becomes optional at **5.3**. See the
+  //     `io.file-read` block above for the C; nothing here re-derives it.
+  //   * **How many formats one call may carry, and it is not a delta worth a chip.** 5.1 has
+  //     no formats. **v5.2.0** caps at `LUA_MINSTACK - 3` (17) with "too many options";
+  //     **v5.3.0 and v5.3.1 have no cap at all**; `MAXARGLINE` (250, "too many arguments")
+  //     arrives at **v5.3.2** and is unchanged to v5.5.1. The entries state the cap without a
+  //     number, under a `<Since v="5.2" />`, which is true on every line; a `changed_in` would
+  //     put a *Changed* chip on 5.3 for a number nobody reaches.
+  //   * **Four values at 5.4, and that is `io.lines`' whole delta.** **v5.4.0** adds
+  //     `if (toclose) { lua_pushnil; lua_pushnil; lua_pushvalue(L, 1); return 4; }` to
+  //     `io_lines`. `f_lines` returns 1 at every release, so the method has no such note. The
+  //     4th value is the generic `for`'s to-be-closed variable, which needs the `__close`
+  //     metamethod `io.open`'s dataset dates to the same release. **5.4 §8.2 names it** —
+  //     the only `io.lines` hit in any Incompatibilities chapter, and the fact `globals/load`
+  //     deliberately left here. Probed on the 5.4 runtime: `select("#", io.lines(name))` is
+  //     4 and `select("#", io.lines())` is 1; after a `break` the handle reads `closed file`;
+  //     `load(io.lines(name, "L"))` compiles and then fails on its first global, because the
+  //     handle landed in `load`'s `env`, and `load((io.lines(name, "L")))` runs.
+  //
+  // Three things the manuals make look like deltas and are not:
+  //
+  //   * **"returns nil (to finish the loop)" → "returns no values" at 5.3.** `io_readline`
+  //     ends `return 0;` in **every** release read, 5.1 included. Documentation catching up.
+  //   * **"In case of errors this function raises the error, instead of returning an error
+  //     code", added to both passages at 5.2.** 5.1 raises too: `io_lines` calls
+  //     `fileerror`, which is `luaL_argerror`, and `io_readline` raises on `ferror`. The
+  //     sentence is then dropped from `file:lines`' passage at 5.4 with nothing moving.
+  //   * **`io.lines()` versus `io.lines(nil)`.** 5.1 tests `lua_isnoneornil` but then calls
+  //     `f_lines`, whose `tofile` reads index 1 — so an explicit `nil` raises there while
+  //     `io.lines()` works. From v5.2.0 `lua_replace(L, 1)` makes the two identical. Too
+  //     narrow to carry, recorded so it is not rediscovered as a format delta.
+  //
+  // Patch residuals: none in `io_lines`, `f_lines`, `aux_lines` or `io_readline` beyond the
+  // `MAXARGLINE` boundary above. v5.3.0/v5.3.1 are the gap; `luaL_checkstack(L, n, "too many
+  // arguments")` inside `io_readline` (v5.3.0+) is the backstop that made the gap survivable.
+  // v5.5.0 and v5.5.1 are byte-identical for all four functions.
+  'io.file-lines': ioFileLines,
+  'io.lines': ioLines,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
