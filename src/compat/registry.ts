@@ -131,6 +131,8 @@ import osLibrary from './data/os.library.json';
 import ioOpen from './data/io.open.json';
 import ioClose from './data/io.close.json';
 import ioType from './data/io.type.json';
+import ioFileRead from './data/io.file-read.json';
+import ioRead from './data/io.read.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1000,6 +1002,75 @@ const raw: Record<string, unknown> = {
   'io.open': ioOpen,
   'io.close': ioClose,
   'io.type': ioType,
+
+  // The read formats, which are the `io` section's sharpest version hazard and the reason
+  // no entry before this one was allowed to spell one. `file:read` and `io.read` are the
+  // **same C function on two files**: `f_read` is `g_read(L, tofile(L), 2)` and `io_read` is
+  // `g_read(L, getiofile(L, IO_INPUT), 1)`, byte-identical at every release read, so the two
+  // datasets carry the same two notes and every fact below holds for both.
+  //
+  // `liolib.c` read at the **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0
+  // through v5.2.3, v5.3.0 through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus
+  // the two shipped releases with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and
+  // `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). `g_read`, `read_number`,
+  // `read_line`, `read_all`, `read_chars`, `test_eof`, `nextc`, `test2` and `readdigits`
+  // were extracted per release and diffed pairwise rather than read by eye.
+  //
+  //   * **The format set, from `g_read`'s own dispatch, at every tag in every line:**
+  //     5.1 requires the star (`luaL_argcheck(L, p && p[0] == '*', n, "invalid option")`) and
+  //     switches on `p[1]` with cases `'n'`, `'l'`, `'a'` — **no `'L'`**. 5.2 is the same
+  //     check with `'L'` added. **v5.3.0** replaces it with `luaL_checkstring` plus
+  //     `if (*p == '*') p++;  /* skip optional '*' (for compatibility) */`, and that line is
+  //     unchanged through v5.5.1. So the bare spellings are **5.3 and later** and `"*a"` runs
+  //     on all five, which no guard can see: the 5.4 runtime every example executes on
+  //     accepts both. 5.3 §8.2 states the star half — "Option names in `io.read` do not have
+  //     a starting `*` anymore. For compatibility, Lua will continue to accept (and ignore)
+  //     this character" — and is the **only** `read` hit in any Incompatibilities chapter;
+  //     `"*L"`'s arrival is an addition and appears in none of them.
+  //   * **The numeral format changed engine at 5.3.** 5.1 and 5.2 are
+  //     `fscanf(f, LUA_NUMBER_SCAN, &d)` with `LUA_NUMBER_SCAN` defined as `"%lf"` in both
+  //     `luaconf.h`s and `lua_pushnumber` after it, so the C library decides what counts as a
+  //     numeral and the answer is always a float. **v5.3.0** introduces the `RN` scanner —
+  //     skip spaces, optional sign, optional `0x`, digits, radix mark, exponent — and hands
+  //     the collected run to `lua_stringtonumber`, so the reading is Lua's own and the answer
+  //     is an integer or a float. Probed: a run that turns out not to spell a numeral
+  //     (`3.4e-`) is discarded and its characters are gone, while text that never looked
+  //     numeric costs nothing.
+  //   * **A numeric format's integer check arrived with it.** 5.1 and 5.2 read it with
+  //     `lua_tointeger` (a fraction is cut off); v5.3.0 uses `luaL_checkinteger`, which
+  //     raises. Same language-wide tightening `os.exit` and `globals.select` already record.
+  //   * **What did *not* move.** The loop condition `for (n = first; nargs-- && success; n++)`
+  //     is identical in all five, so a failing format has always ended the call and shortened
+  //     the answer — 5.3's manual is the first to say so ("the function does not read
+  //     subsequent formats") and the behaviour is 5.1's. `"a"` has always been unfailing:
+  //     5.1 calls `read_chars(L, f, ~(size_t)0)` and 5.2 onwards `read_all`, and both set
+  //     `success = 1` unconditionally, so 5.4's added "this format never fails" is
+  //     documentation catching up. `test_eof` (a count of `0`) is byte-identical from v5.1 to
+  //     v5.5.1 apart from `lua_pushlstring(L, NULL, 0)` becoming `lua_pushliteral(L, "")` at
+  //     v5.3.1. The 200-character cap on a numeral is `MAXRN`/`L_MAXLENNUM` and is **200 at
+  //     every 5.3+ release**, though only 5.4's manual mentions it.
+  //   * **The stream-error path is in no manual, in any version.** `if (ferror(f)) return
+  //     luaL_fileresult(L, 0, NULL);` — three values, `nil` plus the system's description and
+  //     its code — and 5.1's `pushresult(L, 0, NULL)` pushes the same three. So a single
+  //     `nil` is the end of the file and a `nil` with values behind it is trouble, on all
+  //     five lines and undated. Stated in the entries' prose under
+  //     `#telling-the-end-of-the-file-from-trouble` rather than in a note.
+  //
+  // Two wording changes that are **not** deltas: 5.1 says a count reads that many
+  // *characters* where 5.2 onwards say *bytes* (a Lua string is bytes in every version), and
+  // 5.4 retypes `nil` as *fail*, which is the `os.getenv` non-event — `luaL_pushfail` is
+  // `lua_pushnil` unless `LUA_FAILISFALSE` is defined, and it is not in a stock build.
+  //
+  // Patch residuals, recorded because minor-line granularity cannot hold them: v5.1 and
+  // v5.1.1's `read_number` fails **without pushing a placeholder**, so `g_read`'s
+  // `lua_pop(L, 1)` removes the wrong value — fixed by 5.1.5, which is what
+  // `lua.org/source/5.1` serves and what this site means by 5.1. The numeral scanner accepts
+  // a dot *as well as* the locale's radix mark only from **v5.3.3** (`decp[1] = '.'`); v5.3.0
+  // through v5.3.2 take the locale's mark alone. And `g_read` gains `errno = 0;` at
+  // **v5.4.7**, which changes only what the stream-error path reports when the failure left
+  // `errno` unset.
+  'io.file-read': ioFileRead,
+  'io.read': ioRead,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

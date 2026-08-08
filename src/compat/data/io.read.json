@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A format that keeps the end-of-line character joins the list. `\"*L\"` reads the next line the way `\"*l\"` does and leaves the line's ending on what it hands back, so joining what it produced puts the input back together exactly as it was read. Earlier versions have no such format and refuse the name, and a program that wants the ending there has to add it itself and guess whether the last line had one.",
+    "5.3": "The leading `*` on a format name became optional, so the names are now `\"l\"`, `\"L\"`, `\"a\"` and `\"n\"`, and `\"*l\"` and its neighbours are still accepted with the star read and thrown away. Earlier versions require the star and refuse a bare name before reading anything, so `\"a\"` raises there while `\"*a\"` works on every version. Two smaller changes arrived with it. The numeral format now reads a numeral by Lua's own rules — the longest run that could begin one, handed back as an integer or a float — where before the C library's number scanner decided what counted and every answer was a float. And a format given as a number must now have an exact integer representation, where before a fraction was cut off and the whole part used."
+  }
+}

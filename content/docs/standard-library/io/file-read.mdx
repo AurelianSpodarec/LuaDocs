@@ -1,8 +1,307 @@
 ---
 title: file:read()
-description: ""
+description: Read from the file a handle refers to — a line, a numeral, a count of bytes, or everything left.
+lua-compat: io.file-read
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:read
 ---
 
-{/* Not yet written. */}
+Reads from the file it is called on, starting wherever that file's position has got to. Each
+*format* names one thing to read — a line, a numeral, a fixed number of bytes, everything
+left — and what they found comes back in the order they were given. A call with no format at
+all reads a line.
+
+<RunnableExample code={`local ledger_path = "io-file-read-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal reading = assert(io.open(ledger_path, "r"))\nlocal line = reading:read()\nwhile line do\n  print(line)\n  line = reading:read()\nend\nreading:close()\n\nos.remove(ledger_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+file:read(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more formats, each saying what to read next: a string naming one of the shapes under [The formats](#the-formats), or a number of bytes. A call with no format at all reads one line.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">What a format that reads text found — a line, everything left in the file, or up to the count of bytes asked for. One value per format, in the order the formats were given.</Return>
+  <Return type="integer or float">What the numeral format found, where the text at the position was a numeral.</Return>
+  <Return type="nil">In place of the value for the first format that could not read — the file had run out, or the numeral was not there. The formats after it are not read and nothing comes back for them, so this `nil` is the end of the answer as well as the end of the reading. See [Reading more than one format at a time](#reading-more-than-one-format-at-a-time).</Return>
+  <Return type="string">Where it was the stream itself that went wrong rather than the file running out, the answer is a `nil` with two values behind it instead, and this is the first of them: the system's own description of what happened. See [Telling the end of the file from trouble](#telling-the-end-of-the-file-from-trouble).</Return>
+  <Return type="integer">The system's numeric code for that same trouble, third and last on that path.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: whatever was written first arrives where the file belongs, and when nothing was written, nothing does.
+- Raises when the handle has already been closed. Reading through a closed handle is a mistake about the program's own state rather than a condition to report.
+- Raises when a format is a value that is neither a string nor a number — a boolean, a table, `nil`.
+- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](#the-formats).
+- <Since v="5.3" /> Raises when a format is a number with no exact integer representation.
+- Running out of file does not raise, and neither does trouble the system reported with the stream. Both arrive through the return values.
+
+</Errors>
+
+## Description
+
+A file handle carries a position, and this call reads from it and leaves it past whatever it
+read. Two reads in a row therefore see two different parts of the file, and nothing here ever
+goes back: [`file:seek()`](/docs/standard-library/io/file-seek) is what moves the position
+about.
+
+The handle has to be open for reading, which is settled by the mode it was opened with —
+[`io.open()`](/docs/standard-library/io/open#the-mode-string) sets those out. A handle opened
+for writing alone does not raise when it is read; it answers the way it does for any other
+trouble with the stream, which is described under
+[Telling the end of the file from trouble](#telling-the-end-of-the-file-from-trouble).
+
+The same read is available as a library-level call.
+[`io.read()`](/docs/standard-library/io/read) is this call aimed at the *default input file*
+instead of at a handle a program is holding; the formats and everything that comes back are
+what this page describes.
+
+## The formats
+
+A format is a string naming a shape to read, or a number saying how many bytes to take. What
+each one does, and what it answers once the file has run out:
+
+<Only since="5.3">
+
+| Format | What it reads | At the end of the file |
+|---|---|---|
+| `"l"` | the next line, without its end-of-line character | `nil` |
+| `"L"` | the next line, keeping its end-of-line character where the line has one | `nil` |
+| `"a"` | everything left, from wherever the position is | `""` |
+| `"n"` | a numeral, as an integer or a float | `nil` |
+| a number | up to that many bytes; a count of `0` reads nothing and answers the empty string | `nil` |
+
+The older spellings — `"*l"`, `"*L"`, `"*a"` and `"*n"` — are accepted here as well. The star
+is read and thrown away, so code carried over from an older line goes on working without
+being touched.
+
+</Only>
+
+<Only since="5.2" before="5.3">
+
+| Format | What it reads | At the end of the file |
+|---|---|---|
+| `"*l"` | the next line, without its end-of-line character | `nil` |
+| `"*L"` | the next line, keeping its end-of-line character where the line has one | `nil` |
+| `"*a"` | everything left, from wherever the position is | `""` |
+| `"*n"` | a numeral, as a number | `nil` |
+| a number | up to that many bytes; a count of `0` reads nothing and answers the empty string | `nil` |
+
+The star is part of the name here, not decoration: a bare `"l"` is refused before anything is
+read.
+
+</Only>
+
+<Only before="5.2">
+
+| Format | What it reads | At the end of the file |
+|---|---|---|
+| `"*l"` | the next line, without its end-of-line character | `nil` |
+| `"*a"` | everything left, from wherever the position is | `""` |
+| `"*n"` | a numeral, as a number | `nil` |
+| a number | up to that many bytes; a count of `0` reads nothing and answers the empty string | `nil` |
+
+The star is part of the name here, not decoration: a bare `"l"` is refused before anything is
+read.
+
+</Only>
+
+A call with no format at all reads a line without its ending, which is what the line format
+asks for and the shortest way to write it.
+
+The whole-file format has no failing answer: at the end of the file it hands back the empty
+string rather than `nil`, and it goes on doing that however many times it is asked. The other
+formats answer `nil` once there is nothing left.
+
+The numeral format reads past any whitespace in front of it, takes the longest run of
+characters that could be the beginning of a numeral, and hands back the number that run
+spells, read the way Lua reads a numeral written in a program's own source. Where the run
+turns out not to spell a numeral after all — an empty run, or `0x`, or `3.4e-` — the answer
+is `nil`, and a run that goes on for more than two hundred characters is given up on the same
+way.
+
+A line ends at a newline byte and at nothing else, which is why the line formats suit text
+and not much else. A file whose lines are separated some other way, or one opened in binary
+mode on a system that would otherwise have translated the ending, hands back lines with the
+leftover byte still attached.
+
+A count is a count of *bytes*, not of characters. Twenty bytes of text encoded in UTF-8 may
+end halfway through a character, and this call neither knows nor minds.
+
+## Reading more than one format at a time
+
+Several formats in one call produce several values, one per format, in the order the formats
+were given. That is what makes reading a record in a single line reasonable: a numeral and
+the rest of the line come back together.
+
+The catch is what happens when one of them cannot read. *The first format that fails ends the
+call.* Nothing after it is read, and no value comes back for it — so the number of values is
+the number of formats the call got as far as, which need not be the number it was given. A
+call with three formats whose second one runs out of file answers *two* values, the second of
+them `nil`.
+
+That makes the count worth measuring rather than assuming. Assigning into names hides the
+difference, because a name with nothing to receive is `nil` whether its own format failed or
+was never reached; [`select()`](/docs/standard-library/globals/select) with `"#"` is what
+tells the two apart, and the second example below prints both counts.
+
+## Telling the end of the file from trouble
+
+A read that simply ran out of file answers a single `nil` — one value, nothing behind it. A
+read the system reported trouble on answers *three*: `nil`, its own description of what went
+wrong, and its numeric code for the same thing. That is the shape
+[`io.open()`](/docs/standard-library/io/open#when-the-open-fails) uses when it cannot open a
+file, and the shape most of this library reports trouble in.
+
+So the two are told apart by what follows the `nil`, not by the `nil` itself:
+
+```lua
+local line, complaint = reading:read()
+if complaint then
+  -- the stream went wrong; `line` is nil
+end
+```
+
+A `nil` on its own is the ordinary end of a file and is what a reading loop stops on. The
+message and the number are for reporting: the wording is the system's, meant for a person,
+and the number is the system's code, which differs from one system to the next.
+
+The three values are the whole answer on that path, and they replace it rather than joining
+it: a call whose earlier formats had already read something hands back the `nil`, the message
+and the number, and what those formats found does not come back at all. Reading a handle that
+was opened for writing alone is the everyday way to see this shape.
+
+## Examples
+
+### Reading the whole file at once
+
+<Only since="5.3">
+
+<RunnableExample code={`local recipe_path = "io-file-read-example-recipe.txt"\n\nlocal writing = assert(io.open(recipe_path, "w"))\nwriting:write("cocoa\\nflour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(recipe_path, "r"))\nlocal whole = reading:read("a")\nprint(#whole)\nprint(whole == "cocoa\\nflour\\n")\nprint(reading:read("a") == "")\nreading:close()\n\nos.remove(recipe_path)\n-- Expected output:\n-- 12\n-- true\n-- true`} />
+
+</Only>
+
+<Only before="5.3">
+
+<RunnableExample code={`local recipe_path = "io-file-read-example-recipe.txt"\n\nlocal writing = assert(io.open(recipe_path, "w"))\nwriting:write("cocoa\\nflour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(recipe_path, "r"))\nlocal whole = reading:read("*a")\nprint(#whole)\nprint(whole == "cocoa\\nflour\\n")\nprint(reading:read("*a") == "")\nreading:close()\n\nos.remove(recipe_path)\n-- Expected output:\n-- 12\n-- true\n-- true`} />
+
+</Only>
+
+One value, ends and all, exactly as the file holds them. The second read is the one worth
+looking at: the file has run out, and the answer is the empty string rather than `nil`.
+
+### A numeral and the rest of the line
+
+<Only since="5.3">
+
+<RunnableExample code={`local stock_path = "io-file-read-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("42 cocoa\\n7 flour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(stock_path, "r"))\nlocal quantity, item = reading:read("n", "l")\nprint(quantity)\nprint("[" .. item .. "]")\nprint(select("#", reading:read("n", "l")))\nprint(select("#", reading:read("n", "l")))\nreading:close()\n\nos.remove(stock_path)\n-- Expected output:\n-- 42\n-- [ cocoa]\n-- 2\n-- 1`} />
+
+</Only>
+
+<Only before="5.3">
+
+<RunnableExample code={`local stock_path = "io-file-read-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("42 cocoa\\n7 flour\\n")\nwriting:close()\n\nlocal reading = assert(io.open(stock_path, "r"))\nlocal quantity, item = reading:read("*n", "*l")\nprint(quantity)\nprint("[" .. item .. "]")\nprint(select("#", reading:read("*n", "*l")))\nprint(select("#", reading:read("*n", "*l")))\nreading:close()\n\nos.remove(stock_path)\n-- Expected output:\n-- 42\n-- [ cocoa]\n-- 2\n-- 1`} />
+
+</Only>
+
+The brackets are there to show where the second value starts: the numeral format stops at the
+space, and the line format takes everything after it, space included. The two counts are the
+point of the card. The second row of the file is read whole, so two values come back; the
+third call finds no file left, the numeral fails, and the line format after it is never
+reached — one value.
+
+### Reading a fixed number of bytes
+
+<RunnableExample code={`local packet_path = "io-file-read-example-packet.txt"\n\nlocal writing = assert(io.open(packet_path, "wb"))\nwriting:write("cocoa,flour,sugar")\nwriting:close()\n\nlocal reading = assert(io.open(packet_path, "rb"))\nprint(reading:read(5))\nprint(reading:read(0) ~= nil)\nprint(#reading:read(100))\nprint(reading:read(0))\nreading:close()\n\nos.remove(packet_path)\n-- Expected output:\n-- cocoa\n-- true\n-- 12\n-- nil`} />
+
+A count of `0` reads nothing, which makes it the way to ask whether the file has anything
+left without taking any of it: the empty string while it has, `nil` once it has not. The call
+for 100 bytes shows the other half — twelve is all there was, and getting fewer bytes than
+asked for is a success rather than a failure.
+
+<Only since="5.2">
+
+### Keeping the line ending
+
+<Only since="5.3">
+
+<RunnableExample code={`local memo_path = "io-file-read-example-memo.txt"\n\nlocal writing = assert(io.open(memo_path, "w"))\nwriting:write("cocoa\\nflour")\nwriting:close()\n\nlocal keeping = assert(io.open(memo_path, "r"))\nprint(keeping:read("L") == "cocoa\\n")\nprint(keeping:read("L") == "flour")\nprint(keeping:read("L"))\nkeeping:close()\n\nlocal dropping = assert(io.open(memo_path, "r"))\nprint(dropping:read("l") == "cocoa")\ndropping:close()\n\nos.remove(memo_path)\n-- Expected output:\n-- true\n-- true\n-- nil\n-- true`} />
+
+</Only>
+
+<Only since="5.2" before="5.3">
+
+<RunnableExample code={`local memo_path = "io-file-read-example-memo.txt"\n\nlocal writing = assert(io.open(memo_path, "w"))\nwriting:write("cocoa\\nflour")\nwriting:close()\n\nlocal keeping = assert(io.open(memo_path, "r"))\nprint(keeping:read("*L") == "cocoa\\n")\nprint(keeping:read("*L") == "flour")\nprint(keeping:read("*L"))\nkeeping:close()\n\nlocal dropping = assert(io.open(memo_path, "r"))\nprint(dropping:read("*l") == "cocoa")\ndropping:close()\n\nos.remove(memo_path)\n-- Expected output:\n-- true\n-- true\n-- nil\n-- true`} />
+
+</Only>
+
+The last line of this file has no ending, so the format that keeps endings has none to keep
+and hands back the text alone. That is what makes it the format to reach for when a program
+has to put back together what it took apart: joining what this format produced gives back
+exactly what was read, down to whether the last line ended.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="A dot where the colon belongs hands the format in as the file">
+`reading:read()` and `reading.read(reading)` are the same call; `reading.read()` is not. The
+`:` is what puts the handle in front of the arguments, and without it the first thing written
+arrives where the file belongs — or, as here, nothing does.
+
+<RunnableExample code={`local invoice_path = "io-file-read-example-invoice.txt"\n\nlocal writing = assert(io.open(invoice_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(invoice_path, "r"))\nlocal read_it, complaint = pcall(reading.read)\nprint(read_it)\nprint(type(complaint))\nprint(reading:read())\nreading:close()\n\nos.remove(invoice_path)\n-- Expected output:\n-- false\n-- string\n-- cocoa,2`} />
+
+It raises rather than answering, which is the good outcome: the mistake is in the program
+rather than in the file, and it stops on the line that made it.
+</Gotcha>
+
+<Gotcha title="A loop that waits for the whole-file format to say no waits forever">
+Every other format eventually answers `nil`, and the whole-file one does not — it answers the
+empty string, and goes on answering it. A loop written to stop when the read comes back
+`nil` therefore never stops, and a program that reads in whole-file chunks has to look at the
+length of what it got instead.
+
+The same shape one step down: a read for a fixed number of bytes that comes back short has
+*succeeded*. Only a read that got nothing at all answers `nil`.
+</Gotcha>
+
+<Gotcha title="A numeral that is not there costs the characters it looked at">
+The numeral format takes the longest run of characters that could be the start of a numeral
+before deciding whether the run spells one. Text like `3.4e-` gets that far and then turns
+out not to be a numeral, and those characters are gone: the answer is `nil` and the position
+has moved past them. Text that never looked numeric costs only the whitespace in front of it,
+which the format skips before it starts looking.
+
+So a failed numeral is not something to retry. A file whose numbers might be missing is
+better read a line at a time and converted with
+[`tonumber()`](/docs/standard-library/globals/tonumber), which leaves the file alone.
+</Gotcha>
+
+<Gotcha title="Three formats do not mean three values">
+`local name, quantity, unit = reading:read(...)` fills the names it has values for and leaves
+the rest `nil`, and that reads the same whether the second format failed or the second format
+was never tried at all. The call stops at the first format that cannot read, so a `nil` in the
+middle means everything after it is `nil` too — and a program branching on the *third* name
+is really branching on the first failure, wherever it was.
+</Gotcha>
+
+## See also
+
+- [`io.read()`](/docs/standard-library/io/read) — the same read, aimed at the default input file instead of a handle
+- [`io.open()`](/docs/standard-library/io/open) — where a readable handle comes from
+- [`file:lines()`](/docs/standard-library/io/file-lines) — the same formats, driven by a `for` loop
+- [`io.lines()`](/docs/standard-library/io/lines) — reading a file by name, opening and closing it for you
+- [`file:seek()`](/docs/standard-library/io/file-seek) — moving the position this reads from
+- [`file:write()`](/docs/standard-library/io/file-write) — the other direction
+- [`io.type()`](/docs/standard-library/io/type) — telling an open handle from a closed one
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — reading a numeral out of text already in hand

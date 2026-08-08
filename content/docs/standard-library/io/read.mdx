@@ -1,8 +1,163 @@
 ---
 title: io.read()
-description: ""
+description: Read from the default input file, in the same shapes a file handle takes.
+lua-compat: io.read
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.read
 ---
 
-{/* Not yet written. */}
+Reads from the *default input file* — the one
+[`io.input()`](/docs/standard-library/io/input) last pointed at, and the program's standard
+input until something does. The formats, the values and the answers at the end of the file
+are [`file:read()`](/docs/standard-library/io/file-read)'s; what this spelling settles is
+*which* file gets read.
+
+<RunnableExample code={`local notes_path = "io-read-example-notes.txt"\n\nlocal writing = assert(io.open(notes_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nlocal reading = assert(io.open(notes_path, "r"))\nio.input(reading)\n\nprint(io.read())\nprint(io.read())\nprint(io.read())\n\nio.input(previous_input)\nreading:close()\nos.remove(notes_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1\n-- nil`} />
+
+<Note>
+The examples here run against a sandbox with nothing feeding its standard input, so each one
+points the default input at a file it wrote a moment earlier and puts the old one back before
+it finishes. That is also how a program tests code written around this call.
+</Note>
+
+## Syntax
+
+```lua
+io.read(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more formats, each saying what to read next: a string naming one of the shapes under [The formats](/docs/standard-library/io/file-read#the-formats), or a number of bytes. A call with no format at all reads one line. There is no argument for a file — see [Which file this reads](#which-file-this-reads).</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">What a format that reads text found — a line, everything left in the file, or up to the count of bytes asked for. One value per format, in the order the formats were given.</Return>
+  <Return type="integer or float">What the numeral format found, where the text at the position was a numeral.</Return>
+  <Return type="nil">In place of the value for the first format that could not read — the file had run out, or the numeral was not there. The formats after it are not read and nothing comes back for them, so this `nil` is the end of the answer as well as the end of the reading.</Return>
+  <Return type="string">Where it was the stream itself that went wrong rather than the file running out, the answer is a `nil` with two values behind it instead, and this is the first of them: the system's own description of what happened. See [Telling the end of the file from trouble](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble).</Return>
+  <Return type="integer">The system's numeric code for that same trouble, third and last on that path.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the default input file has been closed. It is reached before any format is looked at, so this is what a program hears about first.
+- Raises when a format is a value that is neither a string nor a number. A file handle is one such value: this call takes no handle, and one written here is read as a format and refused.
+- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](/docs/standard-library/io/file-read#the-formats).
+- <Since v="5.3" /> Raises when a format is a number with no exact integer representation.
+- Running out of file does not raise, and neither does trouble the system reported with the stream. Both arrive through the return values.
+
+</Errors>
+
+## Description
+
+This is the same reading as
+[`file:read()`](/docs/standard-library/io/file-read), against a file the program never names
+in the call. What that page says about the reading itself holds here: the shapes under
+[The formats](/docs/standard-library/io/file-read#the-formats), the way
+[several formats in one call](/docs/standard-library/io/file-read#reading-more-than-one-format-at-a-time)
+stop at the first one that cannot read, and the difference between
+[the end of the file and trouble](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble).
+
+What this spelling buys is brevity in the two situations it fits: a program whose input is
+whatever it was handed, and a program that has one input for its whole run and would rather
+not pass a handle around to say so. Where neither holds — a program reading two files, or a
+function that should read whichever file its caller means — a handle and `file:read()` say
+what is going on where this call does not.
+
+## Which file this reads
+
+The default input file is a single piece of program-wide state. It starts out as the
+program's standard input, which is the handle
+[`io.stdin`](/docs/standard-library/io/stdin) also refers to, and it stays that until
+[`io.input()`](/docs/standard-library/io/input) is called with something else. From then on
+every `io.read()` anywhere in the program reads the new one, including in code that never
+asked for the change.
+
+`io.input()` takes either a handle or a file name; handed a name it opens the file itself,
+and the handle it opened is what a later `io.input()` with nothing at all hands back. That is
+the way to put the old default back afterwards, and to get hold of the handle so it can be
+closed:
+
+```lua
+local previous_input = io.input()
+io.input(inventory_path)
+
+local first_line = io.read()
+
+local opened = io.input()
+io.input(previous_input)
+opened:close()
+```
+
+Restoring before closing is the order that matters. A default input left pointing at a closed
+file makes the next `io.read()` anywhere in the program raise, and the line it raises on is
+whichever one happens to read next rather than the one that closed the file.
+
+## Examples
+
+### A numeral and the rest of the line
+
+<Only since="5.3">
+
+<RunnableExample code={`local stock_path = "io-read-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("412 crates delivered\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nlocal reading = assert(io.open(stock_path, "r"))\nio.input(reading)\n\nlocal delivered, rest = io.read("n", "l")\nprint(delivered)\nprint("[" .. rest .. "]")\n\nio.input(previous_input)\nreading:close()\nos.remove(stock_path)\n-- Expected output:\n-- 412\n-- [ crates delivered]`} />
+
+</Only>
+
+<Only before="5.3">
+
+<RunnableExample code={`local stock_path = "io-read-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("412 crates delivered\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nlocal reading = assert(io.open(stock_path, "r"))\nio.input(reading)\n\nlocal delivered, rest = io.read("*n", "*l")\nprint(delivered)\nprint("[" .. rest .. "]")\n\nio.input(previous_input)\nreading:close()\nos.remove(stock_path)\n-- Expected output:\n-- 412\n-- [ crates delivered]`} />
+
+</Only>
+
+The formats reach this call unchanged, and so does everything they do: the numeral format
+stops at the space, and the line format takes the rest of the line including it. The brackets
+are there to make that visible.
+
+### Letting the library open the file
+
+<RunnableExample code={`local report_path = "io-read-example-report.txt"\n\nlocal writing = assert(io.open(report_path, "w"))\nwriting:write("north,412\\nsouth,208\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nio.input(report_path)\n\nlocal counted = 0\nlocal line = io.read()\nwhile line do\n  counted = counted + 1\n  line = io.read()\nend\nprint(counted)\n\nlocal opened = io.input()\nio.input(previous_input)\nopened:close()\nprint(io.type(opened))\nprint(io.input() == previous_input)\n\nos.remove(report_path)\n-- Expected output:\n-- 2\n-- closed file\n-- true`} />
+
+Handed a name rather than a handle, `io.input()` opens the file — and the program is still
+the one that has to close it, which is what the three lines at the bottom are for. The last
+two prints are the check worth copying: the file this card opened is closed, and the default
+input is back where the card found it.
+
+## Gotchas
+
+<Gotcha title="The first argument is a format, not a file">
+`io.read(handle)` looks like it should read that handle and does not. There is no argument
+here for a file: the handle arrives where a format belongs, is refused, and the call raises —
+after reaching the default input file, which is not the one the program meant. Reading a
+handle you are holding is [`file:read()`](/docs/standard-library/io/file-read), written with
+a `:`.
+</Gotcha>
+
+<Gotcha title="Nothing local about the default input">
+A function that calls [`io.input()`](/docs/standard-library/io/input) changes what every
+later `io.read()` in the program reads, in code it has never seen and cannot check. A library
+that does it without putting the old one back has quietly redirected its caller's input, and
+the symptom shows up somewhere else entirely — as a read that answers with something the
+caller never wrote, or with nothing at all, because the file it expected was never the one
+being read.
+
+Saving the old default and restoring it is the discipline, and a program with more than one
+input is better off holding handles and reading through them.
+</Gotcha>
+
+<Gotcha title="Left alone, this reads whatever the program was fed">
+Until something calls [`io.input()`](/docs/standard-library/io/input), the file being read is
+the program's standard input. A program run from a terminal therefore stops at the first
+`io.read()` and waits for someone to type a line, and the same program run with its input
+coming from a file or another program reads that instead without noticing the difference.
+That is the point of the call, and it is also why a program that meant to read a *particular*
+file and forgot to say so appears to hang rather than to fail.
+</Gotcha>
+
+## See also
+
+- [`file:read()`](/docs/standard-library/io/file-read) — the same read on a handle the program is holding, and where the formats are set out
+- [`io.input()`](/docs/standard-library/io/input) — choosing the file this reads
+- [`io.lines()`](/docs/standard-library/io/lines) — the same default input, driven by a `for` loop
+- [`io.write()`](/docs/standard-library/io/write) — the same idea for the default output file
+- [`io.stdin`](/docs/standard-library/io/stdin) — the handle this reads until something changes it
+- [`io.open()`](/docs/standard-library/io/open) — opening a file to read through a handle instead
