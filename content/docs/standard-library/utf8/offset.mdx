@@ -1,6 +1,6 @@
 ---
 title: utf8.offset()
-description: Find the byte position a numbered character starts at, counting forwards or backwards.
+description: Find where a numbered character sits among a string's bytes, counting forwards or backwards.
 lua-compat: utf8.offset
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-utf8.offset
@@ -35,11 +35,11 @@ utf8.offset(s, n [, i])
 <Errors>
 
 - Raises when `i` resolves to a position before the first byte, or more than one past the last.
-- Raises when `n` is not zero and `i` lands on a continuation byte instead of the first byte of a character. Counting has to start from a character, and a position inside one names none. This applies to the position `i` defaults to as much as to one written out, so a string that itself begins with a continuation byte raises on a plain call.
+- Raises when `n` is not zero and `i` lands on a continuation byte instead of the first byte of a character. Counting has to start from a character, and a position inside one names none. This applies to the position `i` defaults to as much as to one written out, so a positive `n` counting from the front of a string that itself begins with a continuation byte raises before it has started.
 - Raises when `n` is left out. `i` may be left out; it has a default.
 - Raises when `n` or `i` is a number with a fractional part, since there is no character between two whole ones and no position between two bytes.
 - Raises when `s` is neither a string nor a number, and when `i` is neither.
-- A byte sequence that spells no valid character does *not* raise on that account. This function decodes nothing, so it has no value to reject — see [it counts boundaries, not characters](#it-counts-boundaries-not-characters).
+- Bytes that spell no valid character are never rejected *as invalid*. This function decodes nothing, so it has no value to weigh: the only question it asks of a byte is whether that byte is a continuation byte, and every complaint it makes names an argument or a *position*. See [it counts boundaries, not characters](#it-counts-boundaries-not-characters).
 
 </Errors>
 
@@ -66,9 +66,9 @@ further than the string has characters.
 ## What a zero n asks for
 
 `n = 0` is not a character number, and it is the one form that reads `i` as an arbitrary
-byte position rather than as a character boundary. It answers with the start of the
-character that *contains* byte `i`, walking backwards over continuation bytes until it
-reaches a first byte.
+byte position rather than as a character boundary. It reports the character that *contains*
+byte `i`, found by walking backwards over continuation bytes until it reaches a first byte,
+and reported in exactly the positions any other character is reported in.
 
 That makes it the way to snap a position onto a boundary — after arithmetic on byte
 positions, after a cut made by length, or after any calculation that did not know where
@@ -84,10 +84,11 @@ loosen.
 
 The consequence is that a string which is not valid UTF-8 usually gets an answer rather
 than a complaint, and the answer is arithmetic on whatever the bytes happen to be. An
-overlong sequence, or one encoding a value beyond anything Unicode has assigned, is
-counted as a character like any other. The single place bad bytes are noticed is the
-starting position: an `i` sitting on a continuation byte raises, because a count has to
-begin at a character. Where the input is not trusted,
+overlong sequence, or one encoding a value beyond anything Unicode has assigned, is counted
+as a character like any other: validity is not a question this function asks. Where bad
+bytes are noticed at all it is as *positions* — a continuation byte turning up where a
+character's first byte was needed — and the complaint names that position rather than
+saying the string is malformed. Where the input is not trusted,
 [`utf8.len()`](/docs/standard-library/utf8/len) is the function that says so before any of
 this is worth doing.
 
@@ -97,9 +98,11 @@ this is worth doing.
 
 <RunnableExample code={`local title = "crème brûlée"\nlocal first_starts_at = utf8.offset(title, 1)\nlocal sixth_starts_at = utf8.offset(title, 6)\nprint(string.sub(title, first_starts_at, sixth_starts_at - 1))\n-- Expected output: crème`} />
 
-Two positions, and the slice runs from the first up to one byte before the second. Taking
-the first five characters by their count instead — `string.sub(title, 1, 5)` — would cut
-`è` in half.
+Two positions, and the slice runs from the first up to one byte before the second. Counting
+the same five characters as bytes instead — `string.sub(title, 1, 5)` — gives `crèm`, a
+character short, because `è` takes two of those five; and asking for the first three that way,
+`string.sub(title, 1, 3)`, cuts `è` in half and leaves something that is no longer valid
+UTF-8.
 
 ### Counting back from the end
 

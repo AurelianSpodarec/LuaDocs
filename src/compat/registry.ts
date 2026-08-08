@@ -195,13 +195,14 @@ const raw: Record<string, unknown> = {
   //   * `utf8.codes` takes `lax` from 5.4 like the other two decoders, so its 5.4 note
   //     carries the same pair of facts. It also gained an up-front rejection of a subject
   //     that starts on a continuation byte — `luaL_argcheck(L, !iscontp(s), 1, MSGInvalid)`
-  //     in `iter_codes` — which lands at **v5.4.8**, not v5.4.0. Both lines raise on such a
-  //     subject; what moved is whether the raise comes from `utf8.codes(s)` itself or from
+  //     in `iter_codes` — which lands at **v5.4.5**, not v5.4.0: checked at every tag of the
+  //     line, absent in v5.4.0–v5.4.4 and present in v5.4.5–v5.4.8. Both lines raise on such
+  //     a subject; what moved is whether the raise comes from `utf8.codes(s)` itself or from
   //     the loop's first step, so `pcall(utf8.codes, "\x80")` answers `true` on v5.3.6 and
-  //     v5.4.0 and `false` from v5.4.8. Recorded at 5.4 on the standing ruling that a line
+  //     v5.4.0 and `false` from v5.4.5. Recorded at 5.4 on the standing ruling that a line
   //     is credited with what its final release has; the patch boundary is in the U2 report.
-  //     (v5.4.0 also dropped 5.3's `iscontp(next)` check and v5.4.8 restored it, which
-  //     leaves no minor-line difference at all and is therefore recorded nowhere.)
+  //     (v5.4.0 also dropped 5.3's `iscontp(next)` check and v5.4.5 restored it — the same
+  //     boundary — which leaves no minor-line difference and is therefore recorded nowhere.)
   //   * `utf8.offset` returns **two** integers from 5.5 — `byteoffset` pushes the initial
   //     position, then walks the continuation bytes and pushes the final one. The failing
   //     path still pushes one `fail`. 5.3 says "returns nil" and 5.4 says "returns fail" for
@@ -212,7 +213,11 @@ const raw: Record<string, unknown> = {
   //     `"[\0-\x7F\xC2-\xF4][\x80-\xBF]*"` at v5.3.0 and v5.3.6 and
   //     `"[\0-\x7F\xC2-\xFD][\x80-\xBF]*"` from v5.4.0 — the same widening as `utf8.char`'s
   //     ceiling, since a six-byte sequence starts at `0xFC`/`0xFD`. Fourteen bytes on both
-  //     lines; confirmed by probe as well as by source.
+  //     lines; confirmed by probe as well as by source. One residual inside the 5.3 line:
+  //     **v5.3.0 pushes it with `lua_pushliteral`**, which measures with `strlen`, and the
+  //     pattern's second byte is `\0` — so v5.3.0 alone holds the one-byte string `"["`.
+  //     v5.3.1 switched to `lua_pushlstring(L, UTF8PATT, sizeof(UTF8PATT) - 1)`. The final
+  //     release of the line is what the page documents, so the entry says fourteen bytes.
   //
   // Nothing in any Incompatibilities chapter names `utf8.offset` or `utf8.charpattern`, and
   // 5.5's chapter does not mention the extra return value at all.

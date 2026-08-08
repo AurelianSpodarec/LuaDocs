@@ -20,9 +20,9 @@ bytes are written down, and by the time a program reads the field it holds those
 nothing else. The characters that *are* pattern syntax are the two bracketed classes, the
 ranges inside them, and the `*`.
 
-It is a pattern, which is to say a string — not a function, and not something any
-function in this library accepts as an argument. Using it means calling into the `string`
-library with this value in the pattern slot.
+It is a pattern, which is to say a string — not a function, and no function in this library
+takes a pattern. Using it means calling into the `string` library with this value in the
+pattern slot.
 
 ## Description
 
