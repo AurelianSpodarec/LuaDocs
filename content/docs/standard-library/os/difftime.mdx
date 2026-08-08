@@ -6,9 +6,10 @@ entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.difftime
 ---
 
-Measures the gap between two time values, in seconds. It is the one operation the manual
-guarantees on a time value whatever the system underneath is counting — the later moment
-first, the earlier one second.
+Measures the gap between two time values, in seconds. With
+[`os.date()`](/docs/standard-library/os/date) it is one of the two things the manual
+guarantees a time value can be used for, whatever the system underneath is counting — and
+it takes the later moment first, the earlier one second.
 
 <RunnableExample code={`local shift_start = os.time{ year = 2024, month = 6, day = 12, hour = 9, min = 0, sec = 0 }\nlocal shift_end = os.time{ year = 2024, month = 6, day = 12, hour = 17, min = 30, sec = 0 }\n\nprint(string.format("%d seconds", os.difftime(shift_end, shift_start)))\n-- Expected output: 30600 seconds`} />
 
@@ -44,14 +45,15 @@ two of them into a quantity anybody can use: seconds, counted forwards from `t1`
 The sign is the other half of the answer. A negative result says `t2` came first, which
 makes a single call enough to order two moments as well as to measure between them.
 
-On POSIX systems, on Windows and on many others a time value counts seconds already, and
+On POSIX systems, on Windows and on some others a time value counts seconds already, and
 there the result is exactly `t2 - t1`. Writing the subtraction out is not the same thing,
 though: it is arithmetic on a number whose meaning is only defined on those systems, where
 this call is defined everywhere. The two also differ in what they hand back — a difference
-worked out here is a *float* even when the moments are whole seconds apart, which shows
-the moment it is printed or concatenated. A figure meant for a person to read wants
-[`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) or a `%d` in
-[`string.format()`](/docs/standard-library/string/format) on the way out.
+worked out here is a *float* even when the moments are whole seconds apart, where
+subtracting two time values is integer arithmetic. A figure meant for a person to read
+wants [`math.floor()`](/docs/standard-library/math/floor#which-subtype-comes-back) or a
+`%d` in [`string.format()`](/docs/standard-library/string/format) on the way out, which is
+what keeps a whole number of seconds from arriving with a `.0` on the end.
 
 ## Examples
 
@@ -94,9 +96,9 @@ opposite of what was meant.
 <Gotcha title="Subtracting the two is not the same call">
 `finish - start` gives the same number on the systems whose time values count seconds, and
 nothing defines it anywhere else. It also gives a different *kind* of number: subtracting
-two time values is integer arithmetic and this call answers with a float, so one duration
-reads as `30600` and the other as `30600.0` the moment either is printed. Code that
-subtracts in one place and calls this in another gets both spellings of the same figure.
+two time values is integer arithmetic while this call answers with a float, so the same
+duration reads as `30600` from one and `30600.0` from the other. Code that subtracts in
+one place and calls this in another gets both spellings of the same figure.
 </Gotcha>
 
 <Gotcha title="Seconds are the only unit">

@@ -26,6 +26,9 @@ os.time([table])
 
 <Returns>
   <Return type="integer">A time value naming that moment. What the number itself means is the system's business — see [What a time value is](#what-a-time-value-is).</Return>
+  <Only before="5.3">
+    <Return type="nil">In place of a time value, when the date described cannot be turned into one on this system.</Return>
+  </Only>
 </Returns>
 
 <Errors>
@@ -54,7 +57,7 @@ from it.
 
 The number this function answers with is the system's own name for a moment, and the
 manual promises less about it than most code assumes. On POSIX systems, on Windows and
-on many others it counts seconds from a fixed starting point — the *epoch* — which is
+on some others it counts seconds from a fixed starting point — the *epoch* — which is
 why arithmetic on one so often works out. Where a system keeps time some other way the
 number's meaning is not specified at all, and the only use it is guaranteed to have is
 as an argument to [`os.date()`](/docs/standard-library/os/date) and

@@ -27,6 +27,9 @@ os.date([format [, time]])
 <Returns>
   <Return type="string">With a format that is not [the table form](#reading-the-parts-instead): the format with each conversion replaced, and everything else left as written.</Return>
   <Return type="table">With the table form — `"*t"`, or `"!*t"` for the reading in [Coordinated Universal Time](#coordinated-universal-time) — a fresh table holding the moment's parts as separate fields.</Return>
+  <Only before="5.3">
+    <Return type="nil">In place of either, when `time` names a moment this system cannot work out a date for.</Return>
+  </Only>
 </Returns>
 
 <Errors>
@@ -42,12 +45,14 @@ os.date([format [, time]])
 ## Description
 
 The format string decides both *what* comes back and *how much* of it. Almost every
-format produces a string; the one that does not is `"*t"`, which produces a table, and
-is what code reaches for when it wants a field rather than a rendering.
+format produces a string; the exception is the table form — `"*t"`, or `"!*t"` — which
+produces a table, and is what code reaches for when it wants a field rather than a
+rendering.
 
 A leading `!` is read before either of those and changes which clock the moment is read
 against. It is a prefix rather than a conversion, so it applies to the whole format and
-has to be the first character — which is why `"!*t"` is the table form too.
+has to be the first character; it is stripped before the rest of the format is looked at,
+which is what leaves `"!*t"` recognisable as the table form.
 
 Nothing here modifies anything: a call renders a moment and hands back a new string or a
 new table, and the time value it was given is untouched.
