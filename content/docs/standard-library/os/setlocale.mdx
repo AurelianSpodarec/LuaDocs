@@ -1,8 +1,208 @@
 ---
 title: os.setlocale()
-description: ""
+description: Read the locale conventions the program is running under, or move a category of them to another locale.
+lua-compat: os.setlocale
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.setlocale
 ---
 
-{/* Not yet written. */}
+Reads the locale the program is running under, and changes it. A locale is a set of
+conventions the C library underneath Lua consults when it decides which bytes count as
+letters, how two strings sort against each other, which character sits between a number's
+whole part and its fraction, and what the months are called. Handing `nil` in place of a
+name asks for what is in force and changes nothing.
+
+<RunnableExample code={`local numeric_locale = os.setlocale(nil, "numeric")\nprint(type(numeric_locale))\nprint(numeric_locale == os.setlocale(nil, "numeric"))\nprint(os.setlocale(nil) == os.setlocale(nil, "all"))\n-- Expected output:\n-- string\n-- true\n-- true`} />
+
+<Note>
+Two of the cards here only ask; the two that change put the answer back afterwards. That
+discipline is the subject rather than a courtesy — this call changes the program rather
+than a scope, so a card walking away from a change would have changed the cards after it.
+The sandbox they run in carries the conventions of the C locale and no others, and it
+accepted every name it was handed rather than turning one down, so nothing here can show a
+name being refused or a convention moving. Both are described below instead.
+</Note>
+
+## Syntax
+
+```lua
+os.setlocale(locale [, category])
+```
+
+<Parameters>
+  <Param name="locale">The name of the locale to move to. `nil` asks for the current one and changes nothing, and leaving the argument out altogether does the same. `""` asks for the machine's own native locale, whatever it has been configured with; `"C"` asks for the standard C locale. Any other name is the system's to recognise; how such names are spelled is the system's business, and no list of them travels between machines.</Param>
+  <Param name="category">Which part of the locale to read or move, as one of `"all"`, `"collate"`, `"ctype"`, `"monetary"`, `"numeric"` or `"time"`. Left out, it is `"all"`, which is the other five together. [What each of them reaches](#what-a-locale-reaches-in-lua) sets out what moves inside Lua when one of them moves.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">Asking — `locale` as `nil` — hands back the name in force for `category` and leaves everything as it stood.</Return>
+  <Return type="string or nil">Changing hands back the name now in force for `category`, and `nil` when the system would not honour the request, in which case nothing moved. A name that came back is the one to keep: handing it to this call again with the same category puts that part of the locale back.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `category` is a string other than the six listed above. A number in that position is read as its own text first and then checked the same way, so `os.setlocale("C", 1)` is refused too.
+- Raises when `locale` is a value other than a string, a number or `nil`. A number is accepted and used as its own text, so `os.setlocale(1252)` asks the system for a locale named `1252`.
+- A name the system does not recognise does not raise. It arrives as `nil`, and the locale is left as it was — which is why the answer is worth reading rather than discarding.
+
+</Errors>
+
+## Description
+
+Two jobs share one call, and the first argument decides which. A name asks for a move; `nil`
+asks a question. The question matters on its own: it is how a Lua program learns the *name*
+of the conventions it is working under, rather than inferring them from how something came
+out.
+
+What a move changes is the *program*, not a block, a function or a coroutine. There is no
+scoped form of this call, nothing puts the old value back when a function returns, and every
+piece of code that runs afterwards — including library code that never asked for any of this
+— reads the conventions that were left behind. Saving the answer and handing it back later
+is the discipline it leaves room for, and it is the shape the last card on this page takes.
+
+Nothing else in Lua's standard library moves the locale. A program that never makes this
+call runs under whatever the C startup left it with, which for the stand-alone interpreter
+is the C locale; a host program embedding Lua may have set something else before Lua ever
+ran, which is why a program that cares reads the answer instead of assuming it.
+
+The manual fixes the meaning of two names and hands the rest over. `""` is the machine's
+native locale — whatever it has been configured with, read from the environment on most
+systems — and `"C"` is the standard C locale, the set of conventions C requires every
+implementation to provide. Every other name is spelled the way its system spells it, and a
+name that works on one machine is not a name to count on for the next.
+
+## What a locale reaches in Lua
+
+A locale is divided into categories, and a call may move one of them or all of them at once.
+Six names are accepted, and the second column below is what each one moves that a Lua
+program can observe:
+
+| Category | What moves inside Lua |
+|---|---|
+| `"collate"` | the order `<`, `<=`, `>` and `>=` put two strings in, and with it the arrangement [`table.sort()`](/docs/standard-library/table/sort) reaches when it is given no comparison function |
+| `"ctype"` | which bytes count as letters, digits, spaces and punctuation — the [pattern classes](/docs/standard-library/string/patterns) `%a`, `%l`, `%u`, `%s`, `%p` and their neighbours, and the letters [`string.upper()`](/docs/standard-library/string/upper) and [`string.lower()`](/docs/standard-library/string/lower) recognise as having a case |
+| `"numeric"` | [the character between a number's whole part and its fraction](#numbers-written-and-read-under-a-locale), on the way out of a number and on the way back in |
+| `"time"` | the weekday and month names, the words for the two halves of the day, and the arrangements [`os.date()`](/docs/standard-library/os/date#the-format-string) reaches for `%c`, `%x` and `%X` |
+| `"monetary"` | how an amount of money is punctuated. Lua's own libraries do not format one, so this category is here because C has it rather than because a Lua program can see it move |
+| `"all"` | the five above, together |
+
+Reading down that column is the useful part of the table. A locale reaches string ordering,
+character classification, number text and the calendar words
+[`os.date()`](/docs/standard-library/os/date) renders, and the list is short. It does not
+change what a string *is*, it does not re-encode anything, and it has no bearing on
+equality: `==` on two strings compares their bytes, so two spellings a locale would sort
+alongside each other are still two different values.
+
+## Numbers written and read under a locale
+
+The numeric category is worth reading twice, because the text it moves is often text a
+program wrote for another program rather than for a person. The character it moves is the
+one between a number's whole part and its fraction — a dot under the C locale, a comma
+under a good many others.
+
+On the way out, Lua hands a float to the C library to be written. That covers
+[`tostring()`](/docs/standard-library/globals/tostring), the same conversion inside
+[`print()`](/docs/standard-library/globals/print) and inside concatenation, and
+[`string.format()`](/docs/standard-library/string/format)'s `%f`, `%g` and `%e`. So under a
+locale whose character is a comma, `tostring(3.5)` is the three characters `3,5`. `%d`
+writes a whole number, which has no such character in it, so it comes out the same wherever
+it is run.
+
+On the way in, a string becoming a number goes through the same C library. A numeral
+written with a dot is read as one whatever character the current locale names, and so is a
+numeral written with that character instead. Source text is a separate matter and is not
+affected at all: the numeral `3.5` written in a program is read by Lua's own reader, which
+takes a dot and nothing else, so no locale can change what a program's own literals mean.
+
+Reading is the forgiving direction and writing is not, and that asymmetry is what catches
+programs out. Text a program writes for another program to read should not be carrying a
+character that a machine's configuration chose, and
+[`string.format()`](/docs/standard-library/string/format) is no help on its own, since it
+goes through the same writer. Fixing the category around the writing is the answer that
+holds, and that is what the helper in the last example does.
+
+## Examples
+
+### What the numeric category moves
+
+<RunnableExample code={`local saved_numeric = os.setlocale(nil, "numeric")\nos.setlocale("C", "numeric")\n\nlocal price = 1234.5\nlocal written = string.format("%.2f", price)\nprint(written)\nprint(written:sub(5, 5))\nprint(tonumber(written) == price)\n\nos.setlocale(saved_numeric, "numeric")\nprint(os.setlocale(nil, "numeric") == saved_numeric)\n-- Expected output:\n-- 1234.50\n-- .\n-- true\n-- true`} />
+
+The card fixes the category at `"C"` before it writes anything, which is what makes the
+middle character predictable enough to print — under another locale that fifth character is
+whatever that locale names, and the whole point of the exercise is that a program cannot
+assume. Reading the text back gives the number it started from, because the reader and the
+writer are looking at the same category. The last two lines are the pattern the rest of the
+page argues for: the name that came back at the top is handed in again at the bottom, and
+the program leaves the locale as it found it.
+
+### Every category, and one that is not among them
+
+<RunnableExample code={`local categories = { "all", "collate", "ctype", "monetary", "numeric", "time" }\nlocal answered = {}\nfor index = 1, #categories do\n  answered[index] = type(os.setlocale(nil, categories[index]))\nend\nprint(table.concat(answered, " "))\n\nprint((pcall(os.setlocale, nil, "messages")))\n-- Expected output:\n-- string string string string string string\n-- false`} />
+
+Each of the six answers with a name: a query has nothing to honour or to refuse, so it
+reports where the program stands whatever the machine has been set up with. The seventh
+name is a real category on POSIX systems, holding the language the system's own messages
+are written in, and Lua does not offer it — the list of six is fixed in the interpreter,
+and a name outside it raises rather than being quietly ignored. That is the failure mode
+worth knowing, because it lands at the call itself.
+
+### Changing it back afterwards
+
+<RunnableExample code={`local function under_locale(name, category, body)\n  local saved = os.setlocale(nil, category)\n  if not os.setlocale(name, category) then\n    return nil, "no locale called " .. name .. " on this machine"\n  end\n  local answer = body()\n  os.setlocale(saved, category)\n  return answer\nend\n\nlocal before = os.setlocale(nil, "numeric")\nprint(under_locale("C", "numeric", function() return string.format("%.3f", 2.5) end))\nprint(os.setlocale(nil, "numeric") == before)\n-- Expected output:\n-- 2.500\n-- true`} />
+
+Wrapping the change in a helper is the closest Lua gets to a scoped locale. It asks first, so
+it knows what to restore; it checks the answer, so a machine without the locale it wanted
+gets a value back rather than silently different behaviour; and it restores afterwards, so
+the code that runs next reads what it expected to. What it deliberately does not do is
+survive an error raised inside `body` — a
+[protected call](/docs/standard-library/globals/pcall) around that line is what a version
+meant for real use would add, and it is worth adding, because a locale left moved by a
+failure is a bug that shows up somewhere else entirely.
+
+## Gotchas
+
+<Gotcha title="A change here reaches every line that runs after it">
+There is no scope on this. A function that moves the locale and returns has moved it for its
+caller, for the library its caller calls next, and for the coroutines running alongside it.
+Code written by someone who never heard of the change is the code most likely to notice it —
+a report that starts printing commas, a sort that stops matching a saved order, a pattern
+that begins matching accented letters it used to skip. Where a program does need a
+particular set of conventions, setting them once at startup is easier to reason about than
+setting them here and there.
+</Gotcha>
+
+<Gotcha title="A locale name is the system's, not Lua's">
+`"de_DE.UTF-8"` written into a program is a bet that the machine running it has been given
+that locale, and a machine that has not simply answers `nil`. The same conventions are also
+spelled differently from one system to the next, so a name that works on the machine it was
+written on is not a name that travels. `""` and `"C"` are the two the manual fixes the
+meaning of; everything else is worth checking the answer of rather than assuming.
+</Gotcha>
+
+<Gotcha title="A locale-shaped number is not an interchange format">
+Text handed to another program — a CSV column, a config file, a line another process parses
+— should not be carrying a character that a machine's configuration chose. A float written
+where that character is a comma and read back where a dot is in force does not arrive, and
+the failure is a quiet one: [`tonumber()`](/docs/standard-library/globals/tonumber) answers a
+false value rather than raising, so the trouble turns up later as a missing number instead of
+at the line that read the text. Writing under a category fixed at `"C"`, as the last example
+does, keeps the text the same wherever it was produced.
+</Gotcha>
+
+<Gotcha title="Asking about every category can hand back something that is not one name">
+The `"all"` category covers five that need not agree with each other. Where they do not, the
+system may answer the query with a single string listing what each one holds rather than with
+a locale name, and what that string looks like is the system's business. It is still the
+right thing to keep and hand back — that is what restores the whole arrangement — but it is
+not a name to show anybody, compare against a literal, or write down.
+</Gotcha>
+
+## See also
+
+- [`os.date()`](/docs/standard-library/os/date#the-format-string) — the conversions the time category moves
+- [`string.format()`](/docs/standard-library/string/format) — the writer the numeric category reaches
+- [`tonumber()`](/docs/standard-library/globals/tonumber) — reading a number back out of text, through the same category
+- [Patterns](/docs/standard-library/string/patterns) — the character classes the ctype category decides
+- [`string.upper()`](/docs/standard-library/string/upper) — the letters that category decides have a case
+- [`table.sort()`](/docs/standard-library/table/sort) — the order the collate category reaches, through `<`
+- [`os.getenv()`](/docs/standard-library/os/getenv) — where a system usually reads its native locale from

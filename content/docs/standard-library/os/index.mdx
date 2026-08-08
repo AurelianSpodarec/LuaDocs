@@ -1,8 +1,112 @@
 ---
 title: os
-description: ""
+description: The library that reaches outside the program — the clock and the calendar, files by name, the environment, the shell, the locale, and the way out.
+lua-compat: os.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.10
 ---
 
-{/* Not yet written. */}
+This is the library that reaches past Lua to the machine underneath. It reads the clock and
+turns a moment into a date, deletes and renames files by name, looks up an environment
+variable, hands a command to a shell, reports the conventions the program is running under,
+and ends the program. Its functions live in the table `os`, and there are eleven of them.
+
+They have less in common than a library usually does. The manual's own account of this one
+is a single sentence, and everything it has to say about the calls is said one call at a
+time — which is not an oversight so much as the shape of the thing. There is no rule here
+that holds for all eleven the way the [`table`](/docs/standard-library/table) library has a
+rule about how it reaches into a table, and no shared object the way
+[`io`](/docs/standard-library/io) has a file handle. What these eleven share is the
+boundary they stand on.
+
+That boundary is also where the promises get thin, and they get thin unevenly. Some of
+these calls say exactly what they do:
+[`os.remove()`](/docs/standard-library/os/remove) deletes the file the name refers to and
+tells you whether it managed it. Others describe what is counted and hand the meaning to
+the system: [`os.time()`](/docs/standard-library/os/time#what-a-time-value-is) answers with
+a number the manual will only promise you can pass back to two other calls in this table,
+and [`os.clock()`](/docs/standard-library/os/clock#what-the-number-is-measured-from) names
+what it counts without fixing where the counting started. Others still leave whole
+behaviours to the machine —
+[`os.tmpname()`](/docs/standard-library/os/tmpname#whether-there-is-a-file-there-already)
+creates a file on some systems and only reserves a name on others, and
+[`os.execute()`](/docs/standard-library/os/execute) needs a shell that may not be there. The
+entries below spend a good deal of their length on exactly this, because on this boundary
+what a call *does not* promise is usually what the reader came to find out.
+
+<RunnableExample code={`local release = os.time{ year = 2024, month = 3, day = 15, hour = 9, min = 30, sec = 0 }\nlocal shipped = os.time{ year = 2024, month = 3, day = 15, hour = 17, min = 0, sec = 0 }\n\nlocal log_path = "os-index-example-" .. os.date("%Y-%m-%d", release) .. ".log"\nlocal writing = assert(io.open(log_path, "w"))\nwriting:write(string.format("started %s, took %d seconds", os.date("%H:%M", release), os.difftime(shipped, release)))\nwriting:close()\n\nfor line in io.lines(log_path) do\n  print(line)\nend\nprint(os.remove(log_path))\n-- Expected output:\n-- started 09:30, took 27000 seconds\n-- true`} />
+
+Four of the eleven, doing the job they are usually seen doing: a moment built out of
+fields, the same moment rendered two different ways, the distance between two of them, and
+a file taken away again afterwards. The duration goes through
+[`string.format()`](/docs/standard-library/string/format) rather than straight into
+`print`, which is worth copying: the number
+[`os.difftime()`](/docs/standard-library/os/difftime) hands back is a float, and a `%d`
+conversion writes it the same way wherever the example is run.
+
+<Note>
+This library is smaller than the job it is pointed at, and the gaps are not obvious from
+the list. Nothing in standard Lua lists the files in a directory, creates one, reports what
+kind of thing a name refers to, gives the directory the program is running in, or writes an
+environment variable back. A program that needs any of those needs
+something from outside the standard library, and a program built on the eleven below knows
+which files it means because it put them there or was told about them, not because it went
+looking.
+</Note>
+
+Which names this table holds has not moved at all: the same eleven, on every Lua line this
+site documents. What has moved is behaviour — what a call accepts, what it hands back, and
+whether trouble arrives as a value or as a raise — and it has moved on seven of the eleven,
+often in ways that change how the surrounding code has to be written rather than only what
+it prints. Each entry's own version support says where its line falls.
+
+## Telling the time, and writing it down
+
+Three calls that between them name a moment, turn one into text a person can read, and
+measure the distance between two of them.
+
+- [`os.time()`](/docs/standard-library/os/time) — the current moment as a time value, or the one a table of date fields names
+- [`os.date()`](/docs/standard-library/os/date) — a moment rendered as text, or handed back as a table of its separate parts
+- [`os.difftime()`](/docs/standard-library/os/difftime) — the seconds between two moments, with the later of the two written first
+
+## Timing the program's own work
+
+A second kind of second, and it sits on its own because it is not a moment at all: it
+counts work a processor has done on the program's behalf rather than time that has passed,
+and the two are easy to confuse because both arrive as plain numbers out of this same
+table.
+
+- [`os.clock()`](/docs/standard-library/os/clock) — an approximation of the processor time this program has used, which is not a reading of the time of day
+
+## Files, by name
+
+Three calls that work on paths rather than on open handles. The [`io`](/docs/standard-library/io)
+library is where a file gets opened and read; these three are about the name it goes by.
+
+- [`os.tmpname()`](/docs/standard-library/os/tmpname) — a name a temporary file can be given, which on some systems arrives with the file already made at it
+- [`os.rename()`](/docs/standard-library/os/rename) — a file given a different name, with trouble reported as a value rather than as a raise
+- [`os.remove()`](/docs/standard-library/os/remove) — a file deleted by name, reporting trouble the same way
+
+## Other programs, and the end of this one
+
+Two calls whose subject is a process rather than a value: one starts another program and
+waits for it, the other stops this one.
+
+- [`os.execute()`](/docs/standard-library/os/execute) — a command handed to the system's shell and waited for, with an account of how it ended
+- [`os.exit()`](/docs/standard-library/os/exit) — the program ended on the spot, with a status the caller chooses
+
+## Settings the program was handed
+
+Two ways of reading what the machine around the program was configured with. Neither is
+Lua's own state, and one of the two can be changed as well as read.
+
+- [`os.getenv()`](/docs/standard-library/os/getenv) — one environment variable read by name, and a false value where there is none
+- [`os.setlocale()`](/docs/standard-library/os/setlocale) — the conventions in force for sorting, character classes, number text and calendar names, read or moved a category at a time
+
+## See also
+
+- [`io`](/docs/standard-library/io) — the same reach outwards, worked through open handles rather than through names
+- [`string.format()`](/docs/standard-library/string/format) — assembling the text these calls are usually wrapped in
+- [`assert()`](/docs/standard-library/globals/assert) — turning a failing answer from one of these calls into a raise
+- [Protected calls](/docs/language/error-handling/protected-calls) — surviving the ones that raise instead
+- [The stand-alone interpreter](/docs/standalone) — the program `os.exit()` ends, and where its arguments come from

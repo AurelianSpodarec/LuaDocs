@@ -126,6 +126,8 @@ import osExecute from './data/os.execute.json';
 import osExit from './data/os.exit.json';
 import osRemove from './data/os.remove.json';
 import osRename from './data/os.rename.json';
+import osSetlocale from './data/os.setlocale.json';
+import osLibrary from './data/os.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -864,6 +866,46 @@ const raw: Record<string, unknown> = {
   'os.exit': osExit,
   'os.remove': osRemove,
   'os.rename': osRename,
+
+  // `os.setlocale` closes the section, and the surprise is that the function itself has
+  // **never moved**: `os_setlocale` is byte-for-byte identical at v5.1.1, 5.1.5, v5.2.3,
+  // 5.2.4, v5.3.0, v5.3.6, v5.4.0, v5.4.8 and v5.5.0 — `luaL_optstring(L, 1, NULL)`,
+  // `luaL_checkoption(L, 2, "all", catnames)`, `lua_pushstring(L, setlocale(cat[op], l))`,
+  // one `return 1;`. The six category names are the same six in every manual and in every
+  // release, and the manual's own text moves only twice, neither time behaviourally:
+  //
+  //   * 5.2 adds "system-dependent" to the description of `locale`, and adds the
+  //     "may be not thread safe" disclosure — the same non-event `os.date` and `os.time`
+  //     record for `gmtime`/`localtime`.
+  //   * 5.4 retypes the failing answer from `nil` to *fail*, which is the `os.getenv`
+  //     non-event O2 ruled on: `lua_pushstring` with a `NULL` pushes `nil` in every release.
+  //
+  // The one dated fact is **not about this call at all** — it is about what a locale
+  // reaches, and it is recorded here because this entry is the only place in the section
+  // where a reader can observe it. From 5.3, `l_str2d` retries a failed conversion with the
+  // locale's own radix character (`lua_getlocaledecpoint`), so a string→number conversion
+  // accepts a dot *and* the locale's mark; 5.1 and 5.2 hand the text to `strtod` once and
+  // take only the mark. 5.3's manual states it in §3.4.3 ("All conversions from strings to
+  // numbers accept both a dot and the current locale mark as the radix character. (The Lua
+  // lexer, however, accepts only a dot.)") and 5.1's and 5.2's do not.
+  //
+  // **Patch residual:** the compensation is absent from v5.3.0 and arrives at **v5.3.1**;
+  // the lexer's own `trydecpoint`/`decpoint` machinery is still there at v5.3.1 and gone by
+  // v5.3.6. `lua.org/source/5.3` serves 5.3.6, so 5.3 as this site means it has the new
+  // behaviour and the note is correct at minor-line granularity.
+  //
+  // Verified across all five shipped lines (5.1.5, 5.2.4, 5.3.6, 5.4.8, 5.5.0) that
+  // `setlocale()` is called from `os_setlocale` and nowhere else, and that the only
+  // `localeconv()` use reads `decimal_point` — so nothing in the library reads the monetary
+  // category, and nothing but this call moves the locale.
+  'os.setlocale': osSetlocale,
+
+  // The section overview. Membership records nothing, because **`os` never gained or lost a
+  // member**: `grep -o 'pdf-os\.[a-z]*'` over all five manuals returns the same eleven
+  // functions every time, so there is no `changed_in` to write and no matrix renders on the
+  // overview. That is a result rather than an omission — it makes `os` the first section
+  // whose front door is version-invariant while seven of its eleven entries are not.
+  'os.library': osLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

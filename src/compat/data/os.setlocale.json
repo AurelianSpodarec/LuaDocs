@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "Reading a string as a number accepts both a dot and the character the current locale names, so a numeral written with a dot still reads as one after the numeric category has been moved. Earlier versions hand such text straight to the C library, which takes only the character the locale names: under a locale that uses a comma, `tonumber(\"3.5\")` answers `nil` there and `3.5` here, while `tonumber(\"3,5\")` answers `3.5` on both. What this call does, what it accepts and what it answers with are unchanged, and so is the way a number is written back out."
+  }
+}
