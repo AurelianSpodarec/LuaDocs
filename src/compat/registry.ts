@@ -133,6 +133,10 @@ import ioClose from './data/io.close.json';
 import ioType from './data/io.type.json';
 import ioFileRead from './data/io.file-read.json';
 import ioRead from './data/io.read.json';
+import ioFileWrite from './data/io.file-write.json';
+import ioWrite from './data/io.write.json';
+import ioFileFlush from './data/io.file-flush.json';
+import ioFlush from './data/io.flush.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1101,6 +1105,91 @@ const raw: Record<string, unknown> = {
   // `errno` unset.
   'io.file-read': ioFileRead,
   'io.read': ioRead,
+
+  // Writing and flushing. As with reading, each pair is **one C function reached from two
+  // names**: `f_write` and `io_write` both end in `g_write`, and `f_flush` and `io_flush`
+  // both do `fflush` on the file they were handed. So the two write datasets carry the same
+  // three notes and the two flush datasets carry none, and every fact below holds for both
+  // members of its pair.
+  //
+  // `liolib.c` read at the **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0
+  // through v5.2.3, v5.3.0 through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus
+  // the two shipped releases with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and
+  // `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). Whole files were diffed and
+  // `g_write`, `f_write`, `io_write`, `f_flush`, `io_flush`, `aux_flush`, `pushresult`,
+  // `getiofile` and `tofile` extracted per release and diffed pairwise; `lauxlib.c` at
+  // v5.2.0, v5.2.3, v5.3.0, v5.3.6, v5.4.0, v5.4.6, v5.4.7, v5.4.8, v5.5.0 and v5.5.1 for
+  // `luaL_fileresult`; `luaconf.h` at all five lines for `LUA_NUMBER_FMT`, `LUA_INTEGER_FMT`
+  // and `LUA_NUMBER_FMT_N`; `lobject.c` and `lapi.c` at v5.5.1 for `luaO_tostringbuff` and
+  // `lua_numbertocstring`; and `lbaselib.c` plus the header holding `lua_writestring` at all
+  // five lines, which is how the entries can say that `print` does **not** go through the
+  // default output file (it is `fwrite(..., stdout)` in every version).
+  //
+  //   * **What a write hands back moved at 5.2.** 5.1's `g_write` ends in
+  //     `pushresult(L, status, NULL)`, which pushes `lua_pushboolean(L, 1)` — one value,
+  //     `true`. **v5.2.0** changes the tail to `if (status) return 1;  /* file handle already
+  //     on stack top */`, and `f_write` gains a `lua_pushvalue(L, 1)` above the call to put
+  //     the handle there. `io_write` needs no such line because `getiofile` already leaves
+  //     the default output handle on the stack, which is also why `g_write` computes
+  //     `nargs = lua_gettop(L) - arg` rather than counting the arguments it was given. So
+  //     `io.write` hands back the *default output file* from 5.2 and `true` before it.
+  //     The manuals record the change on `file:write` only ("In case of success, this
+  //     function returns file", added at 5.2); `io.write`'s passage says "Equivalent to
+  //     `io.output():write(···)`" in every version and never mentions a return at all.
+  //   * **The failing answer gained a fourth value at 5.5.** From v5.2.0 to v5.4.8 the tail
+  //     is `luaL_fileresult(L, status, NULL)`, which is three values — `nil`/fail, the
+  //     system's description, its code — and 5.1's `pushresult` pushes the same three.
+  //     **v5.5.0** rewrites `g_write` to detect a short `fwrite` per argument and return
+  //     `luaL_fileresult(...)` plus `lua_pushinteger(L, cast_st2S(totalbytes))`, four values,
+  //     where `totalbytes` is summed across all the arguments the call got through. 5.5's
+  //     manual states it outright; no earlier manual does.
+  //   * **How a number is written moved twice.** 5.1 and 5.2 write every number with
+  //     `fprintf(f, LUA_NUMBER_FMT, lua_tonumber(...))`, and `LUA_NUMBER_FMT` is `"%.14g"` in
+  //     both `luaconf.h`s — so a whole number large enough reaches the file in exponent form.
+  //     **v5.3.0** splits the branch on `lua_isinteger` and writes an integer with
+  //     `LUA_INTEGER_FMT`, in full. **v5.5.0** drops `fprintf` entirely for
+  //     `lua_numbertocstring`, which is `luaO_tostringbuff` — the same conversion `tostring`
+  //     uses, so a whole-valued float now keeps its `.0` and a float is retried at
+  //     `LUA_NUMBER_FMT_N` precision when the first attempt does not read back as itself.
+  //     Between 5.3 and 5.4, therefore, `io.write(2.0)` and `tostring(2.0)` genuinely
+  //     disagree; on 5.1, 5.2 and 5.5 they agree, for two different reasons.
+  //     5.5 also moves the default `LUA_NUMBER_FMT` from `"%.14g"` to `"%.15g"`, which is a
+  //     language-wide float-printing change rather than a `write` one and is **not** carried
+  //     here — it belongs to `tostring`, `print` and `string.format` as much as to this.
+  //   * **Flushing did not move at all.** `f_flush` and `io_flush` are `pushresult(L,
+  //     fflush(...) == 0, NULL)` at 5.1 and `luaL_fileresult(L, fflush(...) == 0, NULL)` from
+  //     v5.2.0, and `luaL_fileresult` pushes `lua_pushboolean(L, 1)` and returns 1 on success
+  //     in **every** release read — including v5.5.1, where the flush entries are the only
+  //     `io` writes-side calls the four-value change does not touch. v5.4.7 hoists an
+  //     `errno = 0;` and **v5.5.0** factors both bodies into `aux_flush`; both are refactors.
+  //     No manual in any version says what `file:flush` returns, so this is ADR 0010 rule 3
+  //     and it is stated in the entries' `<Returns>` undated. Probed as well: `flush()` is
+  //     one value, `true`, and a chain written through it raises on a boolean.
+  //   * **A closed default output raises**, in every version — `getiofile`'s `luaL_error`.
+  //     Only the wording moved (`standard %s file is closed` through 5.3, `default %s file is
+  //     closed` from v5.4.0), and wording is never recorded.
+  //
+  // Wording changes that are **not** deltas: 5.1's `file:write` passage adds "To write other
+  // values, use `tostring` or `string.format` before write", which 5.2 drops without any
+  // behaviour moving; 5.1's `io.flush` says "Equivalent to `file:flush` over the default
+  // output file" where 5.2 onwards say "Equivalent to `io.output():flush()`"; and 5.4
+  // retypes `nil` as *fail*, the `os.getenv` non-event.
+  //
+  // **None of the four appears in any Incompatibilities chapter.** 5.2's, 5.3's, 5.4's and
+  // 5.5's §8 were sliced from `<a name="8">` to end of file and read paragraph by paragraph.
+  // Notably 5.5's does **not** mention the fourth return value, though its `file:write`
+  // passage states it.
+  //
+  // Patch residuals, recorded because minor-line granularity cannot hold them: `g_write`
+  // gains `errno = 0;` at **v5.4.7** and `f_flush`/`io_flush` do the same, which with
+  // v5.4.7's `luaL_fileresult` makes a failure that left `errno` unset report
+  // `"(no extra info)"` and code `0` instead of a stale message. `LUAI_UACINT`/`LUAI_UACNUMBER`
+  // casts enter `g_write` at **v5.3.4** and `l_likely` at **v5.4.3**; neither changes an
+  // answer. v5.5.0 and v5.5.1 are byte-identical for all nine functions read.
+  'io.file-write': ioFileWrite,
+  'io.write': ioWrite,
+  'io.file-flush': ioFileFlush,
+  'io.flush': ioFlush,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

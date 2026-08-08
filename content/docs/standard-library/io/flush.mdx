@@ -1,8 +1,128 @@
 ---
 title: io.flush()
-description: ""
+description: Hand over whatever has been written to the default output file and is still waiting.
+lua-compat: io.flush
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.flush
 ---
 
-{/* Not yet written. */}
+Hands over whatever has been written to the *default output file* and is still waiting — the
+file [`io.output()`](/docs/standard-library/io/output) last pointed at, and the program's
+standard output until something does. What the handover is and what it guarantees are
+[`file:flush()`](/docs/standard-library/io/file-flush)'s; what this spelling settles is
+*which* file gets flushed.
+
+<RunnableExample code={`local ledger_path = "io-flush-example-ledger.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(ledger_path, "w"))\nio.output(sink)\n\nio.write("cocoa,2\\n")\nprint(io.flush())\n\nlocal reading = assert(io.open(ledger_path, "r"))\nprint(reading:read())\nreading:close()\n\nio.output(previous_output)\nsink:close()\nos.remove(ledger_path)\n-- Expected output:\n-- true\n-- cocoa,2`} />
+
+<Note>
+The examples here point the default output at a file so that what they write can be shown,
+and put the old one back before they finish. A program left running with the default output
+pointing at a closed file makes every later write in it raise, so putting it back is part of
+the idiom rather than housekeeping for the sandbox.
+</Note>
+
+## Syntax
+
+```lua
+io.flush()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="boolean">`true`, when the handover went through. It is not the file, and not the handle [`io.output()`](/docs/standard-library/io/output) would give you.</Return>
+  <Return type="nil">Where the system reported trouble instead — the first of the values that describe it.</Return>
+  <Return type="string">The system's own description of that trouble, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the default output file has been closed. The file is reached before anything is handed over, and there is no argument for the call to refuse, so this is the condition that raises here.
+- Trouble the system reported does not raise. It arrives through the return values.
+
+</Errors>
+
+## Description
+
+This is the same handover as
+[`file:flush()`](/docs/standard-library/io/file-flush), aimed at a file the program never
+names in the call. What that page says about the handover itself holds here: what a buffer
+is and why one is there, [what flushing does and does not
+guarantee](/docs/standard-library/io/file-flush#what-flushing-does), and the fact that the
+handle is otherwise untouched.
+
+It takes no argument at all. What is left to get wrong is *which* file the default output is
+pointing at when the call runs, which is why this page is mostly about that.
+
+## Which file this flushes
+
+The default output file is a single piece of program-wide state. It starts out as the
+program's standard output, which is the handle
+[`io.stdout`](/docs/standard-library/io/stdout) also refers to, and it stays that until
+[`io.output()`](/docs/standard-library/io/output) is called with something else. This call
+follows it: after the default output moves, `io.flush()` hands over whatever is waiting on
+the *new* file and leaves the old one alone.
+
+That is the trap worth naming. A program that redirects the default output, writes, and then
+flushes after putting the old default back has flushed the wrong file — whatever those writes
+left waiting is still waiting on the file it meant to fill. Flush before restoring, or close
+the handle, which hands over what is waiting as part of closing it.
+
+A file the program is holding a handle to is flushed through that handle with
+[`file:flush()`](/docs/standard-library/io/file-flush), whatever the default output happens
+to be pointing at.
+
+## Examples
+
+### It follows wherever the default output has gone
+
+<RunnableExample code={`local daybook_path = "io-flush-example-daybook.txt"\nlocal aside_path = "io-flush-example-aside.txt"\n\nlocal previous_output = io.output()\nlocal daybook = assert(io.open(daybook_path, "w"))\nlocal aside = assert(io.open(aside_path, "w"))\n\nio.output(daybook)\nio.write("cocoa,2\\n")\nio.flush()\nlocal checking_daybook = assert(io.open(daybook_path, "r"))\nprint(checking_daybook:read())\nchecking_daybook:close()\n\nio.output(aside)\nio.write("flour,1\\n")\nio.flush()\nlocal checking_aside = assert(io.open(aside_path, "r"))\nprint(checking_aside:read())\nchecking_aside:close()\n\nio.output(previous_output)\ndaybook:close()\naside:close()\nos.remove(daybook_path)\nos.remove(aside_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+Two files, two handles held open the whole time, and one call that means a different thing
+each time it is written because the default output moved between them. Each row is read back
+while both files are still open, which is what the flush bought.
+
+### Putting the default output back
+
+<RunnableExample code={`local receipt_path = "io-flush-example-receipt.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(receipt_path, "w"))\nio.output(sink)\nio.write("cocoa,2\\n")\nio.flush()\n\nio.output(previous_output)\nsink:close()\n\nprint(io.type(io.output()))\nprint(io.output() == io.stdout)\nprint(io.flush())\n\nos.remove(receipt_path)\n-- Expected output:\n-- file\n-- true\n-- true`} />
+
+The flush goes in while the redirection is still up, and the restoring goes before the close.
+The three prints at the end are the check worth copying into any code that redirects: the
+default output is open, it is back where the program found it, and a flush through it still
+answers.
+
+## Gotchas
+
+<Gotcha title="Flushing after restoring flushes the wrong file">
+`io.output(previous_output)` and then `io.flush()` hands over what is waiting on whatever the
+default output was restored *to*, which is not the file the program spent the last while
+writing. Nothing raises and nothing reports it; whatever was waiting stays waiting until the
+handle is closed or the buffer fills on its own. Flush while the redirection is still up, or
+reach the file through its handle and call
+[`file:flush()`](/docs/standard-library/io/file-flush) on it.
+</Gotcha>
+
+<Gotcha title="It flushes one file, not everything the program has open">
+One file is in question here, and it is the default output. Every other handle the program is
+holding keeps its own buffer, and this call says nothing about any of them. A program writing
+several files at once flushes each through its own handle.
+</Gotcha>
+
+<Gotcha title="A closed default output raises rather than quietly doing nothing">
+Closing the file the default output points at — with
+[`io.close()`](/docs/standard-library/io/close), or through the handle — leaves the default
+output a closed file, and this call raises on the next attempt rather than quietly doing
+nothing. That is the same raise every later [`io.write()`](/docs/standard-library/io/write)
+in the program gets, and it lands on whichever line happens to come next rather than on the
+one that closed the file.
+</Gotcha>
+
+## See also
+
+- [`file:flush()`](/docs/standard-library/io/file-flush) — the same handover on a handle the program is holding, and where what it guarantees is set out
+- [`io.output()`](/docs/standard-library/io/output) — choosing the file this flushes
+- [`io.write()`](/docs/standard-library/io/write) — putting the data there in the first place
+- [`io.close()`](/docs/standard-library/io/close) — closing the default output, which hands over what is waiting as well
+- [`io.stdout`](/docs/standard-library/io/stdout) — the file this flushes until something changes it
+- [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) — asking for a buffering scheme instead of a single handover

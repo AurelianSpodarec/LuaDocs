@@ -1,8 +1,142 @@
 ---
 title: file:flush()
-description: ""
+description: Hand over whatever has been written to a file and is still waiting, without closing the file.
+lua-compat: io.file-flush
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:flush
 ---
 
-{/* Not yet written. */}
+Hands over whatever has been written to the file it is called on and is still waiting, so
+that anything else reading that file sees it. It is what a program calls when it needs the
+file up to date *now* and is not finished with it — closing the handle does the same thing,
+and ends the program's use of the file along with it.
+
+<RunnableExample code={`local journal_path = "io-file-flush-example-journal.txt"\n\nlocal writing = assert(io.open(journal_path, "w"))\nwriting:write("cocoa,2\\n")\nprint(writing:flush())\n\nlocal reading = assert(io.open(journal_path, "r"))\nprint(reading:read())\nreading:close()\n\nwriting:close()\nos.remove(journal_path)\n-- Expected output:\n-- true\n-- cocoa,2`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+file:flush()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="boolean">`true`, when the handover went through. It is not the file — see [What flushing does](#what-flushing-does).</Return>
+  <Return type="nil">Where the system reported trouble instead — the first of the values that describe it.</Return>
+  <Return type="string">The system's own description of that trouble, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: nothing arrives where the file belongs.
+- Raises when the handle has already been closed. Closing handed over what was waiting on its way out, and asking again through a closed handle is a mistake about the program's own state rather than a condition to report.
+- Trouble the system reported does not raise. It arrives through the return values.
+
+</Errors>
+
+## Description
+
+A program that writes through a handle is not writing to the file directly. What it writes
+can be held back and handed over in batches, which is what makes writing a line at a time
+affordable — and it is also why a file that is still open can look emptier than the program
+that is writing it believes. This call is how a program says *hand over what is waiting*.
+
+It changes nothing else about the handle. The file stays open, the position stays where the
+last write left it, and the next write carries on from there.
+[`file:close()`](/docs/standard-library/io/file-close) hands over what is waiting as well and
+then ends the handle, so which of the two a program wants is a question about whether it is
+finished with the file.
+
+The same handover is available as a library-level call.
+[`io.flush()`](/docs/standard-library/io/flush) is this call aimed at the *default output
+file* instead of at a handle a program is holding.
+
+## What flushing does
+
+What a program writes through a handle goes into a buffer, and the buffer is handed to the
+system on its own schedule — when it fills, when the handle is closed, and under whatever
+scheme [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) has asked for. Until then
+the bytes can still be in Lua's hands, where another reader of the file will not find them,
+which is what makes flushing the way to leave a partial file readable while it is being
+written.
+
+What the guarantee reaches is the *system*, not the storage the file lives on. Once the
+handover has gone through, another program reading that file reads what was written; whether
+the system has yet put those bytes on a disk is the system's business and is not something
+this call settles. For the everyday purposes — a log another process is following, output a
+reader is waiting on — that distinction does not matter, and where it does, it is not this
+library that answers it.
+
+[`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) is the other half of the subject:
+it asks for a buffering scheme rather than for a single handover, and a handle set to hand
+over after every line has already done what a flush after every line would do.
+
+The answer is `true` rather than the file it was called on, so it is not something a further
+call can be written onto: a boolean has no methods, and a `:` after a flush is where a chain
+of calls stops.
+
+## Examples
+
+### Keeping a log readable while the program runs
+
+<RunnableExample code={`local log_path = "io-file-flush-example-log.txt"\n\nlocal logging = assert(io.open(log_path, "w"))\nfor step = 1, 3 do\n  logging:write("step ", step, " done\\n")\n  logging:flush()\nend\n\nlocal watching = assert(io.open(log_path, "r"))\nlocal seen = 0\nlocal line = watching:read()\nwhile line do\n  seen = seen + 1\n  line = watching:read()\nend\nprint(seen)\nwatching:close()\n\nlogging:close()\nos.remove(log_path)\n-- Expected output:\n-- 3`} />
+
+The second handle reads the file while the first still has it open for writing, and finds all
+three rows because each was handed over as it was written. This is the shape of a program
+whose progress someone else is following: a flush after each entry costs a handover every time
+and buys the file being true at every moment rather than only at the end.
+
+### What comes back, and what does not
+
+<RunnableExample code={`local memo_path = "io-file-flush-example-memo.txt"\n\nlocal writing = assert(io.open(memo_path, "w"))\nwriting:write("cocoa,2\\n")\nlocal flushed = writing:flush()\nprint(flushed)\nlocal carried_on = pcall(function() return flushed:write("flour,1\\n") end)\nprint(carried_on)\nwriting:close()\n\nlocal reading = assert(io.open(memo_path, "r"))\nprint(reading:read())\nreading:close()\n\nos.remove(memo_path)\n-- Expected output:\n-- true\n-- false\n-- cocoa,2`} />
+
+`true` is not a file handle, so the second call has nothing to be called on and raises. The
+handle itself is untouched by all of this — the last read shows the row is where it was put.
+
+## Gotchas
+
+<Only since="5.2">
+
+<Gotcha title="A chain of calls can end in a flush but cannot carry on past one">
+`writing:write(row):flush()` works, because the write hands the handle back for the flush to
+be called on. `writing:flush():write(row)` does not, because the flush hands back `true` and a
+boolean has no methods. The asymmetry is easy to miss when a chain is being extended a call at
+a time, and it shows up as an attempt to index a boolean rather than as anything about files.
+</Gotcha>
+
+</Only>
+
+<Gotcha title="Flushing is not closing">
+It hands over what is waiting and leaves everything else alone: the handle is still open, the
+system still holds the file, and the program still has to close it. A loop that flushes after
+every write and never closes still leaks a handle per file, which a program that opens many of
+them notices as opens that begin to fail.
+
+Conversely, [`file:close()`](/docs/standard-library/io/file-close) already hands over what is
+waiting, so a flush written immediately before a close does nothing the close was not going to
+do.
+</Gotcha>
+
+<Gotcha title="Nothing here reaches another handle on the same file">
+A flush concerns the handle it was called on. Two handles open on one file each have their own
+buffer, and handing one over says nothing about the other — which is the trap in a program that
+opens a file twice for writing and expects the two streams to agree. Reading a file a program is
+writing means flushing the writing handle, not the reading one.
+</Gotcha>
+
+## See also
+
+- [`io.flush()`](/docs/standard-library/io/flush) — the same handover, aimed at the default output file instead of a handle
+- [`file:write()`](/docs/standard-library/io/file-write) — putting the data there in the first place
+- [`file:close()`](/docs/standard-library/io/file-close) — handing over what is waiting and ending the handle
+- [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) — asking for a buffering scheme instead of a single handover
+- [`io.close()`](/docs/standard-library/io/close#what-closing-a-file-does) — what closing a file does, handover included
+- [`io.open()`](/docs/standard-library/io/open) — where the handle this is called on comes from

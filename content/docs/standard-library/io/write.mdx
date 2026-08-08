@@ -1,8 +1,177 @@
 ---
 title: io.write()
-description: ""
+description: Write strings and numbers to the default output file, in the shapes a file handle takes.
+lua-compat: io.write
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.write
 ---
 
-{/* Not yet written. */}
+Writes to the *default output file* — the one
+[`io.output()`](/docs/standard-library/io/output) last pointed at, and the program's standard
+output until something does. What can be written, what runs together and what comes back are
+[`file:write()`](/docs/standard-library/io/file-write)'s; what this spelling settles is
+*which* file gets written to.
+
+<RunnableExample code={`local report_path = "io-write-example-report.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(report_path, "w"))\nio.output(sink)\n\nio.write("cocoa,2\\n")\nio.write("flour,1\\n")\n\nio.output(previous_output)\nsink:close()\n\nlocal reading = assert(io.open(report_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(report_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+<Note>
+The examples here point the default output at a file so that what they write can be shown,
+and put the old one back before they finish. A program left running with the default output
+pointing at a closed file makes every later write in it raise, so putting it back is part of
+the idiom rather than housekeeping for the sandbox.
+</Note>
+
+## Syntax
+
+```lua
+io.write(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more values to write, each of them a string or a number, exactly as [`file:write()`](/docs/standard-library/io/file-write#what-can-be-written) takes them. There is no argument for a file — see [Which file this writes](#which-file-this-writes).</Param>
+</Parameters>
+
+<Returns>
+  <Only since="5.2">
+    <Return type="file">The default output file, when everything asked for went out — the same handle [`io.output()`](/docs/standard-library/io/output) would hand back. See [What a write hands back](/docs/standard-library/io/file-write#what-a-write-hands-back).</Return>
+  </Only>
+  <Only before="5.2">
+    <Return type="boolean">`true`, when everything asked for went out. The answer says that the write went through and nothing further: not how much of it did, and not which file it went to.</Return>
+  </Only>
+  <Return type="nil">Where the system reported trouble with the stream instead — the first of the values that describe it.</Return>
+  <Return type="string">The system's own description of that trouble, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+  <Only since="5.5">
+    <Return type="integer">How many bytes the call did get out before it stopped, counted across all of its arguments together.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when the default output file has been closed. It is reached before any argument is looked at, so this is what a program hears about first.
+- Raises when an argument is neither a string nor a number. A file handle is one such value: this call takes no handle, and one written here is read as something to write and refused.
+- Trouble the system reported with the stream does not raise. It arrives through the return values.
+
+</Errors>
+
+## Description
+
+This is the same writing as
+[`file:write()`](/docs/standard-library/io/file-write), aimed at a file the program never
+names in the call. What that page says about the writing itself holds here: the values it
+takes and how each is rendered under
+[What can be written](/docs/standard-library/io/file-write#what-can-be-written), the way
+arguments run together with nothing between them, and
+[what comes back](/docs/standard-library/io/file-write#what-a-write-hands-back) on either
+path.
+
+What this spelling buys is brevity in the two situations it fits: a program whose output is
+wherever it was pointed, and a program that writes everything to one place for its whole run
+and would rather not pass a handle around to say so. Where neither holds — a program writing
+two files, or a function that should write to whichever file its caller means — a handle and
+`file:write()` say what is going on where this call does not.
+
+It is worth being clear about what this call is not. It is not
+[`print()`](/docs/standard-library/globals/print): there is no tab between the arguments and
+no newline after them, and nothing is put through `tostring` on the way — a value that is
+neither a string nor a number is refused here rather than converted. And `print()` does not go
+through the default output file at all, so redirecting the one does not redirect the other.
+
+## Which file this writes
+
+The default output file is a single piece of program-wide state. It starts out as the
+program's standard output, which is the handle
+[`io.stdout`](/docs/standard-library/io/stdout) also refers to, and it stays that until
+[`io.output()`](/docs/standard-library/io/output) is called with something else. From then on
+every `io.write()` anywhere in the program writes to the new one, including in code that
+never asked for the change.
+
+`io.output()` takes either a handle or a file name; handed a name it opens the file itself,
+and the handle it opened is what a later `io.output()` with nothing at all hands back. That
+is the way to put the old default back afterwards, and to get hold of the handle so it can be
+closed:
+
+```lua
+local previous_output = io.output()
+io.output(summary_path)
+
+io.write("north,412\n")
+
+local opened = io.output()
+io.output(previous_output)
+opened:close()
+```
+
+Restoring before closing is the order that matters. A default output left pointing at a
+closed file makes the next `io.write()` anywhere in the program raise, and the line it raises
+on is whichever one happens to write next rather than the one that closed the file.
+
+## Examples
+
+### Letting the library open the file
+
+<RunnableExample code={`local summary_path = "io-write-example-summary.txt"\n\nlocal previous_output = io.output()\nio.output(summary_path)\n\nio.write("north,412\\n")\nio.write("south,208\\n")\n\nlocal opened = io.output()\nio.output(previous_output)\nopened:close()\nprint(io.type(opened))\nprint(io.output() == io.stdout)\n\nlocal reading = assert(io.open(summary_path, "r"))\nprint(reading:read())\nreading:close()\n\nos.remove(summary_path)\n-- Expected output:\n-- closed file\n-- true\n-- north,412`} />
+
+Handed a name rather than a handle, `io.output()` opens the file — and the program is still
+the one that has to close it, which is what the three lines at the bottom are for. The first
+two prints are the check worth copying: the file this card opened is closed, and the default
+output is back where the card found it.
+
+### Nothing between the values, and nothing after them
+
+<RunnableExample code={`local note_path = "io-write-example-note.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(note_path, "w"))\nio.output(sink)\n\nio.write("cocoa", 2)\nio.write("flour", 1)\n\nio.output(previous_output)\nsink:close()\n\nlocal reading = assert(io.open(note_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(note_path)\n-- Expected output:\n-- cocoa2flour1\n-- nil`} />
+
+Four values, two calls, and one line in the file — the second `read` finds nothing after it.
+Every break a reader of that file would look for is a break the program has to write.
+
+## Gotchas
+
+<Gotcha title="The first argument is something to write, not a file">
+`io.write(handle, text)` looks like it should write that text to that handle and does not.
+There is no argument here for a file: the handle arrives where a value to write belongs, is
+refused, and the call raises — after reaching the default output file, which is not the one
+the program meant.
+
+<RunnableExample code={`local wrote_it, complaint = pcall(io.write, io.stdout)\nprint(wrote_it)\nprint(type(complaint))\n-- Expected output:\n-- false\n-- string`} />
+
+Writing to a handle the program is holding is
+[`file:write()`](/docs/standard-library/io/file-write), written with a `:`.
+</Gotcha>
+
+<Gotcha title="Nothing local about the default output">
+A function that calls [`io.output()`](/docs/standard-library/io/output) changes where every
+later `io.write()` in the program goes, in code it has never seen and cannot check. A library
+that does it without putting the old one back has quietly redirected its caller's output, and
+the symptom shows up somewhere else entirely — as output that never appears where it was
+expected, or as a raise on a line that had nothing to do with the change.
+
+Saving the old default and restoring it is the discipline, and a program writing to more than
+one place is better off holding handles and writing through them.
+</Gotcha>
+
+<Gotcha title="Closing the default output makes every later write raise">
+[`io.close()`](/docs/standard-library/io/close) with no argument closes the default output
+file, and closing the handle a program pointed the default output at does the same thing by
+the other route. Either way the default output is now a closed file, and the next
+`io.write()` anywhere in the program raises rather than answering. Point the default output
+back at something open *before* closing what it was pointing at.
+</Gotcha>
+
+<Gotcha title="Left alone, this writes wherever the program was pointed">
+Until something calls [`io.output()`](/docs/standard-library/io/output), what is written goes
+to the program's standard output. A program run from a terminal therefore shows its writes
+there, and the same program run with its output sent to a file or another program fills that
+instead without noticing the difference. That is the point of the call — and it is also why a
+program that meant to write a *particular* file and forgot to say so appears to have written
+nothing.
+</Gotcha>
+
+## See also
+
+- [`file:write()`](/docs/standard-library/io/file-write) — the same write on a handle the program is holding, and where what can be written is set out
+- [`io.output()`](/docs/standard-library/io/output) — choosing the file this writes to
+- [`io.flush()`](/docs/standard-library/io/flush) — handing over what has been written to the same file
+- [`io.read()`](/docs/standard-library/io/read) — the same idea for the default input file
+- [`io.stdout`](/docs/standard-library/io/stdout) — the handle this writes to until something changes it
+- [`io.open()`](/docs/standard-library/io/open) — opening a file to write through a handle instead
+- [`print()`](/docs/standard-library/globals/print) — putting text out with separators, a newline, and `tostring` applied

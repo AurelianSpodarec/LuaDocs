@@ -1,8 +1,214 @@
 ---
 title: file:write()
-description: ""
+description: Write strings and numbers to the file a handle refers to, one after another, with nothing put between them.
+lua-compat: io.file-write
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:write
 ---
 
-{/* Not yet written. */}
+Writes each of its arguments to the file it is called on, in the order they were given and
+starting wherever that file's position has got to. A string goes out as the bytes it holds
+and a number as the text that spells it; nothing is put between one argument and the next,
+and nothing is added at the end.
+
+<RunnableExample code={`local ledger_path = "io-file-write-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal reading = assert(io.open(ledger_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(ledger_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+file:write(···)
+```
+
+<Parameters>
+  <Param name="···">Zero or more values to write, each of them a string or a number. What becomes of each, and what a value of any other kind does instead, is under [What can be written](#what-can-be-written).</Param>
+</Parameters>
+
+<Returns>
+  <Only since="5.2">
+    <Return type="file">The file it was called on, when everything asked for went out. Handing the file back rather than a count is what lets one write be written onto the end of another — see [What a write hands back](#what-a-write-hands-back).</Return>
+  </Only>
+  <Only before="5.2">
+    <Return type="boolean">`true`, when everything asked for went out. The answer says that the write went through and nothing further: not how much of it did, and not which file it went to.</Return>
+  </Only>
+  <Return type="nil">Where the system reported trouble with the stream instead — the first of the values that describe it. See [What a write hands back](#what-a-write-hands-back).</Return>
+  <Return type="string">The system's own description of that trouble, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+  <Only since="5.5">
+    <Return type="integer">How many bytes the call did get out before it stopped, counted across all of its arguments together.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: whatever was written first arrives where the file belongs, and when nothing was written, nothing does.
+- Raises when the handle has already been closed. Writing through a closed handle is a mistake about the program's own state rather than a condition to report.
+- Raises when an argument is neither a string nor a number — a boolean, a table, `nil`. A `__tostring` metamethod on the value makes no difference to this; it is not consulted.
+- Trouble the system reported with the stream does not raise. It arrives through the return values.
+
+</Errors>
+
+## Description
+
+A file handle carries a position, and this call writes at it and leaves it past what it
+wrote. Two writes in a row therefore land one after the other rather than on top of each
+other, and nothing here moves the position backwards on its own:
+[`file:seek()`](/docs/standard-library/io/file-seek) is what does that. Where the position has
+been moved back over text the file already holds, a write lands *on* that text and replaces
+it — there is no writing that pushes the rest of a file along to make room. A handle opened in
+append mode is the exception the mode makes for itself: everything written through one lands
+at the end of the file however the position has been moved about.
+
+The handle has to be open for writing, which is settled by the mode it was opened with;
+[`io.open()`](/docs/standard-library/io/open#the-mode-string) sets those out. A handle opened
+for reading alone does not raise when it is written through. It answers the way it does for
+any other trouble with the stream, which is described under
+[What a write hands back](#what-a-write-hands-back).
+
+What has been written need not have reached the file yet. It can sit in a buffer until enough
+has piled up, until the handle is closed, or until
+[`file:flush()`](/docs/standard-library/io/file-flush#what-flushing-does) hands it over — so a
+program whose file is read while it is still writing to it has to say when.
+
+The same write is available as a library-level call.
+[`io.write()`](/docs/standard-library/io/write) is this call aimed at the *default output
+file* instead of at a handle a program is holding; what can be written and what comes back
+are what this page describes.
+
+## What can be written
+
+A string is written as the bytes it holds, and the library puts nothing between one argument
+and the next. A newline gets into the file because a string carried one. This is not
+[`print()`](/docs/standard-library/globals/print), which puts a tab between its arguments and
+a newline after the last of them.
+
+The one thing that can come between the string and the file is the *system*. Where a system
+spells the end of a line with something other than the single byte Lua writes, a handle not
+opened in binary mode translates as the bytes go out, so what lands in the file need not be
+byte for byte what this call was handed.
+[`io.open()`](/docs/standard-library/io/open#the-mode-string) is where the `b` that asks for
+the other treatment is set out.
+
+A number is turned into text first, and it comes out looking the way
+[`tostring()`](/docs/standard-library/globals/tostring) renders it: a whole number written out
+in full, a fractional one in decimal, and a value too large or too small for either in
+exponent notation.
+
+A value of any other kind is refused rather than converted, and a `__tostring` metamethod does
+not change that. A program that wants a table, a boolean or `nil` in the file calls
+[`tostring()`](/docs/standard-library/globals/tostring) or
+[`string.format()`](/docs/standard-library/string/format) itself and writes the string that
+comes back — which is worth preferring for numbers too, because deciding how a number should
+look is a decision the program is better placed to make than the library is.
+
+The arguments go out one at a time in the order they were given, so a refused argument is
+refused *after* the arguments in front of it have already been written.
+
+## What a write hands back
+
+A write that went through hands back the file it was called on. That is what makes a run of
+writes read as one statement — `writing:write("cocoa"):write(",")` writes both — and it is
+also what a program should not mistake for a count: what comes back from a write that went
+through says that it did, and says nothing about how much of it did.
+
+Where the system reported trouble with the stream instead, the answer is a `nil` and the
+values that describe it: the system's own description of what went wrong, its numeric code
+for the same thing, and how many bytes the call got out before it stopped. A `nil` with a
+description and a code behind it is the shape most of this library reports trouble in — the
+same one
+[`io.open()`](/docs/standard-library/io/open#when-the-open-fails) uses when it cannot open a
+file, and the one
+[`file:read()`](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble)
+uses for a read that went wrong rather than one that ran out of file.
+
+So a write is checked by looking at what came back, not at whether the call came back at all.
+The failing answer is a `nil`, and a handle opened for reading alone is the everyday way to
+see one.
+
+## Examples
+
+### Writing text and numbers in one call
+
+<RunnableExample code={`local stock_path = "io-file-write-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("crates: ", 412, "\\n")\nwriting:write(7, " ", "pallets", "\\n")\nwriting:close()\n\nlocal reading = assert(io.open(stock_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(stock_path)\n-- Expected output:\n-- crates: 412\n-- 7 pallets`} />
+
+Both rows are one call each, and every part of the row — the label, the number, the space
+between them, the newline at the end — is an argument the program supplied. The library puts
+nothing between them.
+
+<Only since="5.2">
+
+### Writing one thing onto the end of another
+
+<RunnableExample code={`local receipt_path = "io-file-write-example-receipt.txt"\n\nlocal writing = assert(io.open(receipt_path, "w"))\nwriting:write("cocoa"):write(","):write(2):write("\\n")\nprint(writing:write("flour,1\\n") == writing)\nwriting:close()\n\nlocal reading = assert(io.open(receipt_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(receipt_path)\n-- Expected output:\n-- true\n-- cocoa,2\n-- flour,1`} />
+
+The first row is built by four writes with the handle named once, because each write hands the
+handle back for the next one to be called on. The `print` is the check that says so: what came
+back is the very handle the write was called on, not a copy and not a report.
+
+</Only>
+
+### A write that did not get through
+
+<RunnableExample code={`local manifest_path = "io-file-write-example-manifest.txt"\n\nlocal writing = assert(io.open(manifest_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(manifest_path, "r"))\nlocal sent, complaint = reading:write("flour,1\\n")\nprint(sent)\nprint(type(complaint))\nprint(reading:read())\nreading:close()\n\nos.remove(manifest_path)\n-- Expected output:\n-- nil\n-- string\n-- cocoa,2`} />
+
+The handle was opened for reading, so the write has nowhere to go — and it says so rather
+than raising. The wording of the complaint is the system's and worth showing a person rather
+than branching on; the last line is there to show that the file is as it was.
+
+## Gotchas
+
+<Gotcha title="A dot where the colon belongs hands the text in as the file">
+`writing:write(text)` and `writing.write(writing, text)` are the same call; `writing.write(text)`
+is not. The `:` is what puts the handle in front of the arguments, and without it the first
+thing written arrives where the file belongs.
+
+<RunnableExample code={`local invoice_path = "io-file-write-example-invoice.txt"\n\nlocal writing = assert(io.open(invoice_path, "w"))\nlocal wrote_it, complaint = pcall(writing.write, "cocoa,2\\n")\nprint(wrote_it)\nprint(type(complaint))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(invoice_path, "r"))\nprint(reading:read())\nreading:close()\n\nos.remove(invoice_path)\n-- Expected output:\n-- false\n-- string\n-- cocoa,2`} />
+
+It raises rather than answering, which is the good outcome: the mistake is in the program
+rather than in the file, and it stops on the line that made it.
+</Gotcha>
+
+<Gotcha title="A refused argument leaves the ones in front of it written">
+The arguments are written as they are reached, and the check that a value is a string or a
+number happens as each one is reached too. So a call whose third argument is a table has
+already written the first two by the time it raises, and a program that catches the raise and
+carries on is carrying on with half a row written.
+
+<RunnableExample code={`local tally_path = "io-file-write-example-tally.txt"\n\nlocal writing = assert(io.open(tally_path, "w"))\nlocal wrote_it = pcall(writing.write, writing, "cocoa,", true, "\\n")\nprint(wrote_it)\nwriting:close()\n\nlocal reading = assert(io.open(tally_path, "r"))\nprint(reading:read() == "cocoa,")\nreading:close()\n\nos.remove(tally_path)\n-- Expected output:\n-- false\n-- true`} />
+
+Building the row as a string first — with [`string.format()`](/docs/standard-library/string/format)
+or [`table.concat()`](/docs/standard-library/table/concat) — and writing it in one argument
+moves the refusal to before anything is written, which is where a program can still do
+something about it.
+</Gotcha>
+
+<Gotcha title="The library puts nothing between the values, and nothing after the last one">
+`writing:write("cocoa", 2)` puts `cocoa2` in the file, and a second call putting `flour` in
+follows it with no break. Readers arriving from [`print()`](/docs/standard-library/globals/print)
+expect a tab and a newline and get neither, which is the point of the call: it writes what it
+was given. The newlines that separate rows are newlines the program wrote.
+</Gotcha>
+
+<Gotcha title="A write that came back is not a write that reached the file">
+The answer says the bytes left Lua, not that they are on the storage the file lives on. They
+can sit in a buffer until it fills, until the handle is closed, or until
+[`file:flush()`](/docs/standard-library/io/file-flush) hands them over. A program that writes
+a log another program is watching, or that might be stopped between writes, is the one that
+notices.
+</Gotcha>
+
+## See also
+
+- [`io.write()`](/docs/standard-library/io/write) — the same write, aimed at the default output file instead of a handle
+- [`file:flush()`](/docs/standard-library/io/file-flush) — handing over what has been written, without closing the file
+- [`file:close()`](/docs/standard-library/io/file-close) — finishing with the file, which hands over what is left as well
+- [`io.open()`](/docs/standard-library/io/open) — where a writable handle comes from, and what the modes mean
+- [`file:read()`](/docs/standard-library/io/file-read) — the other direction
+- [`file:seek()`](/docs/standard-library/io/file-seek) — moving the position this writes at
+- [`string.format()`](/docs/standard-library/string/format) — building the string to write
+- [`print()`](/docs/standard-library/globals/print) — the other way to put text out, with separators and a newline
