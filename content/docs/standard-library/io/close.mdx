@@ -30,8 +30,8 @@ io.close([file])
 <Returns>
   <Return type="boolean">`true` when the close went through — and, for a handle from [`io.popen()`](/docs/standard-library/io/popen), when the program on the other end also ended well.</Return>
   <Return type="nil">In place of `true` when it did not — one of the standard handles, which this call refuses, or a close the system reported trouble with.</Return>
-  <Return type="string">Why. Beside the `nil` only for an ordinary file: the library's own wording when it refused, and the system's description of the trouble otherwise. A handle from [`io.popen()`](/docs/standard-library/io/popen) puts `"exit"` or `"signal"` here instead, beside the `true` as well as beside the `nil`.</Return>
-  <Return type="integer">A number to go with the string, where there is one: the system's code for the trouble, or — for a handle from `io.popen()` — the status the program ended with. A refusal answers with the message alone and no number at all.</Return>
+  <Return type="string">Why, and on an ordinary file it comes beside the `nil` alone: the library's own wording where the close was refused, and the system's description of the trouble where it was attempted and failed. A handle from [`io.popen()`](/docs/standard-library/io/popen) uses the position differently — `"exit"` or `"signal"` naming how the program ended, beside the `true` as well as beside the `nil`, or the system's own message where the program could not be started at all. [`os.execute()`](/docs/standard-library/os/execute#what-the-three-results-mean) sets out all four answers.</Return>
+  <Return type="integer">A number to go with the string, where there is one. On an ordinary file it is the system's code for the trouble. On a handle from `io.popen()` it is the status the program exited with, or the number of the signal that stopped it — which of the two is what the string says. A refusal answers with the message alone and no number at all.</Return>
 </Returns>
 
 <Errors>
@@ -54,19 +54,27 @@ written two ways: `io.close(handle)` and `handle:close()` do the same thing to t
 What this spelling adds is the form with no argument at all.
 
 A handle that came from [`io.popen()`](/docs/standard-library/io/popen) closes through here
-too, and answers differently: what comes back describes how the program on the other end
-ended, in the shape
-[`os.execute()`](/docs/standard-library/os/execute#what-the-three-results-mean) sets out,
-rather than describing a file.
+too, and what comes back then describes a program rather than a file — see
+[What closing a file does](#what-closing-a-file-does).
 
 ## What closing a file does
 
-Three things come of it. Anything written through the handle and still sitting in a buffer is
-handed to the system, so a file a program has written and not closed can hold less than the
-program thinks it does. The system's own hold on the file is released, which returns it to
-the pool of files a process may keep open at once — a pool the system, not Lua, decides the
-size of. And the handle is marked closed: it stays a file handle and stays reachable, and
-every later attempt to read through it, write through it or close it again raises.
+Three things come of it, on an ordinary file. Anything written through the handle and still
+sitting in a buffer is handed to the system, so a file a program has written and not closed
+can hold less than the program thinks it does.
+[`file:flush()`](/docs/standard-library/io/file-flush) does that half on its own, without
+giving the file back. The system's own
+hold on the file is released, which returns it to the pool of files a process may keep open at
+once, a pool the system rather than Lua decides the size of. And the handle is marked closed:
+it stays a file handle and stays reachable, and every later attempt to read through it, write
+through it or close it again raises.
+
+Two kinds of handle the library makes do something else. One of the standard handles is
+refused outright and stays open, which [Without an argument](#without-an-argument) covers. And
+a handle from
+[`io.popen()`](/docs/standard-library/io/popen) has a program on the other end: closing it
+waits for that program to finish and reports how it ended, which is where the values described
+by [`os.execute()`](/docs/standard-library/os/execute#what-the-three-results-mean) come from.
 
 A file left open is closed eventually. Its handle carries a finalizer, so a handle nothing
 refers to any more is closed when the collector gets to it — but the manual is plain that
@@ -167,7 +175,7 @@ a long way through a program before the operation that finally uses it raises.
 
 ## See also
 
-- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the file it acts on
 - [`io.open()`](/docs/standard-library/io/open) — where the handle this closes comes from
 - [`io.type()`](/docs/standard-library/io/type) — asking whether a handle is still open before closing it
 - [`io.flush()`](/docs/standard-library/io/flush) — handing buffered writes over without closing

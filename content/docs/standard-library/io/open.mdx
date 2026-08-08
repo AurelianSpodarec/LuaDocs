@@ -26,7 +26,7 @@ io.open(filename [, mode])
 
 <Parameters>
   <Param name="filename">The name of the file to open. It reaches the system exactly as written, so a name with no directory in it is read against wherever the program is running from.</Param>
-  <Param name="mode">What the file is being opened for, as one of the spellings under [The mode string](#the-mode-string). Left out, it is `"r"` — reading.</Param>
+  <Param name="mode">What the file is being opened for. [The mode string](#the-mode-string) sets out the spellings. Left out, it is `"r"` — reading.</Param>
 </Parameters>
 
 <Returns>
@@ -40,7 +40,7 @@ io.open(filename [, mode])
 
 - Raises when `filename` is absent, or is a value other than a string or a number. A number is accepted and looked up as its own text, so `io.open(2024)` asks about a file called `2024`.
 - Raises when `mode` is a value other than a string or a number.
-- <Since v="5.2" /> Raises when `mode` is a string this call does not recognise. The spellings it takes are the six under [The mode string](#the-mode-string), each of them optionally followed by `b`.
+- <Since v="5.2" /> Raises when `mode` is a string this call does not recognise. The six under [The mode string](#the-mode-string) are recognised, each of them optionally followed by `b`, and the `b` comes after the `+` rather than before it.
 - A file that could not be opened does not raise. Every such answer arrives through the return values, which is what makes `assert(io.open(path))` the way to turn one into a raise where that is what is wanted.
 
 </Errors>
@@ -85,11 +85,16 @@ The three spellings with a `+` are what the manual calls *update* modes: one han
 reads and writes. In the two append forms, writing lands at the end of the file however the
 handle's position has been moved about.
 
-A `b` may follow, and it goes last — `"r+b"`, not `"rb+"`. What the manual says about it is
-narrow: some systems need it to open the file in binary mode, and what that amounts to on
-those systems is their business rather than Lua's. Where it makes no difference the letter is
-harmless, which is why code meant to run anywhere and read bytes rather than text tends to
-write it every time.
+A `b` may follow, and it goes after the `+` rather than before it — `"r+b"`, not `"rb+"`. What
+the manual says about it is narrow: some systems need it to open the file in binary mode, and
+what that amounts to on those systems is their business rather than Lua's. Where it makes no
+difference the letter is harmless, which is why code meant to run anywhere and read bytes
+rather than text tends to write it every time.
+
+What else a mode string may carry past that point is up to the build — the set of extension
+letters is a compile-time setting rather than something the language fixes, and a build is
+free to widen it. The rows above are the portable core, and a program that stays inside them
+is asking for nothing a stock Lua would refuse.
 
 ## When the open fails
 
@@ -167,19 +172,25 @@ looking at what comes back, and a program that means "add to it" wants `"a"`, wh
 what is already there.
 </Gotcha>
 
-<Gotcha title="The b goes at the end">
-`"rb+"` and `"r+b"` mean the same thing in C, and this call takes only the second. The letter
-that names the mode comes first, then `+` if the handle is to do both, then `b` — anything
-else is refused before the file is touched.
+<Gotcha title="The b goes after the +, not before it">
+`"rb+"` and `"r+b"` mean the same thing in C, and this call takes the second and refuses the
+first. The letter that names the mode comes first, then `+` if the handle is to do both, then
+`b` — and the refusal happens before the file is touched, so it is a raise rather than a
+failed open.
 </Gotcha>
 
 <Gotcha title="A handle nobody closed is a file nobody finished writing">
-Writes are buffered, so what a program has written and what the file holds are two different
-things until the handle is closed. A program that opens, writes and then simply stops
-referring to the handle is relying on the collector to close it, and the manual is plain that
-this takes an unpredictable amount of time to happen — long enough that another part of the
-same program can open the file and find it short.
-[`io.close()`](/docs/standard-library/io/close) is the way to say when.
+Writes are buffered, so what a program has written and what the file holds can be two
+different things. A program that opens, writes and then simply stops referring to the handle
+is relying on the collector to close it, and the manual is plain that this takes an
+unpredictable amount of time to happen — long enough that another part of the same program can
+open the file and find it short.
+
+Closing is the usual way to settle it and not the only one:
+[`file:flush()`](/docs/standard-library/io/file-flush) hands the buffer over and keeps the file
+open, and [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) changes how much is held
+back before any of it is written. What
+[`io.close()`](/docs/standard-library/io/close) adds is that it also gives the file back.
 </Gotcha>
 
 <Only since="5.4">
@@ -206,7 +217,7 @@ where a close that failed is something the program has to report.
 ## See also
 
 - [`io.close()`](/docs/standard-library/io/close) — finishing with the handle this hands back
-- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the file it acts on
 - [`io.type()`](/docs/standard-library/io/type) — telling a handle from anything else, and an open one from a closed one
 - [`io.lines()`](/docs/standard-library/io/lines) — reading a file by name, opening and closing it for you
 - [`file:read()`](/docs/standard-library/io/file-read) — what a handle opened for reading can be asked for

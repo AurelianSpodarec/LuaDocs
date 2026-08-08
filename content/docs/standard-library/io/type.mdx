@@ -75,10 +75,19 @@ metatable the `io` library installs. That description matters here because it is
 this function checks: the value has to be a userdata carrying *that* metatable.
 
 The metatable is also how the handle's methods are reached. `read`, `write`, `lines`, `seek`,
-`setvbuf` and `close` all arrive through it, which is what makes `handle:read()` work when
-nothing was ever assigned to the handle itself. And it carries a finalizer, which is why a
-handle nothing refers to any more is eventually closed by the collector rather than being
-leaked outright.
+`flush`, `setvbuf` and `close` all arrive through it, which is what makes `handle:read()` work
+when nothing was ever assigned to the handle itself. It supplies the handle's printed form as
+well, and a finalizer — which is why a handle nothing refers to any more is eventually closed
+by the collector rather than being leaked outright.
+
+<Only since="5.4">
+
+From the same metatable comes a `__close` metamethod, so a handle held in a to-be-closed
+variable is closed when the block holding it ends.
+[`io.open()`](/docs/standard-library/io/open) shows what that looks like, and records when the
+handle gained it.
+
+</Only>
 
 Two consequences a program can feel:
 
@@ -149,5 +158,5 @@ on the value in hand, not a check on the world.
 - [`math.type()`](/docs/standard-library/math/type) — the same narrowing question, asked about numbers
 - [`io.open()`](/docs/standard-library/io/open) — where a value that answers `"file"` comes from
 - [`io.close()`](/docs/standard-library/io/close) — what turns `"file"` into `"closed file"`
-- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the file it acts on
 - [`io.stdout`](/docs/standard-library/io/stdout) — a handle the program was given rather than opened

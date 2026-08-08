@@ -941,12 +941,31 @@ const raw: Record<string, unknown> = {
   //   * What **did** move is the mode check. 5.1 has none: `fopen(filename, mode)` gets the
   //     string as written, which is why 5.1's manual adds "This string is exactly what is used
   //     in the standard C function `fopen`" and 5.2's drops that sentence. **v5.2.0** rejects
-  //     anything not matching `[rwa]%+?b?`, and the macro is byte-identical from there to
-  //     v5.5.1. Note the shape: the `b` has to come *last*, so Lua accepts a strict subset of
-  //     what C does — `"rb+"` is a valid `fopen` mode and is refused here. v5.2.0 and v5.2.1
-  //     raise through `luaL_error`, v5.2.2 onwards through `luaL_argcheck`; both raise, so the
-  //     note is dated 5.2 either way. Probed on the runtime: `"r+b"` opens, `"rb+"` and `""`
-  //     raise `invalid mode`.
+  //     anything not matching `[rwa]%+?b?`. v5.2.0 and v5.2.1 raise through `luaL_error`,
+  //     v5.2.2 onwards through `luaL_argcheck`; both raise, so the note is dated 5.2 either
+  //     way. The `b` comes *after* the `+`, which makes Lua's set a strict subset of C's:
+  //     `"rb+"` is a valid `fopen` mode and is refused. Probed on the runtime: `"r+b"` opens,
+  //     `"rb+"`, `"rt"` and `""` raise `invalid mode`.
+  //
+  //     **The check then moved again, at v5.3.2**, and the entry must not enumerate a closed
+  //     set because of it. The `%+?b?` tail became
+  //     `strspn(mode, L_MODEEXT) == strlen(mode)` with `L_MODEEXT` defined as `"b"` — so **any
+  //     number of trailing `b`s is accepted**, and, because both `L_MODEEXT` and `l_checkmode`
+  //     sit behind `#if !defined`, the extension letters are a compile-time setting a build may
+  //     widen. v5.2.4, v5.3.0 and v5.3.1 still have the single-`b` form; v5.3.2 through v5.5.1
+  //     have the `strspn` form (a macro until v5.3.5, a static function from v5.3.6). Probed on
+  //     the 5.4 runtime: `"rbb"`, `"rbbb"`, `"r+bb"`, `"wbb"`, `"abb"` and `"a+bb"` all open,
+  //     while `"rb+"`, `"bb"`, `"rt"`, `"r+t"` and `"rbt"` all raise. **No `changed_in` at 5.3:**
+  //     the behaviour is worthless to a real program and dating it would put a *Changed* chip on
+  //     the strip for `"rbb"`. What it does forbid is any claim that the six spellings plus one
+  //     `b` are *all* a version accepts, which the first draft of this entry made in two places.
+  //
+  //     **Why this was missed the first time round, because it generalises:** the batch
+  //     extracted ten *function bodies* per release and diffed them mechanically. The mode check
+  //     is a **macro** through v5.3.5, so the diff never saw it, and `io_open`'s own body reads
+  //     identically either side of the change — only the spelling of the macro's name moves
+  //     (`lua_checkmode` → `l_checkmode` at 5.3). A per-release diff of whole files, or of the
+  //     `#if !defined(...)` blocks, is what catches this class.
   //   * **The 5.4 note is about the handle, not the call.** `metameth` first appears at
   //     v5.4.0 with `{"__close", f_gc}` beside `{"__gc", f_gc}`; 5.1 through 5.3 register
   //     `__gc` alone. The 5.4 and 5.5 library preambles say so outright — "The metatable for
@@ -994,6 +1013,17 @@ const raw: Record<string, unknown> = {
   // Incompatibilities chapter: 5.2, 5.3, 5.4 and 5.5's §8 were sliced from `<a name="8">` to
   // end of file and searched. The only `io` hits in four chapters are `io.read`'s dropped
   // `*` at 5.3 and `io.lines` returning four values at 5.4, which belong to I2 and I4.
+  //
+  // Two things found here that belong to later `io` batches rather than to these three, so that
+  // nobody has to find them twice. **`__close` enters at v5.4.0 on the *handle*, not on
+  // `io.open`**, so it is observable through every call that hands one back — `io.tmpfile`,
+  // `io.popen`, `io.input` and `io.output` when they answer with a handle, and the three
+  // standard handles. Each of those nodes wants the same 5.4 note `io.open` carries.
+  // And **`io.popen` gained a mode check of its own inside the 5.4 line**: `l_checkmodep`
+  // ("Windows accepts `[rw][bt]?` as valid modes") is absent at v5.4.0, arrives at **v5.4.1**
+  // and is extended at v5.4.3. Before it, `io.popen`'s `mode` reached the system unchecked, so
+  // that entry has a 5.4-versus-earlier story of the same shape as `io.open`'s 5.2 one — and it
+  // is a *macro*, so a function-body diff will not show it.
   //
   // One more patch residual, recorded because minor-line granularity cannot hold it: `io_open`
   // and `io_fclose` gain an `errno = 0;` line before the call at **v5.4.7**, and v5.4.8's
