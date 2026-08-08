@@ -42,7 +42,7 @@ file:read(···)
 - Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: whatever was written first arrives where the file belongs, and when nothing was written, nothing does.
 - Raises when the handle has already been closed. Reading through a closed handle is a mistake about the program's own state rather than a condition to report.
 - Raises when a format is a value that is neither a string nor a number — a boolean, a table, `nil`.
-- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](#the-formats).
+- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](#the-formats). Each format is checked as it is reached rather than up front, so the formats before the bad one have already been read and the position has already moved.
 - <Since v="5.3" /> Raises when a format is a number with no exact integer representation.
 - Running out of file does not raise, and neither does trouble the system reported with the stream. Both arrive through the return values.
 
@@ -51,7 +51,7 @@ file:read(···)
 ## Description
 
 A file handle carries a position, and this call reads from it and leaves it past whatever it
-read. Two reads in a row therefore see two different parts of the file, and nothing here ever
+read, so a read that took something leaves the next one looking further on. Nothing here ever
 goes back: [`file:seek()`](/docs/standard-library/io/file-seek) is what moves the position
 about.
 
@@ -119,16 +119,17 @@ read.
 A call with no format at all reads a line without its ending, which is what the line format
 asks for and the shortest way to write it.
 
-The whole-file format has no failing answer: at the end of the file it hands back the empty
-string rather than `nil`, and it goes on doing that however many times it is asked. The other
-formats answer `nil` once there is nothing left.
+The whole-file format never runs out: at the end of the file it hands back the empty string
+rather than `nil`, and it goes on doing that however many times it is asked. The other formats
+answer `nil` once there is nothing left. So a `nil` from the whole-file format is never the end
+of the file — it is the stream in trouble, which is a different thing and is described
+[below](#telling-the-end-of-the-file-from-trouble).
 
 The numeral format reads past any whitespace in front of it, takes the longest run of
 characters that could be the beginning of a numeral, and hands back the number that run
 spells, read the way Lua reads a numeral written in a program's own source. Where the run
 turns out not to spell a numeral after all — an empty run, or `0x`, or `3.4e-` — the answer
-is `nil`, and a run that goes on for more than two hundred characters is given up on the same
-way.
+is `nil`.
 
 A line ends at a newline byte and at nothing else, which is why the line formats suit text
 and not much else. A file whose lines are separated some other way, or one opened in binary
@@ -145,23 +146,35 @@ were given. That is what makes reading a record in a single line reasonable: a n
 the rest of the line come back together.
 
 The catch is what happens when one of them cannot read. *The first format that fails ends the
-call.* Nothing after it is read, and no value comes back for it — so the number of values is
-the number of formats the call got as far as, which need not be the number it was given. A
-call with three formats whose second one runs out of file answers *two* values, the second of
-them `nil`.
+call.* Nothing after it is read, and the `nil` standing in for the one that failed is the last
+value there is — so the number of values is the number of formats the call got as far as,
+which need not be the number it was given. A call with three formats whose second one runs out
+of file answers *two* values, the second of them `nil`.
 
-That makes the count worth measuring rather than assuming. Assigning into names hides the
-difference, because a name with nothing to receive is `nil` whether its own format failed or
-was never reached; [`select()`](/docs/standard-library/globals/select) with `"#"` is what
-tells the two apart, and the second example below prints both counts.
+That count is the ordinary reading's. Trouble with the stream is the exception, and it does
+not follow this rule at all: there the answer is *three* values however many formats were
+given, and what the earlier ones had already found does not come back. That case is
+[below](#telling-the-end-of-the-file-from-trouble).
+
+The ordinary count is worth measuring rather than assuming. Assigning into names hides it,
+because a name with nothing to receive is `nil` whether its own format failed or was never
+reached; [`select()`](/docs/standard-library/globals/select) with `"#"` is what tells the two
+apart, and the second example below prints both counts.
 
 ## Telling the end of the file from trouble
 
-A read that simply ran out of file answers a single `nil` — one value, nothing behind it. A
-read the system reported trouble on answers *three*: `nil`, its own description of what went
-wrong, and its numeric code for the same thing. That is the shape
+When a format simply runs out of file, its `nil` has nothing behind it: the call ends there,
+and anything in front of it is what the earlier formats found. When the system reports trouble
+with the stream, the answer is *three* values instead — `nil`, its own description of what
+went wrong, and its numeric code for the same thing. That is the shape
 [`io.open()`](/docs/standard-library/io/open#when-the-open-fails) uses when it cannot open a
-file, and the shape most of this library reports trouble in.
+file, and the shape this library reports trouble in throughout.
+
+Those three are the *whole* answer, not an addition to one. A call whose earlier formats had
+already read something hands back the `nil`, the message and the number and nothing else, so
+what those formats found does not come back at all — which is why the count rule above stops
+at the edge of this one. Reading a handle that was opened for writing alone is the everyday
+way to meet this shape.
 
 So the two are told apart by what follows the `nil`, not by the `nil` itself:
 
@@ -172,14 +185,9 @@ if complaint then
 end
 ```
 
-A `nil` on its own is the ordinary end of a file and is what a reading loop stops on. The
-message and the number are for reporting: the wording is the system's, meant for a person,
-and the number is the system's code, which differs from one system to the next.
-
-The three values are the whole answer on that path, and they replace it rather than joining
-it: a call whose earlier formats had already read something hands back the `nil`, the message
-and the number, and what those formats found does not come back at all. Reading a handle that
-was opened for writing alone is the everyday way to see this shape.
+A `nil` with nothing behind it is the ordinary end of a file and is what a reading loop stops
+on. The message and the number are for reporting: the wording is the system's, meant for a
+person, and the number is the system's code, which differs from one system to the next.
 
 ## Examples
 
@@ -197,8 +205,8 @@ was opened for writing alone is the everyday way to see this shape.
 
 </Only>
 
-One value, ends and all, exactly as the file holds them. The second read is the one worth
-looking at: the file has run out, and the answer is the empty string rather than `nil`.
+One value, line endings and all, exactly as the read produced them. The second read is the one
+worth looking at: the file has run out, and the answer is the empty string rather than `nil`.
 
 ### A numeral and the rest of the line
 
@@ -266,10 +274,11 @@ rather than in the file, and it stops on the line that made it.
 </Gotcha>
 
 <Gotcha title="A loop that waits for the whole-file format to say no waits forever">
-Every other format eventually answers `nil`, and the whole-file one does not — it answers the
-empty string, and goes on answering it. A loop written to stop when the read comes back
-`nil` therefore never stops, and a program that reads in whole-file chunks has to look at the
-length of what it got instead.
+The other formats eventually answer `nil` because the file runs out; this one does not — it
+answers the empty string, and goes on answering it. A loop written to stop when the read comes
+back `nil` therefore never stops, and a program that reads in whole-file chunks has to look at
+the length of what it got instead. The `nil` such a loop is waiting for arrives only when the
+stream goes wrong, which is not the ending it meant.
 
 The same shape one step down: a read for a fixed number of bytes that comes back short has
 *succeeded*. Only a read that got nothing at all answers `nil`.
@@ -293,13 +302,18 @@ the rest `nil`, and that reads the same whether the second format failed or the 
 was never tried at all. The call stops at the first format that cannot read, so a `nil` in the
 middle means everything after it is `nil` too — and a program branching on the *third* name
 is really branching on the first failure, wherever it was.
+
+The trailing names are worth one more look, because there is a case where they are not `nil`
+at all. When the stream goes wrong the answer is `nil`, a message and a number, so `quantity`
+holds text and `unit` holds a number whatever the formats asked for. Code that reads a
+non-`nil` `quantity` as something a format found is wrong exactly then.
 </Gotcha>
 
 ## See also
 
 - [`io.read()`](/docs/standard-library/io/read) — the same read, aimed at the default input file instead of a handle
 - [`io.open()`](/docs/standard-library/io/open) — where a readable handle comes from
-- [`file:lines()`](/docs/standard-library/io/file-lines) — the same formats, driven by a `for` loop
+- [`file:lines()`](/docs/standard-library/io/file-lines) — reading the same handle through a `for` loop instead of a call at a time
 - [`io.lines()`](/docs/standard-library/io/lines) — reading a file by name, opening and closing it for you
 - [`file:seek()`](/docs/standard-library/io/file-seek) — moving the position this reads from
 - [`file:write()`](/docs/standard-library/io/file-write) — the other direction

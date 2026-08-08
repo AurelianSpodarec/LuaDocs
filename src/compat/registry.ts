@@ -1071,7 +1071,9 @@ const raw: Record<string, unknown> = {
   //     the collected run to `lua_stringtonumber`, so the reading is Lua's own and the answer
   //     is an integer or a float. Probed: a run that turns out not to spell a numeral
   //     (`3.4e-`) is discarded and its characters are gone, while text that never looked
-  //     numeric costs nothing.
+  //     numeric costs **only the whitespace in front of it** — the skip loop
+  //     `do { rn.c = l_getc(rn.f); } while (isspace(rn.c));` consumes it and only the one
+  //     lookahead character is ungot. Probed: `"   cocoa"` answers `nil` and leaves `cocoa`.
   //   * **A numeric format's integer check arrived with it.** 5.1 and 5.2 read it with
   //     `lua_tointeger` (a fraction is cut off); v5.3.0 uses `luaL_checkinteger`, which
   //     raises. Same language-wide tightening `os.exit` and `globals.select` already record.
@@ -1083,13 +1085,23 @@ const raw: Record<string, unknown> = {
   //     `success = 1` unconditionally, so 5.4's added "this format never fails" is
   //     documentation catching up. `test_eof` (a count of `0`) is byte-identical from v5.1 to
   //     v5.5.1 apart from `lua_pushlstring(L, NULL, 0)` becoming `lua_pushliteral(L, "")` at
-  //     v5.3.1. The 200-character cap on a numeral is `MAXRN`/`L_MAXLENNUM` and is **200 at
-  //     every 5.3+ release**, though only 5.4's manual mentions it.
-  //   * **The stream-error path is in no manual, in any version.** `if (ferror(f)) return
-  //     luaL_fileresult(L, 0, NULL);` — three values, `nil` plus the system's description and
-  //     its code — and 5.1's `pushresult(L, 0, NULL)` pushes the same three. So a single
-  //     `nil` is the end of the file and a `nil` with values behind it is trouble, on all
-  //     five lines and undated. Stated in the entries' prose under
+  //     v5.3.1.
+  //   * **The 200-character cap on a numeral did arrive with the scanner.** It is `MAXRN`
+  //     (v5.3.0–v5.3.2) / `L_MAXLENNUM` (v5.3.3+), **200 at every 5.3+ release**, and 5.1 and
+  //     5.2 have no ceiling at all because `fscanf` imposes none. Only 5.4's manual mentions
+  //     it, but the boundary is a real 5.3 one and it is in the 5.3 note. Probed: 200 digits
+  //     read as a number, 201 answer `nil`.
+  //   * **The stream-error path's *shape* is documented; what the entries turn on is not.**
+  //     Every I/O chapter preamble states the triple — 5.1 §5.7, 5.2/5.3/5.4 §6.8, 5.5 §6.9:
+  //     "Unless otherwise stated, all I/O functions return nil [fail] on failure (plus an
+  //     error message as a second result and a system-dependent error code as a third
+  //     result)". What no manual states, in any version, is that on this call those three
+  //     values **replace** an answer earlier formats had already filled, and that this is how
+  //     the end of the file is told from trouble. `if (ferror(f)) return
+  //     luaL_fileresult(L, 0, NULL);` returns 3 whatever the formats were, and 5.1's
+  //     `pushresult(L, 0, NULL)` pushes the same three. Probed: two formats on a write-only
+  //     handle answer 3 values, and `read("a")` alone answers 3 rather than `""`. True on all
+  //     five lines and undated; stated in the entries' prose under
   //     `#telling-the-end-of-the-file-from-trouble` rather than in a note.
   //
   // Two wording changes that are **not** deltas: 5.1 says a count reads that many

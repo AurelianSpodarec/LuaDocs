@@ -42,7 +42,7 @@ io.read(···)
 
 - Raises when the default input file has been closed. It is reached before any format is looked at, so this is what a program hears about first.
 - Raises when a format is a value that is neither a string nor a number. A file handle is one such value: this call takes no handle, and one written here is read as a format and refused.
-- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](/docs/standard-library/io/file-read#the-formats).
+- Raises when a format is a string this call does not recognise. Which strings it recognises is [the version's own list](/docs/standard-library/io/file-read#the-formats). Each format is checked as it is reached rather than up front, so the formats before the bad one have already been read and the position has already moved.
 - <Since v="5.3" /> Raises when a format is a number with no exact integer representation.
 - Running out of file does not raise, and neither does trouble the system reported with the stream. Both arrive through the return values.
 
