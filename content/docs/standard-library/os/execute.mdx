@@ -7,8 +7,10 @@ source: https://www.lua.org/manual/5.5/manual.html#pdf-os.execute
 ---
 
 Hands a command to an operating system shell, waits for it to finish, and reports how it
-ended. The report is three values rather than one, and the two after the first are where
-the detail is.
+ended. The command runs outside Lua entirely: what comes back describes how it finished, not
+anything it printed.
+
+<Only since="5.2">
 
 ```lua
 local succeeded, how, code = os.execute("tar -czf photos.tar.gz photos")
@@ -19,6 +21,22 @@ else
   print("the archive was not written (" .. how .. " " .. code .. ")")
 end
 ```
+
+</Only>
+
+<Only before="5.2">
+
+```lua
+local status = os.execute("tar -czf photos.tar.gz photos")
+
+if status == 0 then
+  print("the archive was written")
+else
+  print("the archive was not written (status " .. status .. ")")
+end
+```
+
+</Only>
 
 <Note>
 The sandbox these examples run in cannot start another program, so no card on this page
@@ -99,11 +117,25 @@ Called with no command, this runs nothing. It asks a different question — *is 
 here at all* — and answers only that. A program that has to survive on a machine with no
 command processor can ask before it commits to a plan that needs one:
 
+<Only since="5.2">
+
 ```lua
 if not os.execute() then
   return fall_back_to_doing_it_in_lua()
 end
 ```
+
+</Only>
+
+<Only before="5.2">
+
+```lua
+if os.execute() == 0 then
+  return fall_back_to_doing_it_in_lua()
+end
+```
+
+</Only>
 
 That is all the no-command form does. It is worth knowing about mostly so that a stray
 `os.execute()` in code is read as the question it is rather than as a call that forgot its
@@ -135,9 +167,11 @@ failed* and *the backup failed with status 2*.
 <Gotcha title="assert() on this call reports the wrong thing">
 [`assert()`](/docs/standard-library/globals/assert) raises with its *second* argument as the
 error object, and the second result here is the word `"exit"` or the word `"signal"`. So
-`assert(os.execute(command))` on a command that failed raises with `exit` as the message,
-which names neither the command nor the status it ended with. A command worth asserting on
-is worth checking by hand, so that the complaint can carry both.
+`assert(os.execute(command))` on a command that failed raises with that word as the error
+object — with [the chunk and line glued to the front](/docs/standard-library/globals/assert#what-the-failure-carries),
+as a string message picks up — and it names neither the command nor the status it ended
+with. A command worth asserting on is worth checking by hand, so that the complaint can carry
+both.
 </Gotcha>
 
 <Gotcha title="The string is shell syntax, not a list of arguments">

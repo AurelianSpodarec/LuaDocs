@@ -6,9 +6,9 @@ entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.rename
 ---
 
-Changes the name a file answers to. Because a name carries the directory it sits in, the call
-that renames a file is also the call that moves it. Trouble is an answer rather than a raise,
-in the shape
+Changes the name a file — or a directory — answers to. Because a name carries the directory
+it sits in, the call that renames something is also the call that moves it. Trouble is an
+answer rather than a raise, in the shape
 [`os.remove()` describes](/docs/standard-library/os/remove#what-comes-back-on-each-path).
 
 <RunnableExample code={`local partial_path = "os-rename-example-part"\nlocal finished_path = "os-rename-example-report.csv"\n\nlocal writing = assert(io.open(partial_path, "w"))\nwriting:write("region,total\\n")\nwriting:write("north,412\\n")\nwriting:close()\n\nprint(os.rename(partial_path, finished_path))\n\nfor line in io.lines(finished_path) do\n  print(line)\nend\n\nos.remove(finished_path)\n-- Expected output:\n-- true\n-- region,total\n-- north,412`} />
@@ -26,8 +26,8 @@ os.rename(oldname, newname)
 ```
 
 <Parameters>
-  <Param name="oldname">The name the file has now.</Param>
-  <Param name="newname">The name to give it. Both reach the system exactly as written, and a `newname` whose directory part differs from `oldname`'s asks for the file to be moved there.</Param>
+  <Param name="oldname">The name the file or directory has now.</Param>
+  <Param name="newname">The name to give it. Both reach the system exactly as written, and a `newname` whose directory part differs from `oldname`'s asks for the thing to be moved there.</Param>
 </Parameters>
 
 <Returns>
@@ -55,10 +55,16 @@ places the system treats as separate storage is one of the things it can refuse,
 moving files around a machine has to be ready for that answer and fall back to copying. A
 rename involving a name the program is not allowed to write is another.
 
+A directory can be renamed by this call as well as a file, and without the qualification
+[`os.remove()`](/docs/standard-library/os/remove) attaches to *deleting* one — the promise
+here is not scoped to a family of systems. What any particular system will let a program
+move, and where to, is still its own answer rather than Lua's.
+
 Two things about `newname` are worth being deliberate about, because neither is checked here.
-The first is that the message on the failing path describes the trouble and not the file, so
-code that wants to report *which* rename failed has to say so itself. The second is what
-happens when `newname` already refers to something, which is the next section.
+The first is that the message on the failing path is the system's own description of the
+trouble, so code that wants to report *which* rename failed, and to where, has to name them
+itself. The second is what happens when `newname` already refers to something, which is the
+next section.
 
 ## When the new name is already taken
 
@@ -106,7 +112,7 @@ one on the way out when it worked, three when it did not.
 
 ### The old name stops referring to anything
 
-<RunnableExample code={`local before_path = "os-rename-example-before.txt"\nlocal after_path = "os-rename-example-after.txt"\n\nlocal writing = assert(io.open(before_path, "w"))\nwriting:write("the whole note")\nwriting:close()\n\nprint(os.rename(before_path, after_path))\nprint(io.open(before_path, "r") == nil)\n\nlocal reading = assert(io.open(after_path, "r"))\nprint(reading:read("a"))\nreading:close()\nos.remove(after_path)\n-- Expected output:\n-- true\n-- true\n-- the whole note`} />
+<RunnableExample code={`local before_path = "os-rename-example-before.txt"\nlocal after_path = "os-rename-example-after.txt"\n\nlocal writing = assert(io.open(before_path, "w"))\nwriting:write("the whole note")\nwriting:close()\n\nprint(os.rename(before_path, after_path))\nprint(io.open(before_path, "r") == nil)\n\nlocal reading = assert(io.open(after_path, "r"))\nprint(reading:read("*a"))\nreading:close()\nos.remove(after_path)\n-- Expected output:\n-- true\n-- true\n-- the whole note`} />
 
 The file kept its contents and stopped answering to the name it was created under. That is
 the difference from a copy worth having in mind: after the call there is nothing left at the

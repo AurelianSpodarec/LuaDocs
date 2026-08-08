@@ -818,8 +818,9 @@ const raw: Record<string, unknown> = {
   //     path, and with no command `lua_pushboolean(L, stat); return 1;`. So the count changes
   //     for a command and the *type* changes for the no-command form, and both halves are in
   //     the note. Nothing moved after 5.2: v5.4.0 added `errno = 0` before the call and
-  //     v5.4.8 routed it through an `l_system` macro (so that a build with no `system`, iOS
-  //     being the shipped case, can substitute one) — neither changes what any line answers.
+  //     **v5.4.5** routed it through an `l_system` macro (so that a build with no `system`,
+  //     iOS being the shipped case, can substitute one) — neither changes what any line
+  //     answers, and v5.4.0 through v5.4.4 call `system` directly.
   //     `luaL_execresult`'s own edit at 5.4 — `stat == -1` becomes `stat != 0 && errno != 0`
   //     for the could-not-be-started branch — changes only which failures take that branch,
   //     and both lines take it in the same situations a Lua program can produce, so it is
@@ -846,10 +847,13 @@ const raw: Record<string, unknown> = {
   //     `nil` at 5.4 is the same non-event `os.getenv` already records.
   //   * The one thing that *did* move is **`os.rename`'s message**. 5.1.1 and 5.1.5 pass
   //     `fromname` to `os_pushresult`, so the message is the old name, a colon and the
-  //     system's description; from v5.2.0 the call is `luaL_fileresult(L, ..., NULL)` and the
-  //     description arrives alone. `os_remove` keeps passing `filename` at every release, so
-  //     its message names the file on all five lines and it carries no note. No manual states
-  //     either half. Probed on the runtime: `os.remove` answers
+  //     system's description; the call becomes `luaL_fileresult(L, ..., NULL)` and the
+  //     description arrives alone. That edit lands at **v5.2.2**, not at the line's edge —
+  //     v5.2.0 and v5.2.1 still pass `fromname` — so the note is dated 5.2 on the standing
+  //     ruling that a line is credited with what its final release has, 5.2.4 being what
+  //     `lua.org/source/5.2` serves. `os_remove` keeps passing `filename` at every release,
+  //     so its message names the file on all five lines and it carries no note. No manual
+  //     states either half. Probed on the runtime: `os.remove` answers
   //     `"…-not-here.txt: No such file or directory"` and `os.rename` answers
   //     `"No such file or directory"`.
   //
@@ -862,6 +866,12 @@ const raw: Record<string, unknown> = {
   //
   // Neither `os.exit`, `os.remove` nor `os.rename` appears in any Incompatibilities chapter;
   // all four were sliced from `<a name="8">` to end of file and searched for each name.
+  //
+  // One more patch-level residual, recorded because minor-line granularity cannot hold it:
+  // `os_remove` and `os_rename` gain an `errno = 0;` line before the call at **v5.4.7**
+  // (v5.4.0 through v5.4.6 do not have it), and v5.4.8's `luaL_fileresult` then reports
+  // `"(no extra info)"` with code `0` where a failure left `errno` unset. Both lines of 5.4
+  // are credited with 5.4.8's behaviour under the same ruling.
   'os.execute': osExecute,
   'os.exit': osExit,
   'os.remove': osRemove,
