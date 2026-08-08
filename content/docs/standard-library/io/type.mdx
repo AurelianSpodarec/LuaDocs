@@ -1,8 +1,153 @@
 ---
 title: io.type()
-description: ""
+description: Say whether a value is a file handle, and whether that file is still open.
+lua-compat: io.type
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.type
 ---
 
-{/* Not yet written. */}
+Answers two questions at once: whether the value it is handed is a file handle at all, and —
+if it is — whether the file behind it is still open. The answer is a string in both of those
+cases and `nil` in every other, which is what makes it a test as well as a description.
+
+<RunnableExample code={`local ledger_path = "io-type-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nprint(io.type(writing))\nwriting:close()\nprint(io.type(writing))\nprint(io.type(ledger_path))\n\nos.remove(ledger_path)\n-- Expected output:\n-- file\n-- closed file\n-- nil`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a file write one first and clean up after themselves. Nothing on this page touches a
+file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+io.type(obj)
+```
+
+<Parameters>
+  <Param name="obj">The value to ask about. Any value at all is allowed, `nil` included — a value is answered, not refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string or nil">`"file"` or `"closed file"` when `obj` is a file handle — see [The answers it can give](#the-answers-it-can-give) for which — and `nil` when it is anything else.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value and is answered with `nil`; nothing at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+The question this asks is narrower than it looks. It is not *can I read from this* — it is
+*is this one of the `io` library's own file handles*. A value passes only when it carries the
+metatable the library gives its handles, and the answer then reports the library's own record
+of whether that handle has been closed.
+
+That makes it the check to write in front of code that is about to use a handle it did not
+open itself, and the check to write in cleanup code, where a handle may or may not still be
+open. It is not a way to find out whether a file exists, whether it can be read, or whether
+there is anything left in it; those are questions for
+[`io.open()`](/docs/standard-library/io/open) and for reading.
+
+## The answers it can give
+
+| Result | What answers with it |
+|---|---|
+| `"file"` | a file handle whose file is open |
+| `"closed file"` | a file handle whose file has been closed |
+| `nil` | everything else — a name, a number, a table, `nil` itself |
+
+Both of the first two are file handles, and both are strings. A test written to mean *is this
+a usable file* has to compare against `"file"` on its own, because the other answer is a
+string too and every string is true in Lua.
+
+Which of the two comes back is bookkeeping the library keeps, not a question it puts to the
+system. A handle it has not been told to close reads as `"file"` however the file itself has
+fared.
+
+## What a file handle is
+
+A file handle is a *userdata* — a value Lua holds on the program's behalf without
+understanding what is inside it — carrying the system's own handle on an open file, with a
+metatable the `io` library installs. That description matters here because it is exactly what
+this function checks: the value has to be a userdata carrying *that* metatable.
+
+The metatable is also how the handle's methods are reached. `read`, `write`, `lines`, `seek`,
+`setvbuf` and `close` all arrive through it, which is what makes `handle:read()` work when
+nothing was ever assigned to the handle itself. And it carries a finalizer, which is why a
+handle nothing refers to any more is eventually closed by the collector rather than being
+leaked outright.
+
+Two consequences a program can feel:
+
+- A table of your own carrying `read` and `close` fields is not a file handle here, however
+  faithfully it behaves like one. Code that wants to accept both a real handle and a stand-in
+  should ask what it can do rather than asking this.
+- Closing changes nothing about the value's basic type.
+  [`type()`](/docs/standard-library/globals/type) answers `"userdata"` before and after, so
+  this function is where a program asks which of the two states a handle is in.
+  [`tostring()`](/docs/standard-library/globals/tostring) also shows the difference, in
+  wording meant for a person to read rather than for code to test.
+
+## Examples
+
+### Not the same question as `type()`
+
+<RunnableExample code={`local basic_path = "io-type-example-basic.txt"\n\nlocal writing = assert(io.open(basic_path, "w"))\nprint(type(writing), io.type(writing))\nwriting:close()\nprint(type(writing), io.type(writing))\n\nos.remove(basic_path)\n-- Expected output:\n-- userdata\tfile\n-- userdata\tclosed file`} />
+
+The left column never moves and the right one does.
+[`type()`](/docs/standard-library/globals/type) names the eight basic types and stops there,
+so an open file and a closed one are the same answer to it; this function is the finer
+question the `io` library adds for its own values.
+
+### Everything that is not a handle
+
+<RunnableExample code={`print(io.type(2024))\nprint(io.type("orders.csv"))\nprint(io.type(nil))\nprint(io.type(io.lines))\nprint(io.type(io.stdout))\n-- Expected output:\n-- nil\n-- nil\n-- nil\n-- nil\n-- file`} />
+
+A file's *name* is a string and answers `nil` — the commonest way this gets misread, because
+a path and a handle are both "the file" in conversation. The last line is the reminder that
+the standard handles are ordinary file handles: they are open, they answer `"file"`, and code
+that accepts a handle can be handed one.
+
+### Guarding a call that needs an open file
+
+<RunnableExample code={`local function is_open(value)\n  return io.type(value) == "file"\nend\n\nlocal ledger_path = "io-type-example-guard.txt"\nlocal writing = assert(io.open(ledger_path, "w"))\n\nprint(is_open(writing))\nwriting:close()\nprint(is_open(writing))\nprint(is_open(ledger_path))\n\nos.remove(ledger_path)\n-- Expected output:\n-- true\n-- false\n-- false`} />
+
+One comparison covers all three cases: a handle that is open, a handle that is not, and a
+value that was never a handle. Writing it as a named test rather than inline is what keeps
+the `== "file"` — the part that is easy to leave out — in one place.
+
+## Gotchas
+
+<Gotcha title="A closed file is still a truthy answer">
+`io.type(handle)` on a closed handle is `"closed file"`, a non-empty string, and every string
+is true in Lua. So `if io.type(handle) then` runs its branch for a handle that can no longer
+read or write anything, and the raise arrives on the next line instead of the branch being
+skipped. The test that means what it looks like is `io.type(handle) == "file"`.
+</Gotcha>
+
+<Gotcha title="nil is the answer for a value that is not a file, and nil is also a value it answers about">
+`io.type(nil)` is `nil`, and so is `io.type(42)`. The result does not distinguish *this is not
+a file handle* from *there was nothing to ask about*, which matters when the argument is
+itself a call: `io.type(find_handle())` on a `find_handle` that returns nothing at all raises,
+because no argument is a different thing from `nil`. Assigning the result to a local first
+turns the error back into an answer.
+</Gotcha>
+
+<Gotcha title="It says nothing about the file">
+The answer describes the handle, and the library's own record of it. A file that has been
+deleted, emptied or replaced since it was opened still leaves its handle reading `"file"`, and
+a handle that reads `"file"` may still fail the next thing it is asked to do. This is a check
+on the value in hand, not a check on the world.
+</Gotcha>
+
+## See also
+
+- [`type()`](/docs/standard-library/globals/type) — the basic type, which is `"userdata"` for a handle either way
+- [`math.type()`](/docs/standard-library/math/type) — the same narrowing question, asked about numbers
+- [`io.open()`](/docs/standard-library/io/open) — where a value that answers `"file"` comes from
+- [`io.close()`](/docs/standard-library/io/close) — what turns `"file"` into `"closed file"`
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`io.stdout`](/docs/standard-library/io/stdout) — a handle the program was given rather than opened

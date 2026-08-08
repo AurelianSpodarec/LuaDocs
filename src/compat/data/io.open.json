@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "`mode` is now checked before the file is touched, and a spelling this call does not recognise raises instead of reaching the system. The spellings it takes are `\"r\"`, `\"w\"`, `\"a\"`, `\"r+\"`, `\"w+\"` and `\"a+\"`, each optionally followed by `b` — and the `b` has to come last, so `\"r+b\"` is accepted where `\"rb+\"` is not. Earlier versions hand the string over exactly as written, so a spelling the system understands works there even when this list does not have it, and one the system does not understand is the system's business rather than Lua's. What the call answers with on each path is unchanged.",
+    "5.4": "The handle can now be held in a to-be-closed variable. Its metatable gains a `__close` metamethod beside the finalizer it has always carried, so `local reading <close> = assert(io.open(path))` closes the file when the block ends, whether it ends normally or through an error. Earlier versions have no such declaration, and nothing but an explicit close or the collector shuts the file there."
+  }
+}

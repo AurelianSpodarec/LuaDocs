@@ -128,6 +128,9 @@ import osRemove from './data/os.remove.json';
 import osRename from './data/os.rename.json';
 import osSetlocale from './data/os.setlocale.json';
 import osLibrary from './data/os.library.json';
+import ioOpen from './data/io.open.json';
+import ioClose from './data/io.close.json';
+import ioType from './data/io.type.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -916,6 +919,87 @@ const raw: Record<string, unknown> = {
   // overview. That is a result rather than an omission — it makes `os` the first section
   // whose front door is version-invariant while seven of its eleven entries are not.
   'os.library': osLibrary,
+
+  // The `io` section opens here, and it opens with the pair that decides the section's
+  // shape: `io.close` and `file:close` are two entries for one operation, and `io.type` is
+  // the function that tells an open handle from a closed one. `liolib.c` was read at the
+  // **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0 through v5.2.3, v5.3.0
+  // through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus the two shipped releases
+  // that have no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and `/5.2`. Every
+  // function body was extracted per release and diffed rather than read by eye, and
+  // `lauxlib.c`'s `luaL_fileresult` and `luaL_execresult` beside them.
+  //
+  //   * **`io.open` never changed what it answers with.** 5.1.5's `pushresult(L, 0, filename)`
+  //     already pushes **three** values on the failing path — `nil`, `"%s: %s"` of the name and
+  //     the system's description, and `errno` — which is exactly `luaL_fileresult`'s answer
+  //     from v5.2.0 to v5.5.1, and one value on the way out when it worked. The 5.1 and 5.2
+  //     manuals say only "nil plus an error message"; 5.3 drops the sentence and leaves the
+  //     library preamble's three-value rule to cover it. Documentation catching up with code
+  //     that had not moved, on the ruling `math.huge` set — no note.
+  //   * What **did** move is the mode check. 5.1 has none: `fopen(filename, mode)` gets the
+  //     string as written, which is why 5.1's manual adds "This string is exactly what is used
+  //     in the standard C function `fopen`" and 5.2's drops that sentence. **v5.2.0** rejects
+  //     anything not matching `[rwa]%+?b?`, and the macro is byte-identical from there to
+  //     v5.5.1. Note the shape: the `b` has to come *last*, so Lua accepts a strict subset of
+  //     what C does — `"rb+"` is a valid `fopen` mode and is refused here. v5.2.0 and v5.2.1
+  //     raise through `luaL_error`, v5.2.2 onwards through `luaL_argcheck`; both raise, so the
+  //     note is dated 5.2 either way. Probed on the runtime: `"r+b"` opens, `"rb+"` and `""`
+  //     raise `invalid mode`.
+  //   * **The 5.4 note is about the handle, not the call.** `metameth` first appears at
+  //     v5.4.0 with `{"__close", f_gc}` beside `{"__gc", f_gc}`; 5.1 through 5.3 register
+  //     `__gc` alone. The 5.4 and 5.5 library preambles say so outright — "The metatable for
+  //     file handles provides metamethods for `__gc` and `__close`" — where 5.1 to 5.3 say
+  //     nothing about either, though `io_gc`/`f_gc` is in every release. So the finalizer is
+  //     a non-event and `__close` is the delta, recorded on `io.open` because that is where a
+  //     reader meets the handle. Probed: `local scoped <close> = io.open(path)` reads
+  //     `"file"` inside the block and `"closed file"` after it. **A grep trap:** 5.1.5's
+  //     `liolib.c` contains the string `"__close"` three times, and none of them is a
+  //     metamethod — 5.1 keeps each handle's closing C function in a field of that name in the
+  //     handle's *environment*, which `aux_close` reads. It has nothing to do with
+  //     to-be-closed variables, which the language does not have before 5.4.
+  //   * **`io.close` and `file:close` are one operation in every version.** Through 5.3 they
+  //     are literally the same C function: `io_close` is registered in `iolib` *and* as
+  //     `flib`'s `"close"`. **v5.3.5** splits `f_close` out, and `io_close` becomes
+  //     `if (lua_isnone(L, 1)) get default output; return f_close(L);` — a refactor, not a
+  //     behaviour change, and it lands inside the 5.3 line rather than at 5.4. The default is
+  //     the default *output* file in all five (`LUA_ENVIRONINDEX`'s `IO_OUTPUT` slot in 5.1, a
+  //     registry field from 5.2), and `tofile` raises `attempt to use a closed file` before
+  //     anything else happens, so a second close raises on every line.
+  //   * The one dated fact on `io.close` is the **`io.popen` handle**. 5.1's `io_pclose` is
+  //     `pushresult(L, lua_pclose(L, *p), NULL)` with `lua_pclose` defined as
+  //     `(pclose(file) != -1)` — so the answer is `true` whenever the close itself went
+  //     through, whatever status the program exited with, and `nil` plus a message and `errno`
+  //     when it did not. From **v5.2.0** it is `luaL_execresult(L, ...)`, the same three values
+  //     `os.execute` gained in the same release and the same ones its Incompatibilities entry
+  //     describes. The 5.2 manual adds the matching sentence to `file:close`'s passage and 5.1
+  //     has none. Recorded here as well as there because it is observable through this call.
+  //   * **Refusing to close a standard handle is not a raise**, on any line: `io_noclose`
+  //     pushes `nil` and the literal `cannot close standard file` and returns **2**, and the
+  //     handle stays open. `luaL_pushfail` replaces `lua_pushnil` at 5.4 and is `lua_pushnil`
+  //     in a stock build (`LUA_FAILISFALSE` is off), which is the `os.getenv` non-event again.
+  //     **Patch residual:** v5.1 and v5.1.1 have no `io_noclose` at all — their standard
+  //     handles close like any other file, guarded only in `io_gc` — and it arrives inside the
+  //     5.1 line, by 5.1.5. `lua.org/source/5.1` serves 5.1.5, so 5.1 as this site means it
+  //     refuses, and the residual is recorded here rather than in the dataset.
+  //   * **`io.type` has not moved at all.** `luaL_checkany` in every release, so no argument
+  //     raises and `nil` is answered; the metatable test is `lua_getmetatable` plus
+  //     `lua_rawequal` in 5.1 and `luaL_testudata` from v5.2.0, which is the same question
+  //     asked through a helper; the three answers are `"file"`, `"closed file"` and `nil` in
+  //     all five. `fail` for the third from 5.4 is the same non-event. Its node is
+  //     availability and nothing else, which keeps the matrix off a page where nothing varies.
+  //
+  // Nothing about `io.open`, `io.close`, `io.type` or `file:close` appears in **any**
+  // Incompatibilities chapter: 5.2, 5.3, 5.4 and 5.5's §8 were sliced from `<a name="8">` to
+  // end of file and searched. The only `io` hits in four chapters are `io.read`'s dropped
+  // `*` at 5.3 and `io.lines` returning four values at 5.4, which belong to I2 and I4.
+  //
+  // One more patch residual, recorded because minor-line granularity cannot hold it: `io_open`
+  // and `io_fclose` gain an `errno = 0;` line before the call at **v5.4.7**, and v5.4.8's
+  // `luaL_fileresult` then reports `"(no extra info)"` with code `0` where a failure left
+  // `errno` unset. Both halves of the 5.4 line are credited with v5.4.8's behaviour.
+  'io.open': ioOpen,
+  'io.close': ioClose,
+  'io.type': ioType,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

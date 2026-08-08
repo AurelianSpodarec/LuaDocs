@@ -1,8 +1,215 @@
 ---
 title: io.open()
-description: ""
+description: Open a file by name and get back a handle to read or write it through.
+lua-compat: io.open
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.open
 ---
 
-{/* Not yet written. */}
+Opens the named file and hands back a *file handle* — the value every later read, write and
+seek is addressed to. A name it could not open is an answer rather than a failure: `nil`
+comes back in place of the handle, followed by a message and a number.
+
+<RunnableExample code={`local report_path = "io-open-example-report.txt"\n\nlocal writing = assert(io.open(report_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal reading = assert(io.open(report_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\n\nos.remove(report_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a file write one first and clean up after themselves. Nothing on this page touches a
+file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+io.open(filename [, mode])
+```
+
+<Parameters>
+  <Param name="filename">The name of the file to open. It reaches the system exactly as written, so a name with no directory in it is read against wherever the program is running from.</Param>
+  <Param name="mode">What the file is being opened for, as one of the spellings under [The mode string](#the-mode-string). Left out, it is `"r"` — reading.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="file">A handle on the open file, when it opened. Its basic type is `userdata`; what it can do is described under [What a file handle is](/docs/standard-library/io/type#what-a-file-handle-is).</Return>
+  <Return type="nil">In place of the handle, when the file could not be opened.</Return>
+  <Return type="string">A message from the system describing what stopped it, with the name it was given in front. On the failing path only.</Return>
+  <Return type="integer">The system's own numeric code for the same trouble. On the failing path only, and the numbers belong to the system rather than to Lua.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `filename` is absent, or is a value other than a string or a number. A number is accepted and looked up as its own text, so `io.open(2024)` asks about a file called `2024`.
+- Raises when `mode` is a value other than a string or a number.
+- <Since v="5.2" /> Raises when `mode` is a string this call does not recognise. The spellings it takes are the six under [The mode string](#the-mode-string), each of them optionally followed by `b`.
+- A file that could not be opened does not raise. Every such answer arrives through the return values, which is what makes `assert(io.open(path))` the way to turn one into a raise where that is what is wanted.
+
+</Errors>
+
+## Description
+
+Two things come out of a successful call: the file is open, and the program is holding a
+handle on it. Everything the `io` library does to that file afterwards goes through the
+handle — reading, writing, moving about, and closing — so a program that loses track of it
+has lost the file until the collector notices.
+
+The name is looked up, not built. Nothing here creates a directory, expands a `*`, or
+resolves anything the system would not resolve on its own; whether a name that does not refer
+to anything yet gets created is the mode's business, and the table below says which modes do
+it. The standard library has no way to list a directory or ask what kind of thing a name
+refers to, so a program opening files knows which ones it means because it put them there or
+was told about them.
+
+A handle should be closed when the program is done with it — see
+[`io.close()`](/docs/standard-library/io/close#what-closing-a-file-does) for what that does
+and why leaving it to the collector is a poor substitute.
+
+## The mode string
+
+The mode says what the file is being opened for. It settles three separate things: whether
+reading is allowed, whether writing is allowed, and what becomes of the file the call finds —
+or does not find.
+
+| Mode | Reading | Writing | The file it finds |
+|---|---|---|---|
+| `"r"` | yes | no | has to be there already |
+| `"w"` | no | yes | created if absent, emptied if present |
+| `"a"` | no | yes, at the end | created if absent, kept if present |
+| `"r+"` | yes | yes | has to be there already, and is kept |
+| `"w+"` | yes | yes | created if absent, emptied if present |
+| `"a+"` | yes | yes, at the end | created if absent, kept if present |
+
+`"r"` is what a call that names no mode gets, which makes reading the thing you do not have
+to ask for.
+
+The three spellings with a `+` are what the manual calls *update* modes: one handle that both
+reads and writes. In the two append forms, writing lands at the end of the file however the
+handle's position has been moved about.
+
+A `b` may follow, and it goes last — `"r+b"`, not `"rb+"`. What the manual says about it is
+narrow: some systems need it to open the file in binary mode, and what that amounts to on
+those systems is their business rather than Lua's. Where it makes no difference the letter is
+harmless, which is why code meant to run anywhere and read bytes rather than text tends to
+write it every time.
+
+## When the open fails
+
+One value when it worked, three when it did not — so
+`local reading, complaint = io.open(path)` is the shape that reads both, and the first name
+alone is enough when the reason does not matter.
+
+Testing the first value is the whole test. It is a handle or it is `nil`:
+
+```lua
+local reading = io.open(settings_path)
+if not reading then
+  return default_settings
+end
+```
+
+The two values behind it are for reporting rather than for branching. The message is the
+system's own wording with the name in front, meant for a person to read, and matching it
+against a literal ties the program to one system's phrasing. The number is the system's code
+for the same trouble, and the same trouble carries different numbers on different systems.
+
+The rest of the library reports trouble in this shape too, except where an entry says
+otherwise — [`os.remove()`](/docs/standard-library/os/remove#what-comes-back-on-each-path)
+describes the same three values from the other side of the library.
+
+## Examples
+
+### What a failed open hands back
+
+<RunnableExample code={`local missing_path = "io-open-example-not-here.txt"\n\nprint(select("#", io.open(missing_path, "r")))\n\nlocal reading, complaint = io.open(missing_path, "r")\nprint(reading)\nprint(type(complaint))\n-- Expected output:\n-- 3\n-- nil\n-- string`} />
+
+Three values, and the card prints what it can promise: how many there were, that the first
+one is `nil`, and that the second is text. The text itself is not printed, because it is the
+system's wording and reads differently from one machine to the next — which is the same
+reason it should not be compared against anything in code.
+
+### Adding to a file instead of replacing it
+
+<RunnableExample code={`local orders_path = "io-open-example-orders.log"\n\nlocal function record(line)\n  local writing = assert(io.open(orders_path, "a"))\n  writing:write(line, "\\n")\n  writing:close()\nend\n\nrecord("cocoa,2")\nrecord("flour,1")\n\nlocal recorded = 0\nfor line in io.lines(orders_path) do\n  recorded = recorded + 1\n  print(line)\nend\nprint(recorded)\n\nos.remove(orders_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1\n-- 2`} />
+
+`"a"` is what makes the second call add to the first one's work instead of wiping it. The
+file is opened and closed once per line here, which is what a log written by a
+long-running program looks like: nothing holds the handle between calls, so nothing has to
+be handed around to keep the file open.
+
+### Writing over what was already there
+
+<RunnableExample code={`local draft_path = "io-open-example-draft.txt"\n\nlocal first = assert(io.open(draft_path, "w"))\nfirst:write("a whole paragraph")\nfirst:close()\n\nlocal checking = assert(io.open(draft_path, "r"))\nprint(checking:read())\nchecking:close()\n\nlocal second = assert(io.open(draft_path, "w"))\nsecond:close()\n\nlocal checking_again = assert(io.open(draft_path, "r"))\nprint(checking_again:read())\nchecking_again:close()\n\nos.remove(draft_path)\n-- Expected output:\n-- a whole paragraph\n-- nil`} />
+
+The second `"w"` writes nothing at all and still leaves the file empty: the emptying happens
+at the open, not at the first write. Reading the empty file back gives `nil` — end of file on
+the first line — rather than an error.
+
+## Gotchas
+
+<Gotcha title="A file that is not there is an answer, not a raise">
+The `nil` this hands back is an ordinary value, so a program that ignores it carries on and
+fails somewhere else. The line that finally complains is the one that tries to use the
+handle, and its message is about indexing a `nil` value rather than about a file that was
+not found — several lines away from the call that knew what went wrong.
+
+<RunnableExample code={`local settings_path = "io-open-example-settings.cfg"\n\nlocal function first_line_of(path)\n  local reading = assert(io.open(path, "r"))\n  local line = reading:read()\n  reading:close()\n  return line\nend\n\nlocal read_it, complaint = pcall(first_line_of, settings_path)\nprint(read_it)\nprint(type(complaint))\n-- Expected output:\n-- false\n-- string`} />
+
+Wrapping the call in [`assert()`](/docs/standard-library/globals/assert) moves the complaint
+back to the line that has something to say: what it raises carries the message the open
+produced, which names the file. That is the right default for a program that cannot go on without
+the file, and the wrong one for a program to which the file's absence is ordinary — there,
+test the first value instead.
+</Gotcha>
+
+<Gotcha title="Opening for writing empties the file before anything is written">
+`"w"` and `"w+"` empty the file as part of opening it, so a call made to find out *whether* a
+file is there destroys it when it is. Asking that question means opening for reading and
+looking at what comes back, and a program that means "add to it" wants `"a"`, which keeps
+what is already there.
+</Gotcha>
+
+<Gotcha title="The b goes at the end">
+`"rb+"` and `"r+b"` mean the same thing in C, and this call takes only the second. The letter
+that names the mode comes first, then `+` if the handle is to do both, then `b` — anything
+else is refused before the file is touched.
+</Gotcha>
+
+<Gotcha title="A handle nobody closed is a file nobody finished writing">
+Writes are buffered, so what a program has written and what the file holds are two different
+things until the handle is closed. A program that opens, writes and then simply stops
+referring to the handle is relying on the collector to close it, and the manual is plain that
+this takes an unpredictable amount of time to happen — long enough that another part of the
+same program can open the file and find it short.
+[`io.close()`](/docs/standard-library/io/close) is the way to say when.
+</Gotcha>
+
+<Only since="5.4">
+
+<Gotcha title="A handle can be made to close itself">
+Declaring the handle as a *to-be-closed* variable ties the close to the block rather than to
+a line, which covers the failing path as well as the succeeding one:
+
+```lua
+do
+  local writing <close> = assert(io.open(report_path, "w"))
+  writing:write(summary)
+end
+```
+
+The file is closed when the block ends, whether it ends by reaching the bottom or by
+something inside it raising. What the close answered is dropped, so this is the right shape
+where finishing the writing matters more than hearing about the close, and the wrong one
+where a close that failed is something the program has to report.
+</Gotcha>
+
+</Only>
+
+## See also
+
+- [`io.close()`](/docs/standard-library/io/close) — finishing with the handle this hands back
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`io.type()`](/docs/standard-library/io/type) — telling a handle from anything else, and an open one from a closed one
+- [`io.lines()`](/docs/standard-library/io/lines) — reading a file by name, opening and closing it for you
+- [`file:read()`](/docs/standard-library/io/file-read) — what a handle opened for reading can be asked for
+- [`io.tmpfile()`](/docs/standard-library/io/tmpfile) — a file with no name, removed for you
+- [`os.remove()`](/docs/standard-library/os/remove) — deleting the file this creates
+- [`assert()`](/docs/standard-library/globals/assert) — turning the failing answer into a raise

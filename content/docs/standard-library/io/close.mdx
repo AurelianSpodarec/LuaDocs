@@ -1,8 +1,176 @@
 ---
 title: io.close()
-description: ""
+description: Close a file handle, or the default output file when handed nothing.
+lua-compat: io.close
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.close
 ---
 
-{/* Not yet written. */}
+Closes the file a handle refers to, finishing whatever was still buffered and letting the
+system have the file back. Handed nothing, it closes the *default output file* instead.
+
+<RunnableExample code={`local receipt_path = "io-close-example-receipt.txt"\n\nlocal writing = assert(io.open(receipt_path, "w"))\nwriting:write("cocoa,2\\n")\nprint(io.type(writing))\nprint(io.close(writing))\nprint(io.type(writing))\n\nos.remove(receipt_path)\n-- Expected output:\n-- file\n-- true\n-- closed file`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a file write one first and clean up after themselves. Nothing on this page touches a
+file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+io.close([file])
+```
+
+<Parameters>
+  <Param name="file">The handle to close. Left out, the default output file is closed instead — see [Without an argument](#without-an-argument).</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true` when the close went through — and, for a handle from [`io.popen()`](/docs/standard-library/io/popen), when the program on the other end also ended well.</Return>
+  <Return type="nil">In place of `true` when it did not — one of the standard handles, which this call refuses, or a close the system reported trouble with.</Return>
+  <Return type="string">Why. Beside the `nil` only for an ordinary file: the library's own wording when it refused, and the system's description of the trouble otherwise. A handle from [`io.popen()`](/docs/standard-library/io/popen) puts `"exit"` or `"signal"` here instead, beside the `true` as well as beside the `nil`.</Return>
+  <Return type="integer">A number to go with the string, where there is one: the system's code for the trouble, or — for a handle from `io.popen()` — the status the program ended with. A refusal answers with the message alone and no number at all.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when the argument is a value that is not a file handle. A name, a number, a table dressed up with a `close` field: all refused on the spot rather than answered.
+- Raises when the argument is `nil`. Leaving it out altogether is what reaches the default output file; `nil` is a value, and not a file handle.
+- Raises when the handle has already been closed. A second close is a mistake about the program's own state rather than a condition to report.
+- Raises when called with no argument and the default output file has already been closed.
+- Refusing to close one of the standard handles does not raise. That answer arrives through the return values like any other.
+
+</Errors>
+
+## Description
+
+Every handle [`io.open()`](/docs/standard-library/io/open) hands back is a resource the
+system is holding on the program's behalf, and this is how a program gives it back. The same
+work is available as a method on the handle —
+[`file:close()`](/docs/standard-library/io/file-close) — and the two are the same operation
+written two ways: `io.close(handle)` and `handle:close()` do the same thing to the same file.
+What this spelling adds is the form with no argument at all.
+
+A handle that came from [`io.popen()`](/docs/standard-library/io/popen) closes through here
+too, and answers differently: what comes back describes how the program on the other end
+ended, in the shape
+[`os.execute()`](/docs/standard-library/os/execute#what-the-three-results-mean) sets out,
+rather than describing a file.
+
+## What closing a file does
+
+Three things come of it. Anything written through the handle and still sitting in a buffer is
+handed to the system, so a file a program has written and not closed can hold less than the
+program thinks it does. The system's own hold on the file is released, which returns it to
+the pool of files a process may keep open at once — a pool the system, not Lua, decides the
+size of. And the handle is marked closed: it stays a file handle and stays reachable, and
+every later attempt to read through it, write through it or close it again raises.
+
+A file left open is closed eventually. Its handle carries a finalizer, so a handle nothing
+refers to any more is closed when the collector gets to it — but the manual is plain that
+this takes an unpredictable amount of time to happen, and *eventually* is the wrong promise
+for a program that has just written a file another part of it is about to read. Closing
+explicitly is what makes the moment knowable.
+
+Closing is also not undoing. The file stays where it is with whatever was written to it;
+[`os.remove()`](/docs/standard-library/os/remove) is the call that makes it go away, and it
+wants the handle closed first.
+
+## Without an argument
+
+`io.close()` closes the *default output file* — the handle
+[`io.output()`](/docs/standard-library/io/output) currently names, which every
+[`io.write()`](/docs/standard-library/io/write) goes to. A program that has never set one is
+still on the standard output, and that handle refuses to be closed, so the bare call is
+useful only in the stretch between an `io.output(handle)` and the end of the writing:
+
+```lua
+io.output(assert(io.open(summary_path, "w")))
+io.write("orders,412\n")
+io.close()
+io.output(io.stdout)
+```
+
+The last line is the part that is easy to forget. Closing the default output leaves the
+program with a closed handle as its default, and the next `io.write()` raises rather than
+going anywhere sensible — so a program that redirects should put the standard output back.
+
+The three standard handles — [`io.stdin`](/docs/standard-library/io/stdin),
+[`io.stdout`](/docs/standard-library/io/stdout) and
+[`io.stderr`](/docs/standard-library/io/stderr) — answer `nil` and a message here instead of
+closing, and stay open afterwards. That is the library keeping them, not a failure the
+program caused: they belong to the process rather than to Lua.
+
+## Examples
+
+### The standard output refuses
+
+<RunnableExample code={`local closed, complaint = io.close(io.stdout)\nprint(closed)\nprint(type(complaint))\nprint(io.type(io.stdout))\n-- Expected output:\n-- nil\n-- string\n-- file`} />
+
+Two values rather than a raise, and the handle is still open afterwards — the card's third
+line is the proof. Code that closes whatever handle it was given can therefore be handed
+`io.stdout` without bringing the program's own output down; it just has to read the answer
+rather than assume it.
+
+### Closing on the way out of a failure
+
+<RunnableExample code={`local export_path = "io-close-example-export.csv"\n\nlocal function write_rows(writing, rows)\n  for index = 1, #rows do\n    if rows[index] == "" then\n      error("a row came through blank", 0)\n    end\n    writing:write(rows[index], "\\n")\n  end\nend\n\nlocal writing = assert(io.open(export_path, "w"))\nlocal completed, complaint = pcall(write_rows, writing, { "cocoa,2", "", "flour,1" })\nio.close(writing)\n\nprint(completed)\nprint(complaint)\nprint(io.type(writing))\n\nos.remove(export_path)\n-- Expected output:\n-- false\n-- a row came through blank\n-- closed file`} />
+
+The close is written after a [protected call](/docs/standard-library/globals/pcall) rather
+than after the work, which is what puts it on the failing path as well as the succeeding one.
+That is the path that leaves handles open in practice, and the one the collector would
+otherwise have to clean up at a time nobody chose.
+
+### A second close is a mistake, not a condition
+
+<RunnableExample code={`local note_path = "io-close-example-note.txt"\n\nlocal writing = assert(io.open(note_path, "w"))\nprint(io.close(writing))\n\nlocal closed_again = pcall(io.close, writing)\nprint(closed_again)\n\nos.remove(note_path)\n-- Expected output:\n-- true\n-- false`} />
+
+The second call raises rather than answering `nil`, which is why cleanup written to run twice
+needs [`io.type()`](/docs/standard-library/io/type) in front of it — asking whether the
+handle is still open is cheap, and catching the raise afterwards is not.
+
+## Gotchas
+
+<Gotcha title="The bare call does not close everything">
+`io.close()` reads as *close up*, and it closes exactly one file: the default output. Every
+other handle the program is holding stays open, and a program that opened four files closes
+four files. There is no call in this library that closes them all.
+</Gotcha>
+
+<Gotcha title="An argument that vanished turns this into the bare call">
+Leaving the argument out and passing `nil` are different things here, and a call whose
+argument is itself a call can be either. `io.close(find_handle())` where `find_handle`
+returns `nil` raises, because `nil` is a value and not a file handle; where it returns
+*nothing at all*, this becomes `io.close()` and closes the default output instead — a
+different file from the one the code meant, and no complaint anywhere. Assigning the result
+to a local first makes both cases the same case.
+</Gotcha>
+
+<Gotcha title="Closing twice raises, and closing a standard handle does not">
+Two of the ways this can go wrong go in opposite directions. Handing over a handle that was
+already closed raises; handing over one of the standard handles answers `nil` and a message.
+So a cleanup routine that wraps this in [`pcall()`](/docs/standard-library/globals/pcall) and
+one that reads the return values each catch one of them, and code that has to be safe against
+both does both — or asks [`io.type()`](/docs/standard-library/io/type) first, which
+distinguishes the two cases before either arises.
+</Gotcha>
+
+<Gotcha title="A closed handle is still a handle">
+Closing does not empty the variable. What was a handle is a handle afterwards —
+[`type()`](/docs/standard-library/globals/type) still answers `"userdata"`, and
+[`io.type()`](/docs/standard-library/io/type) answers `"closed file"` rather than `nil`. A
+check written `if writing then` is true either way, which is what lets a closed handle travel
+a long way through a program before the operation that finally uses it raises.
+</Gotcha>
+
+## See also
+
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the handle
+- [`io.open()`](/docs/standard-library/io/open) — where the handle this closes comes from
+- [`io.type()`](/docs/standard-library/io/type) — asking whether a handle is still open before closing it
+- [`io.flush()`](/docs/standard-library/io/flush) — handing buffered writes over without closing
+- [`io.output()`](/docs/standard-library/io/output) — the default output file, and the one the bare call closes
+- [`io.popen()`](/docs/standard-library/io/popen) — the handle whose close reports on a program instead of a file
+- [`os.remove()`](/docs/standard-library/os/remove) — deleting the file, once nothing has it open
