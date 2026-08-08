@@ -1,8 +1,153 @@
 ---
 title: os.rename()
-description: ""
+description: Give a file a different name, reporting trouble as a value rather than a raise.
+lua-compat: os.rename
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.rename
 ---
 
-{/* Not yet written. */}
+Changes the name a file answers to. Because a name carries the directory it sits in, the call
+that renames a file is also the call that moves it. Trouble is an answer rather than a raise,
+in the shape
+[`os.remove()` describes](/docs/standard-library/os/remove#what-comes-back-on-each-path).
+
+<RunnableExample code={`local partial_path = "os-rename-example-part"\nlocal finished_path = "os-rename-example-report.csv"\n\nlocal writing = assert(io.open(partial_path, "w"))\nwriting:write("region,total\\n")\nwriting:write("north,412\\n")\nwriting:close()\n\nprint(os.rename(partial_path, finished_path))\n\nfor line in io.lines(finished_path) do\n  print(line)\nend\n\nos.remove(finished_path)\n-- Expected output:\n-- true\n-- region,total\n-- north,412`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a file write one first and clean up after themselves. Nothing on this page touches a
+file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+os.rename(oldname, newname)
+```
+
+<Parameters>
+  <Param name="oldname">The name the file has now.</Param>
+  <Param name="newname">The name to give it. Both reach the system exactly as written, and a `newname` whose directory part differs from `oldname`'s asks for the file to be moved there.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean or nil">`true` when the file was renamed, and `nil` when it was not.</Return>
+  <Return type="string">A message from the system describing what stopped it. On the failing path only.</Return>
+  <Return type="integer">The system's own numeric code for the same trouble. On the failing path only, and the numbers belong to the system rather than to Lua.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when either name is a value other than a string or a number. Both are required — there is no form of this call that takes one.
+- A rename the system would not do does not raise. It arrives as `nil` and the two values behind it, the same way [`os.remove()`](/docs/standard-library/os/remove) reports.
+
+</Errors>
+
+## Description
+
+The file's contents are not read and not written: what changes is which name reaches them.
+That is what separates a rename from a copy, and why one stays cheap as the file grows while
+the other does not — worth keeping apart in one's head, because the visible effect of the two
+can look the same.
+
+How far the call can reach is bounded by the system rather than by Lua. A rename between two
+places the system treats as separate storage is one of the things it can refuse, so a program
+moving files around a machine has to be ready for that answer and fall back to copying. A
+rename involving a name the program is not allowed to write is another.
+
+Two things about `newname` are worth being deliberate about, because neither is checked here.
+The first is that the message on the failing path describes the trouble and not the file, so
+code that wants to report *which* rename failed has to say so itself. The second is what
+happens when `newname` already refers to something, which is the next section.
+
+## When the new name is already taken
+
+Lua does not look, and the system decides. The two answers systems actually give are opposite
+ones: some replace what was there without a word, and others refuse the rename and report it
+like any other failure. There is no argument to ask for one or the other, and no way to tell
+from the result which kind of system the program is running on — a `true` could mean *nothing
+was in the way* or *something was, and is not any more*.
+
+A program that must not overwrite anything has to check first, and a check leaves a gap:
+between looking and renaming, something else can create the file. Where that matters, the
+answer is not in this library.
+
+A program that *wants* the replacement — publishing a finished file over an older copy of
+itself — is relying on behaviour the system offers rather than on something promised here,
+which is worth a comment in the code and a thought about the machines it will run on.
+
+## Renaming a file into place
+
+Writing to a working name and renaming once the file is complete is one of the main reasons
+to reach for this call. A reader opening the finished name while the write is going on finds
+either nothing there or the previous version of the file, rather than the one being written,
+because the writing is happening under a different name entirely.
+
+Whether the swap itself happens in one indivisible step is a guarantee the system makes or
+does not; Lua neither promises it nor gets in its way. What the pattern buys even without
+that guarantee is that the window during which a reader could see a partial file shrinks from
+*the whole time the file is being written* to *the moment of the rename*.
+
+The working name wants to sit beside the finished one rather than somewhere temporary, for
+the reason the section above gives: a rename that has to cross into different storage is one
+the system may refuse, and a system temporary directory is exactly where that tends to
+happen.
+
+## Examples
+
+### Publishing a file only once it is complete
+
+<RunnableExample code={`local function publish_when_written(final_path, contents)\n  local working_path = final_path .. ".part"\n  local writing = assert(io.open(working_path, "w"))\n  writing:write(contents)\n  writing:close()\n  return os.rename(working_path, final_path)\nend\n\nlocal summary_path = "os-rename-example-summary.txt"\nprint(publish_when_written(summary_path, "412 rows imported\\n"))\n\nfor line in io.lines(summary_path) do\n  print(line)\nend\n\nos.remove(summary_path)\n-- Expected output:\n-- true\n-- 412 rows imported`} />
+
+The working name is the final one with a suffix, so the two sit in the same place and the
+rename asks nothing awkward of the system. The function hands the call's result straight back
+to its caller, which keeps every value the call produced available to whoever wants it —
+one on the way out when it worked, three when it did not.
+
+### The old name stops referring to anything
+
+<RunnableExample code={`local before_path = "os-rename-example-before.txt"\nlocal after_path = "os-rename-example-after.txt"\n\nlocal writing = assert(io.open(before_path, "w"))\nwriting:write("the whole note")\nwriting:close()\n\nprint(os.rename(before_path, after_path))\nprint(io.open(before_path, "r") == nil)\n\nlocal reading = assert(io.open(after_path, "r"))\nprint(reading:read("a"))\nreading:close()\nos.remove(after_path)\n-- Expected output:\n-- true\n-- true\n-- the whole note`} />
+
+The file kept its contents and stopped answering to the name it was created under. That is
+the difference from a copy worth having in mind: after the call there is nothing left at the
+old name to clean up, and no second copy to keep in step with the first.
+
+### What a failed rename hands back
+
+<RunnableExample code={`local missing_path = "os-rename-example-not-here.txt"\nlocal wanted_path = "os-rename-example-wanted.txt"\n\nprint(select("#", os.rename(missing_path, wanted_path)))\n\nlocal renamed, complaint = os.rename(missing_path, wanted_path)\nprint(renamed)\nprint(type(complaint))\n-- Expected output:\n-- 3\n-- nil\n-- string`} />
+
+Three values on the failing path, one on the succeeding one, exactly as
+[`os.remove()`](/docs/standard-library/os/remove#what-comes-back-on-each-path) has it. The
+message is not printed, because its wording is the system's and differs from machine to
+machine.
+
+## Gotchas
+
+<Gotcha title="An existing new name is not checked">
+Nothing here looks to see whether `newname` already refers to something, and what the system
+does about it is not the same everywhere — replacing silently and refusing outright are both
+answers a program can get. Code that would be wrong to overwrite a file has to arrange that
+itself; code that means to overwrite one is depending on the system rather than on this call.
+</Gotcha>
+
+<Gotcha title="Renaming a file the program still has open">
+An open handle refers to a file, and the name it was opened by is a separate thing; renaming
+the file underneath a handle is another place systems disagree, some carrying on happily and
+others refusing the rename. Closing the handle first, then renaming, is the arrangement that
+reads the same everywhere.
+</Gotcha>
+
+<Gotcha title="Moving is renaming, and it can be refused for that reason">
+`os.rename("/tmp/report.csv", "/home/dana/reports/report.csv")` is a move, and it is the shape most
+likely to come back `nil` on a machine where the two paths are on different storage. The
+failure looks like every other failure here, so code that treats a `nil` as *the source was
+missing* will diagnose it wrongly. Where a move has to work across a machine, copying and
+then deleting is the fallback, and neither half of that is in this library.
+</Gotcha>
+
+## See also
+
+- [`os.remove()`](/docs/standard-library/os/remove) — deleting a file, and the answer shape both calls share
+- [`io.open()`](/docs/standard-library/io/open) — creating the file being renamed
+- [`os.tmpname()`](/docs/standard-library/os/tmpname) — a working name to write under, though one that may not sit near the finished file
+- [`io.lines()`](/docs/standard-library/io/lines) — reading the renamed file back

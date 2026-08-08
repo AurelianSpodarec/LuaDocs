@@ -1,8 +1,143 @@
 ---
 title: os.remove()
-description: ""
+description: Delete a file by name, reporting trouble as a value rather than a raise.
+lua-compat: os.remove
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.remove
 ---
 
-{/* Not yet written. */}
+Deletes the file with the given name. A name it could not delete is an answer rather than a
+failure: `nil` comes back in place of the `true`, followed by a message and a number.
+
+<RunnableExample code={`local receipt_path = "os-remove-example-receipt.txt"\n\nlocal writing = assert(io.open(receipt_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nprint(os.remove(receipt_path))\n\nlocal reopened = io.open(receipt_path, "r")\nprint(reopened == nil)\n-- Expected output:\n-- true\n-- true`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a file write one first. Nothing on this page reads or deletes a file on your own
+machine.
+</Note>
+
+## Syntax
+
+```lua
+os.remove(filename)
+```
+
+<Parameters>
+  <Param name="filename">The name of the file to delete. It reaches the system exactly as written, so a name with no directory in it is read against wherever the program is running from.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean or nil">`true` when the file was deleted, and `nil` when it was not — a name that is not there, a file something else is holding, a place the program may not write.</Return>
+  <Return type="string">A message from the system describing what stopped it, with the name it was given in front. On the failing path only.</Return>
+  <Return type="integer">The system's own numeric code for the same trouble. On the failing path only, and the numbers belong to the system rather than to Lua.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `filename` is a value other than a string or a number. A number is accepted and looked up as its own text, so `os.remove(2024)` asks about a file called `2024`.
+- A name that could not be deleted does not raise. Every such answer arrives through the return values, which is what makes `assert(os.remove(path))` the way to turn one into a raise where that is what is wanted.
+
+</Errors>
+
+## Description
+
+One name, one file, and nothing recursive: this deletes what the name refers to and looks no
+further. There is no pattern matching and no expansion — a name holding a `*` is a name
+holding a `*`, and deleting several files means calling this several times.
+
+The library that surrounds it is small in a way that shapes how the call gets used. Nothing
+in the standard library lists a directory, creates one, or reports what kind of thing a name
+refers to, so a program deleting files knows which ones it means because it put them there or
+was told about them, not because it went looking.
+
+The manual scopes what happens when the name refers to a *directory* rather than a file: on
+POSIX systems an empty directory can be removed by this call as well. Where the manual does
+not make that promise, what a directory name does here is the system's business, and a
+program that needs to be sure has nothing in this library to check with.
+
+## What comes back on each path
+
+One value when it worked, three when it did not — so `local removed, complaint = os.remove(path)`
+is the shape that reads both, and the first name alone is enough when the reason does not
+matter.
+
+Testing the first value is the whole test. It is `true` or it is `nil`, and there is no
+partial success to worry about in between:
+
+```lua
+if not os.remove(cache_path) then
+  log("the cache file is still there")
+end
+```
+
+The two values behind it are for reporting rather than for branching. The message is the
+system's own wording, meant for a person to read, and matching it against a literal ties the
+program to one system's phrasing. The number is the system's code for the same trouble, and
+the same trouble carries different numbers on different systems — which is why neither
+belongs in a comparison, and why a program that has to tell one kind of failure from another
+usually has to find that out some other way.
+
+[`os.rename()`](/docs/standard-library/os/rename) answers in the same shape, and so do most
+of the calls in the [`io`](/docs/standard-library/io) library.
+
+## Examples
+
+### What a failed removal hands back
+
+<RunnableExample code={`local missing_path = "os-remove-example-not-here.txt"\n\nprint(select("#", os.remove(missing_path)))\n\nlocal removed, complaint = os.remove(missing_path)\nprint(removed)\nprint(type(complaint))\n-- Expected output:\n-- 3\n-- nil\n-- string`} />
+
+Three values, and the card prints what it can promise: how many there were, that the first
+one is `nil`, and that the second is text. The text itself is not printed, because it is the
+system's wording and reads differently from one machine to the next — which is the same
+reason it should not be compared against anything in code.
+
+### Deleting a batch and reporting what stayed
+
+<RunnableExample code={`local function delete_all(paths)\n  local stayed = {}\n  for index = 1, #paths do\n    if not os.remove(paths[index]) then\n      stayed[#stayed + 1] = paths[index]\n    end\n  end\n  return stayed\nend\n\nlocal kept_path = "os-remove-example-kept.txt"\nlocal writing = assert(io.open(kept_path, "w"))\nwriting:write("one row")\nwriting:close()\n\nlocal stayed = delete_all({ kept_path, "os-remove-example-never-there.txt" })\nprint(#stayed)\nprint(stayed[1])\n-- Expected output:\n-- 1\n-- os-remove-example-never-there.txt`} />
+
+Because a failure is a value, the loop keeps going: a name that could not be deleted does not
+stop the rest of the list from being tried. Collecting the ones that stayed gives the caller
+something to act on afterwards, which is more than a raise partway through would have left it
+with.
+
+## Gotchas
+
+<Gotcha title="A file that was not there reports a failure">
+Deleting something that may or may not exist is an ordinary thing to want, and this call has
+no way to say *there was nothing to do*. A missing name and a name the program was not
+allowed to touch both come back as `nil` and a message, which is why
+`assert(os.remove(path))` on a best-effort cleanup turns a non-problem into a raise. Where
+the file's absence is fine, ignore the result or test it and move on.
+
+<RunnableExample code={`local draft_path = "os-remove-example-draft.txt"\n\nlocal function write_draft(writing)\n  writing:write("half a line")\n  error("the export gave up", 0)\nend\n\nlocal writing = assert(io.open(draft_path, "w"))\nlocal completed, complaint = pcall(write_draft, writing)\nwriting:close()\n\nprint(completed)\nprint(complaint)\nprint(os.remove(draft_path))\n-- Expected output:\n-- false\n-- the export gave up\n-- true`} />
+
+The removal is written after a [protected call](/docs/standard-library/globals/pcall) rather
+than after the work, which is what makes it run down the failing path — the path that leaves
+half-written files behind in practice. Its result is printed here to show the file went away;
+real cleanup code would more often ignore it.
+</Gotcha>
+
+<Gotcha title="Close the handle before deleting the name">
+What happens when a program deletes a file it still has open differs sharply from system to
+system: some let the open handle carry on working against a file no name refers to any more,
+and others refuse the removal outright. Neither is Lua's doing and neither is something this
+call reports in a way worth branching on, so closing the handle first is the version of the
+code that behaves the same everywhere.
+</Gotcha>
+
+<Gotcha title="The name is not the file">
+Two names can refer to the same file, and deleting one of them says nothing about the other.
+A program that has been handed a path has been handed a way to reach a file, not a claim
+about how many ways there are, so *the file is gone* is a stronger reading of `true` than
+this call supports. What it reports is that the name it was given no longer reaches
+anything.
+</Gotcha>
+
+## See also
+
+- [`os.rename()`](/docs/standard-library/os/rename) — giving a file a different name instead of deleting it
+- [`io.open()`](/docs/standard-library/io/open) — creating the file this deletes
+- [`os.tmpname()`](/docs/standard-library/os/tmpname) — a name for a temporary file, and the cleanup that has to follow it
+- [`io.tmpfile()`](/docs/standard-library/io/tmpfile) — a temporary file that needs no removal at all
+- [`assert()`](/docs/standard-library/globals/assert) — turning the failing answer into a raise

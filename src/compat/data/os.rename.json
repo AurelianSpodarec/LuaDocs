@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "The message handed back on the failing path no longer begins with the name the file had. Earlier versions put `oldname` and a colon in front of the system's description of the trouble; from here that description arrives on its own, so code reading the name back out of the message stops finding it. What the call does, and the three values it answers with, are unchanged."
+  }
+}

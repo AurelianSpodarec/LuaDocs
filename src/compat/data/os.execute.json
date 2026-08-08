@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "What the call answers with changed shape. Given a command, it used to hand back a single number — the status code the system produced, with a meaning the system decided — and it now hands back three values: `true` or `nil` for whether the command finished normally with nothing to report, then a string naming which kind of ending the number after it describes (`\"exit\"` or `\"signal\"`, or a description of the trouble when the command could not be started at all), then that number. Given no command, the one value it answers with is now a boolean where it used to be a number, though it still says the same thing: whether a shell is available."
+  }
+}

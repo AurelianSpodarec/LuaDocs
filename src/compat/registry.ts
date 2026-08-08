@@ -122,6 +122,10 @@ import osDifftime from './data/os.difftime.json';
 import osClock from './data/os.clock.json';
 import osGetenv from './data/os.getenv.json';
 import osTmpname from './data/os.tmpname.json';
+import osExecute from './data/os.execute.json';
+import osExit from './data/os.exit.json';
+import osRemove from './data/os.remove.json';
+import osRename from './data/os.rename.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -796,6 +800,70 @@ const raw: Record<string, unknown> = {
   'os.clock': osClock,
   'os.getenv': osGetenv,
   'os.tmpname': osTmpname,
+
+  // The four that reach past Lua into the machine. `os.execute` is the section's one real
+  // arity change and the only `os` symbol named in any Incompatibilities chapter — 5.2 §8.2,
+  // "Function `os.execute` now returns true when command terminates successfully and nil plus
+  // error information otherwise". All four `loslib.c` bodies were read at v5.1.1, 5.1.5,
+  // v5.2.3, 5.2.4, v5.3.0, v5.3.2, v5.3.6, v5.4.0, v5.4.8 and v5.5.0, and `lauxlib.c`'s
+  // `luaL_fileresult` and `luaL_execresult` beside them, since three of the four hand their
+  // whole answer to one of those two helpers.
+  //
+  //   * **`os.execute`** is `lua_pushinteger(L, system(cmd)); return 1;` in the whole 5.1
+  //     line — **one value in both forms of the call**, and with no command that value is a
+  //     *number* (nonzero when a shell is available), not a boolean. From v5.2.0 the body
+  //     splits: with a command it is `luaL_execresult(L, stat)`, which returns **3** on every
+  //     path, and with no command `lua_pushboolean(L, stat); return 1;`. So the count changes
+  //     for a command and the *type* changes for the no-command form, and both halves are in
+  //     the note. Nothing moved after 5.2: v5.4.0 added `errno = 0` before the call and
+  //     v5.4.8 routed it through an `l_system` macro (so that a build with no `system`, iOS
+  //     being the shipped case, can substitute one) — neither changes what any line answers.
+  //     `luaL_execresult`'s own edit at 5.4 — `stat == -1` becomes `stat != 0 && errno != 0`
+  //     for the could-not-be-started branch — changes only which failures take that branch,
+  //     and both lines take it in the same situations a Lua program can produce, so it is
+  //     recorded nowhere. The **manual describes only two of the four answers**: it gives
+  //     `"exit"` and `"signal"` and never mentions that the could-not-be-started branch puts
+  //     the system's message and error code in those same two positions. That gap is closed in
+  //     the entry's prose rather than in a note, because it is true of every version that has
+  //     the three-value shape.
+  //   * **`os.exit`** moved twice. 5.1 is `exit(luaL_optint(L, 1, EXIT_SUCCESS))` — a number
+  //     or a numeric string, and a boolean raises; there is no second argument, and a value
+  //     passed in that position is read by nothing. v5.2.0 adds the `lua_isboolean` branch and
+  //     `if (lua_toboolean(L, 2)) lua_close(L);`. v5.3.0 changes `luaL_optint` to
+  //     `(int)luaL_optinteger`, which is the language-wide tightening `globals.select` and
+  //     `os.time` record for their own numeric arguments: a fraction used to be truncated and
+  //     now raises. Nothing has moved since — v5.3.0 through v5.5.0 are byte-identical here.
+  //     `close` is never type-checked in any version, only read for its truth.
+  //   * **`os.remove` and `os.rename` never changed what they answer with**, on any line, and
+  //     this is the batch's reversal: every manual reads as though they did. 5.1's own
+  //     `os_pushresult` already pushes `true` on success and **three** values on failure —
+  //     `nil`, `"%s: %s"` of the name and the system's message, and `errno` — which is exactly
+  //     what `luaL_fileresult` does from 5.2 on. The 5.1 manual mentions only `nil` and a
+  //     string, 5.2 adds "and the error code", and 5.3 adds "Otherwise, it returns true": three
+  //     manual edits, no behaviour change, on the ruling `math.huge` set. `fail` replacing
+  //     `nil` at 5.4 is the same non-event `os.getenv` already records.
+  //   * The one thing that *did* move is **`os.rename`'s message**. 5.1.1 and 5.1.5 pass
+  //     `fromname` to `os_pushresult`, so the message is the old name, a colon and the
+  //     system's description; from v5.2.0 the call is `luaL_fileresult(L, ..., NULL)` and the
+  //     description arrives alone. `os_remove` keeps passing `filename` at every release, so
+  //     its message names the file on all five lines and it carries no note. No manual states
+  //     either half. Probed on the runtime: `os.remove` answers
+  //     `"…-not-here.txt: No such file or directory"` and `os.rename` answers
+  //     `"No such file or directory"`.
+  //
+  // What the manual says about **directories** narrowed without the code moving: 5.1 promises
+  // `os.remove` deletes "the file or directory" and that directories must be empty; from 5.2 it
+  // is "the file (or empty directory, on POSIX systems)". The implementation is ISO C `remove`
+  // in every release, so 5.1's manual was over-broad rather than describing a different call —
+  // a documentation change, recorded nowhere, with the entry stating the POSIX-scoped version.
+  // `os.rename`'s passage says "file or directory" unqualified in all five.
+  //
+  // Neither `os.exit`, `os.remove` nor `os.rename` appears in any Incompatibilities chapter;
+  // all four were sliced from `<a name="8">` to end of file and searched for each name.
+  'os.execute': osExecute,
+  'os.exit': osExit,
+  'os.remove': osRemove,
+  'os.rename': osRename,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

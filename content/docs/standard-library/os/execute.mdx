@@ -1,8 +1,167 @@
 ---
 title: os.execute()
-description: ""
+description: Hand a command to the system's shell, wait for it, and read how it ended.
+lua-compat: os.execute
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.execute
 ---
 
-{/* Not yet written. */}
+Hands a command to an operating system shell, waits for it to finish, and reports how it
+ended. The report is three values rather than one, and the two after the first are where
+the detail is.
+
+```lua
+local succeeded, how, code = os.execute("tar -czf photos.tar.gz photos")
+
+if succeeded then
+  print("the archive was written")
+else
+  print("the archive was not written (" .. how .. " " .. code .. ")")
+end
+```
+
+<Note>
+The sandbox these examples run in cannot start another program, so no card on this page
+calls `os.execute()`. The listings that do are shown rather than run, and the cards under
+[Examples](#examples) work on the three results directly.
+</Note>
+
+## Syntax
+
+```lua
+os.execute([command])
+```
+
+<Parameters>
+  <Param name="command">The command, written the way the shell would read it. Left out entirely, nothing is run at all — the call reports only whether there is a shell to run things in.</Param>
+</Parameters>
+
+<Returns>
+  <Only before="5.2">
+    <Return type="integer">One value, in both forms of the call. Given a command, it is the status code the system handed back, and what that number means is the system's business rather than Lua's. Given no command, it is nonzero when a shell is available and zero when there is none.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="boolean or nil">Whether the command finished normally with nothing to report: `true` when it did, `nil` when it did not. Called with no command, this is the whole answer — a boolean saying whether a shell is available — and the two results below are absent.</Return>
+    <Return type="string">On the ordinary path, which kind of ending the number below describes: `"exit"` for a command that ran to completion, `"signal"` for one that was stopped from outside. When the command could not be started at all, a description of that instead — see [What the three results mean](#what-the-three-results-mean).</Return>
+    <Return type="integer">The number the string above names: an exit status after `"exit"`, a signal's number after `"signal"`, and the system's own numeric code for the trouble when the second result was a description rather than either word.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when `command` is a value other than a string or a number. Leaving it out, or passing `nil`, is not a mistake — either one asks the no-command question instead.
+- A command that does not exist, fails, or is stopped from outside does not raise. Those answers arrive through the return values.
+
+</Errors>
+
+## Description
+
+The string goes to a shell, and the shell reads it. Which shell that is, and what counts as
+a command in it, belong to the system rather than to Lua — the manual points at the same
+mechanism a C program reaches for, and does no interpreting of its own. A command written
+against one shell is not something to expect another one to understand.
+
+The call waits: the results describe a command that has already finished by the time they
+arrive, which is why they can say how it ended.
+
+What the command *printed* does not come back. Its output goes wherever the shell sends
+it — the same place the calling program's own output goes, usually — and this call has no
+way to collect it. [`io.popen()`](/docs/standard-library/io/popen) is the call that hands
+back a handle to read from, and it is the one to reach for when the point of running the
+program is what it says.
+
+## What the three results mean
+
+The first result is a summary and carries nothing the other two do not. It is `true` when
+the second result is `"exit"` and the third is zero, and it is `nil` in every other case.
+So the three ordinary answers are:
+
+- `true`, `"exit"` and `0` — the command ran and reported success.
+- `nil`, `"exit"` and a nonzero number — the command ran and reported a failure of its own,
+  and the number is the status it chose.
+- `nil`, `"signal"` and a number — the command was stopped from outside before it finished,
+  and the number identifies the signal that stopped it.
+
+There is a fourth, and it is the one to write code against deliberately: when the command
+could not be started at all, the second result is the system's description of why and the
+third is the system's numeric code for it. Both positions still hold a string and a number,
+so nothing about the *shape* says which case arrived — code that branches on
+`how == "signal"` and treats everything else as an exit status will read a system error as
+one.
+
+Telling a signal apart from an exit status is something the library can only do where the
+system offers the distinction. Where it does not, a command that ran reports `"exit"`
+whatever became of it, and the number beside it is whatever the shell handed over, unpicked.
+
+## Running nothing on purpose
+
+Called with no command, this runs nothing. It asks a different question — *is there a shell
+here at all* — and answers only that. A program that has to survive on a machine with no
+command processor can ask before it commits to a plan that needs one:
+
+```lua
+if not os.execute() then
+  return fall_back_to_doing_it_in_lua()
+end
+```
+
+That is all the no-command form does. It is worth knowing about mostly so that a stray
+`os.execute()` in code is read as the question it is rather than as a call that forgot its
+argument.
+
+## Examples
+
+### Turning the three results into one answer
+
+<RunnableExample usesEntry={false} code={`local function describe_outcome(succeeded, how, code)\n  if succeeded then\n    return "the backup finished"\n  elseif how == "signal" then\n    return "the backup was stopped by signal " .. code\n  else\n    return "the backup ended with status " .. code\n  end\nend\n\nprint(describe_outcome(true, "exit", 0))\nprint(describe_outcome(nil, "exit", 2))\nprint(describe_outcome(nil, "signal", 15))\n-- Expected output:\n-- the backup finished\n-- the backup ended with status 2\n-- the backup was stopped by signal 15`} />
+
+The three argument lists are the three ordinary triples described above, supplied here
+because this page cannot produce them. The order of the branches is the part worth copying:
+the first result answers *did it work*, and only once that is `nil` is there any reason to
+look at which kind of ending it was.
+
+### What the first result leaves out
+
+<RunnableExample usesEntry={false} code={`local function backup_outcome()\n  return nil, "exit", 2\nend\n\nprint(select("#", backup_outcome()))\n\nlocal succeeded = backup_outcome()\nprint(succeeded)\n\nlocal finished, how, code = backup_outcome()\nprint(finished == succeeded)\nprint(how)\nprint(code)\n-- Expected output:\n-- 3\n-- nil\n-- true\n-- exit\n-- 2`} />
+
+`local succeeded = os.execute(command)` is a complete, ordinary-looking line that throws
+two values away. What it keeps is enough to branch on and not enough to report: the reason
+the command failed, and the number a caller would want in a log, are both in the results it
+dropped. Writing all three names down costs a line and is the difference between *the backup
+failed* and *the backup failed with status 2*.
+
+## Gotchas
+
+<Gotcha title="assert() on this call reports the wrong thing">
+[`assert()`](/docs/standard-library/globals/assert) raises with its *second* argument as the
+error object, and the second result here is the word `"exit"` or the word `"signal"`. So
+`assert(os.execute(command))` on a command that failed raises with `exit` as the message,
+which names neither the command nor the status it ended with. A command worth asserting on
+is worth checking by hand, so that the complaint can carry both.
+</Gotcha>
+
+<Gotcha title="The string is shell syntax, not a list of arguments">
+Nothing in Lua quotes, escapes or splits the command. A file name pasted into it is read by
+the shell as shell text, so a name holding a space becomes two words, and one holding a
+semicolon or a backtick becomes a second command. Building a command out of values that came
+from somewhere else — a directory listing, a configuration file, anything a user typed — is
+where that stops being a formatting problem and starts being a hole.
+[`string.format()`](/docs/standard-library/string/format)'s `%q` quotes for *Lua*, and is
+not the tool for this.
+</Gotcha>
+
+<Gotcha title="A command that is not there fails like any other failure">
+Asking for a program the system does not have is not different in kind from asking for one
+that does and having it fail: the shell runs, reports a nonzero status, and the results
+describe that. Nothing raises, and nothing distinguishes *I could not find it* from *it ran
+and did not like what it found* except the status the shell chose — which is a convention of
+the shell rather than something Lua promises.
+</Gotcha>
+
+## See also
+
+- [`io.popen()`](/docs/standard-library/io/popen) — running a program and reading what it prints
+- [`os.exit()`](/docs/standard-library/os/exit) — ending this program with a status of its own
+- [`os.getenv()`](/docs/standard-library/os/getenv) — reading the environment a command would inherit
+- [`os.tmpname()`](/docs/standard-library/os/tmpname) — a file name to hand to the command as a place to write
+- [`select()`](/docs/standard-library/globals/select) — counting the values a call handed back

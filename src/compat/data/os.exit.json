@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "`code` now accepts a boolean as well as a number: `true` asks for the system's success status and `false` for its failure status, and leaving the argument out counts as `true`. Earlier versions take a number only and refuse a boolean outright. A second argument arrives with it — a true value in that position closes the Lua state before the program ends, so that finalizers run and to-be-closed variables are closed. Earlier versions have no such argument and silently ignore anything passed there.",
+    "5.3": "A number given as `code` now has to be a whole one. Earlier versions take the whole part of a fraction and carry on with that, so `os.exit(3.7)` ends with status 3 there and raises here."
+  }
+}

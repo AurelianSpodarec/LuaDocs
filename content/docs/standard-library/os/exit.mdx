@@ -1,8 +1,190 @@
 ---
 title: os.exit()
-description: ""
+description: End the host program straight away, with a status of the caller's choosing.
+lua-compat: os.exit
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-os.exit
 ---
 
-{/* Not yet written. */}
+Ends the host program, there and then, with a status the caller chooses. It is not a
+`return` and not a raise: nothing further in the program runs, and nothing catches it.
+
+```lua
+local settings = load_settings("photosort.conf")
+
+if not settings then
+  io.stderr:write("photosort: no configuration file; nothing to do\n")
+  os.exit(false, true)
+end
+```
+
+<Note>
+No example on this page runs. The call ends the program that made it, so a card
+demonstrating it would have nothing left to print afterwards and nothing to hand back.
+Every listing here is shown rather than executed.
+</Note>
+
+## Syntax
+
+<Only before="5.2">
+
+```lua
+os.exit([code])
+```
+
+</Only>
+
+<Only since="5.2">
+
+```lua
+os.exit([code [, close]])
+```
+
+</Only>
+
+<Parameters>
+  <Only before="5.2">
+    <Param name="code">The status to end with, as a number. Left out, the program ends with the system's own code for success.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="code">The status to end with. `true` asks for the system's code for success and `false` for its code for failure; a number is used as the status itself. Left out, it counts as `true`.</Param>
+    <Param name="close">Whether to close the Lua state first. Any true value closes it; anything false, or nothing at all, ends the program without closing it — see [Closing the state on the way out](#closing-the-state-on-the-way-out).</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing — and not because the call answers with an empty list. It does not come back at all, so the line after it in the same function is never reached.</Return>
+</Returns>
+
+<Errors>
+
+<Only before="5.2">
+
+- Raises when `code` is anything other than a number or a string that reads as one. A boolean is not a status here.
+- Leaving `code` out, or passing `nil`, is not a mistake: either one asks for the success status.
+
+</Only>
+
+<Only since="5.2">
+
+- Raises when `code` is anything other than a boolean, a number, or a string that reads as a number.
+- <Since v="5.3" /> Raises when `code` is a number that is not a whole one, or one too large for an integer to hold. Earlier versions take the whole part of a fraction and carry on with that.
+- Leaving `code` out, or passing `nil`, is not a mistake: either one asks for the success status.
+- Nothing is checked about `close`. Any value at all is read for its truth, so a mistake in that position goes unreported.
+
+</Only>
+
+</Errors>
+
+## Description
+
+The status is the number the thing that started the program reads afterwards — a shell, a
+build tool, a supervisor deciding whether to restart something. Zero says *it worked*, and a
+program that wants to say anything more than *it did not* picks its own numbers for the rest
+and documents them.
+
+Being able to end from anywhere is the point of the call. A program that discovers halfway
+down a call stack that it has nothing to do can say so without threading a return value back
+up through every frame that would otherwise have to know about it. The cost is that the
+frames it skips do not get to finish: a caller that meant to close a file, write a summary or
+release a lock after the call it made is not given the chance.
+
+That is also why this is a poor way to report an ordinary failure inside a library. A
+function that ends the program takes the decision away from whoever called it, and there is
+no wrapping it in [`pcall()`](/docs/standard-library/globals/pcall) to get it back —
+[raising](/docs/standard-library/globals/error) is the tool for a failure somebody else might
+want to handle.
+
+## Closing the state on the way out
+
+The Lua state — every value, table, coroutine and open handle the program built — is left
+standing unless `close` says otherwise. The program ends and the system reclaims what it
+was using, without Lua walking through any of it.
+
+Closing it first changes that. The state releases the objects it holds, running the
+[finalizers](/docs/language/garbage-collection/finalizers) they carry, and closes the
+[to-be-closed variables](/docs/language/statements/to-be-closed-variables) the main line of
+execution still has open.
+For most programs that work is invisible, which is why it is not the default: the program is
+about to stop, and tidying a heap that is a moment away from being handed back costs time and
+buys nothing.
+
+It is worth asking for when something in the state has a job to do on the way out and no
+other chance to do it — a finalizer that flushes a record, a `<close>` variable holding a
+lock or a connection another process is waiting on. Deciding needs to happen at the call
+site, because there is nothing after the call to check afterwards.
+
+## Examples
+
+None of the listings below runs here; see the note at the top of the page.
+
+### Ending with a status a caller can read
+
+```lua
+local function main(arguments)
+  local report, complaint = build_report(arguments)
+  if not report then
+    io.stderr:write("photosort: " .. complaint .. "\n")
+    return 2
+  end
+  io.write(report)
+  return 0
+end
+
+os.exit(main({ ... }))
+```
+
+Writing the program's body as a function that *returns* a status, and calling this once at
+the very end, keeps the exit in one place. Everything above it stays testable, because it
+answers with a number rather than ending the process, and the only call that ends the
+process is on the last line.
+
+### Success and failure without picking numbers
+
+```lua
+local rebuilt = rebuild_index()
+os.exit(rebuilt, true)
+```
+
+Handing the boolean straight through asks for the system's own success or failure code
+rather than a number chosen here, which is the portable way to say *it worked* or *it did
+not* when there is nothing more specific to report. The second argument closes the state, so
+the index's own finalizer gets to run before the program stops.
+
+## Gotchas
+
+<Gotcha title="Nothing written after the call runs">
+Not the next line, not the rest of the enclosing loop, not the caller's cleanup, not a
+`return` that was about to happen. Code arranged as *do the work, exit, tidy up* tidies up
+nothing. Anything that has to happen before the program stops has to happen before this line,
+or be attached to the state and asked for with the second argument.
+</Gotcha>
+
+<Gotcha title="A protected call does not catch it">
+`pcall(os.exit)` ends the program. Nothing is raised, so there is no error for a protected
+call to intercept and no message handler to run — the process is simply gone. A library that
+calls this reaches straight past every caller that was prepared to handle a failure.
+</Gotcha>
+
+<Gotcha title="The arguments are easy to get the wrong way round">
+`os.exit(true)` sets the *status* and leaves the state open; it does not ask for the state to
+be closed. The closing is the second argument, and `os.exit(true, true)` is the call that
+means *end successfully, and close the state first*. Both positions accept `true`, so a
+mistake here reads perfectly well and does something else.
+</Gotcha>
+
+<Gotcha title="Not every number survives as a status">
+The number is handed to the system, and what the system passes on to whoever started the
+program is up to it — on many of them only a small range comes through intact, so a large
+status can arrive as something unrecognisable, and a multiple of that range can arrive
+looking like success. Statuses worth relying on are small ones, chosen and documented by the
+program itself.
+</Gotcha>
+
+## See also
+
+- [`error()`](/docs/standard-library/globals/error) — reporting a failure the caller can still deal with
+- [`os.execute()`](/docs/standard-library/os/execute) — reading the status *another* program ended with
+- [Finalizers](/docs/language/garbage-collection/finalizers) — what closing the state gets to run
+- [To-be-closed variables](/docs/language/statements/to-be-closed-variables) — the other thing closing the state closes
+- [`pcall()`](/docs/standard-library/globals/pcall) — the protected call this deliberately escapes
