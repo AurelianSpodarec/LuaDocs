@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "An `offset` with a fractional part is now refused: `file:seek(\"set\", 7 / 2)` raises rather than moving. Earlier versions cut the fraction off and used the whole part, so that same call landed on byte 3 there. The check that refuses it also refuses an offset too large for a file position to be held in."
+  }
+}

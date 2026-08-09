@@ -139,6 +139,8 @@ import ioFileFlush from './data/io.file-flush.json';
 import ioFlush from './data/io.flush.json';
 import ioFileLines from './data/io.file-lines.json';
 import ioLines from './data/io.lines.json';
+import ioFileSeek from './data/io.file-seek.json';
+import ioFileSetvbuf from './data/io.file-setvbuf.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1266,6 +1268,89 @@ const raw: Record<string, unknown> = {
   // v5.5.0 and v5.5.1 are byte-identical for all four functions.
   'io.file-lines': ioFileLines,
   'io.lines': ioLines,
+
+  // Moving about a file, and choosing when what is written leaves for it. The **first `io`
+  // pair with no library-level twin**: there is no `io.seek` and no `io.setvbuf`, so nothing
+  // here has to be reconciled with a second page, and both entries state their rule
+  // unqualified. `f_seek` and `f_setvbuf` are registered in `flib`/`meth` alone at all 26
+  // releases read.
+  //
+  // `liolib.c` read at the **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0
+  // through v5.2.3, v5.3.0 through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus the
+  // two shipped releases with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and
+  // `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). **All 25 consecutive whole-file
+  // diffs were generated and read**, which is what the `l_fseek`/`l_seeknum` block below
+  // needs: it is a `#define` block and a body diff cannot see one.
+  //
+  // **`file:seek`'s one delta is the offset, and it is at 5.2 — not 5.3, where the mechanism
+  // moved without the answer moving.** Three forms in order:
+  //
+  //   * 5.1 (v5.1, v5.1.1, 5.1.5): `long offset = luaL_optlong(L, 3, 0);`. `luaL_optlong` is
+  //     `((long)luaL_optinteger(...))` and 5.1's `lua_tointeger` is a plain cast of the
+  //     number, so **a fraction is cut off and the whole part used**. There is no range check
+  //     of any kind.
+  //   * **v5.2.0**: `lua_Number p3 = luaL_optnumber(L, 3, 0); l_seeknum offset = (l_seeknum)p3;
+  //     luaL_argcheck(L, (lua_Number)offset == p3, 3, "not an integer in proper range");` —
+  //     **the refusal starts here**, and it covers a fraction and an out-of-range value with
+  //     one test.
+  //   * **v5.3.0**: `luaL_optinteger` replaces `luaL_optnumber` and the argcheck compares in
+  //     `lua_Integer`. The language-wide integer-representation tightening `io.read`'s numeric
+  //     format and `os.exit` also record — but here it changes only *which* message a raise
+  //     carries (`not an integer in proper range` → `number has no integer representation`),
+  //     and wording is never recorded. **No 5.3 note is wanted on this entry.**
+  //
+  // Also at v5.2.0 and deliberately **not** carried: the `l_fseek` / `l_ftell` / `l_seeknum`
+  // configuration block, which puts `fseeko`/`off_t` under POSIX and `_fseeki64`/`__int64`
+  // under MSVC where 5.1 has plain `fseek` and `long`. On a build whose `long` is 64 bits
+  // there is no difference at all, so it is a build fact rather than a version fact and a
+  // *Changed* chip would be false for most readers. (The guard is misspelled `lua_fseek` at
+  // v5.2.0–v5.2.2 while the body defines `l_fseek`; v5.2.3 adds the missing
+  // `#if !defined(l_fseek)` default block and an `&& !defined(LUA_ANSI)`. v5.5.0 adds
+  // `LUA_USE_OFF_T` to the POSIX arm. None of it is reachable from Lua.)
+  //
+  // The returned position is `lua_pushinteger(ftell(f))` on 5.1, `lua_pushnumber((lua_Number)
+  // l_ftell(f))` from v5.2.0 and `lua_pushinteger((lua_Integer)l_ftell(f))` from v5.3.0 —
+  // **no observable delta**, because 5.1 and 5.2 have no integer subtype and an integral
+  // number prints the same either way. `<Return type="integer">` is unscoped and
+  // `NumericTypeNote` discloses the gap.
+  //
+  // **`file:setvbuf`'s one delta is `size`, and it is at 5.3.** `luaL_optinteger(L, 3,
+  // LUAL_BUFFERSIZE)` is the line at **all 26 releases**; what moved is `luaL_optinteger`
+  // itself, which cut a fraction off before 5.3 and raises from it. Nothing else in the
+  // function is reachable-different: `pushresult(L, res == 0, NULL)` becomes
+  // `luaL_fileresult(L, res == 0, NULL)` at v5.2.0 and both push `true` on success and
+  // `nil` + message + `errno` on failure, and `(size_t)` casts and an `errno = 0;` hoist are
+  // the only later edits.
+  //
+  // **`LUAL_BUFFERSIZE` is the default `size`, and its value moved twice** — `BUFSIZ` (5.1,
+  // 5.2), `((int)(0x80 * sizeof(void*) * sizeof(lua_Integer)))` = 8192 on a 64-bit build
+  // (5.3), `((int)(16 * sizeof(void*) * sizeof(lua_Number)))` = 1024 (5.4, 5.5). Every
+  // manual says only "The default is an appropriate size", the constant is a build knob, and
+  // the only way to observe it is to measure when a handover happens — which is the thing no
+  // card may assert. **Not carried**, recorded here so it is not later mistaken for a delta.
+  //
+  // Two manual changes at 5.4 that are **not** deltas. "Sets the buffering mode for an output
+  // file" becomes "for a file" — `setvbuf` was always applied to the stream whatever it was
+  // opened for, and a read handle accepts the call in every version (probed). And the
+  // per-mode descriptions ("the result of any output operation appears immediately", "output
+  // is buffered until a newline is output or there is any input from some special files") are
+  // **replaced** by "The specific behavior of each mode is non portable; check the underlying
+  // ISO C function `setvbuf` in your platform for more details." The C is byte-identical
+  // across that boundary, so the manual withdrew a promise it should not have made rather
+  // than describing a change. Both entries' prose is written to the weaker claim, which is
+  // the one true on all five lines.
+  //
+  // **Neither symbol appears in any Incompatibilities chapter.** 5.2's, 5.3's, 5.4's and
+  // 5.5's §8 were sliced from `<a name="8">` to end of file and searched line by line for
+  // `seek`, `setvbuf`, `buffer`, `whence`, `offset` and `position`: zero hits in four
+  // chapters.
+  //
+  // Patch residuals: `l_unlikely` on `f_seek`'s failure branch at **v5.4.3**; `errno = 0;`
+  // hoisted into both functions at **v5.4.7**, which with that release's `luaL_fileresult`
+  // makes a failure that left `errno` unset report `"(no extra info)"` and code `0` rather
+  // than a stale message. v5.5.0 and v5.5.1 are byte-identical for both functions.
+  'io.file-seek': ioFileSeek,
+  'io.file-setvbuf': ioFileSetvbuf,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

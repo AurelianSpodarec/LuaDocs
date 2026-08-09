@@ -1,8 +1,181 @@
 ---
 title: file:setvbuf()
-description: ""
+description: Ask a file to hold writes back under one of three buffering schemes, and how much to hold.
+lua-compat: io.file-setvbuf
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:setvbuf
 ---
 
-{/* Not yet written. */}
+Asks the file it is called on to buffer under one of three schemes — hold nothing back, hold
+back a bufferful, or hold back until a line is finished — and, for the two that keep a
+buffer, how big a one to keep. It settles *when* what a program writes leaves for the file,
+and leaves *what* arrives there alone.
+
+<RunnableExample code={`local journal_path = "io-file-setvbuf-example-journal.txt"\n\nlocal writing = assert(io.open(journal_path, "w"))\nprint(writing:setvbuf("line"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(journal_path, "r"))\nprint(reading:read())\nreading:close()\nos.remove(journal_path)\n-- Expected output:\n-- true\n-- cocoa,2`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+file:setvbuf(mode [, size])
+```
+
+<Parameters>
+  <Param name="mode">Which scheme to ask for: `"no"`, `"full"` or `"line"`. There is no default — a call with nothing here raises.</Param>
+  <Param name="size">How large a buffer to ask for, in bytes. It is a hint rather than an instruction, and it describes the two schemes that keep a buffer. Left out, the library picks a size for itself.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="boolean">`true`, where the request went through. It is not the file it was called on, so nothing can be written onto the end of the call.</Return>
+  <Return type="nil">Where the request was not honoured — the first of the values describing why.</Return>
+  <Return type="string">The system's own description of what stopped it, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `mode` is left out, is `nil`, or is a string other than the three scheme names. A number written there is turned into its digits and refused by the same test.
+- <Since v="5.3" /> Raises when `size` has no exact integer representation.
+- Raises when `size` is a value that is neither a number nor a string that reads as one.
+- Raises when the handle has already been closed.
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: nothing arrives where the file belongs, and what was meant as `mode` arrives there instead.
+- A request the library would not honour does not raise. It arrives through the return values.
+
+</Errors>
+
+## Description
+
+The scheme this asks for governs how long the library may sit on what a program has written
+before handing it to the system. That is a question about timing and cost, not about content:
+a file holds the same bytes once it has been closed whichever scheme was in force while it was
+being written.
+
+The request is passed on to the stream underneath the handle, so what each scheme amounts to
+is settled there rather than by Lua, and a scheme can be declined — the answer says which
+happened. The stream also expects to be asked
+before anything else has been done through the handle, which makes this a call for the line
+just after [`io.open()`](/docs/standard-library/io/open) rather than one to reach for later.
+
+[`file:flush()`](/docs/standard-library/io/file-flush#what-flushing-does) is the other half of
+the subject: it asks for a single handover *now* and leaves the scheme alone.
+
+## What buffering is
+
+A program writing through a handle is not handing bytes to the system a call at a time. What
+it writes is collected in a buffer in memory and handed over in batches, because a handover
+costs more per call than a copy into memory does. That is what makes writing a file a line at a
+time affordable, and it is what this call is about.
+
+The price of it is a gap. Until a batch has gone over, what the program has written and what
+the file holds can be two different things: another reader of the same file finds it short of
+what has been written, and a program following its own output sees nothing there yet. The gap
+closes when the buffer fills, when
+[`file:flush()`](/docs/standard-library/io/file-flush#what-flushing-does) asks for a handover,
+when [`file:close()`](/docs/standard-library/io/file-close) ends the handle, and at whatever
+other moments the stream underneath chooses. Those act once each; this call changes the rule
+they work under, saying how much may pile up before the library hands it over of its own
+accord — and `"no"` asks for that to be nothing, which is the request that closes the gap
+altogether.
+
+Two things the scheme does not reach. It does not change what ends up in the file, so a
+program comparing files written under different schemes is comparing identical bytes. And what
+it buys is measured on the *writing* side: the three names describe when written bytes leave,
+and a handle a program is only reading through has little to gain from any of them.
+
+## The three schemes
+
+| `mode` | What it asks for |
+|---|---|
+| `"no"` | Nothing is held back. What is written goes to the system as it is written. |
+| `"full"` | Writes pile up until the buffer is full, or until something asks for a handover. |
+| `"line"` | Writes pile up until a line has been finished. |
+
+`size` describes the buffer the last two keep, and it is a hint: the library may round it, pick
+a different one, or pay it no attention, and under `"no"` there is no buffer for it to be about.
+Leaving it out is the usual thing to do — a program that has measured its writes and knows
+better can say so, and one that has not is guessing against a number the library chose on
+purpose.
+
+*How far each of these goes is the C library's to settle rather than Lua's*, and `"line"` is
+where that bites: what counts as a finished line, and whether the scheme is honoured at all on
+a file that is nobody's terminal, are decided underneath. A program that needs a partial
+file to be readable at a moment it chooses says so with
+[`file:flush()`](/docs/standard-library/io/file-flush), which is a request about one handover
+rather than a standing arrangement.
+
+## Examples
+
+### Asking for a scheme and a buffer to go with it
+
+<RunnableExample code={`local report_path = "io-file-setvbuf-example-report.txt"\n\nlocal writing = assert(io.open(report_path, "w"))\nprint(writing:setvbuf("full", 4096))\nfor row = 1, 3 do\n  writing:write("row ", row, "\\n")\nend\nwriting:close()\n\nlocal reading = assert(io.open(report_path, "r"))\nlocal seen = 0\nlocal line = reading:read()\nwhile line do\n  seen = seen + 1\n  line = reading:read()\nend\nprint(seen)\nreading:close()\nos.remove(report_path)\n-- Expected output:\n-- true\n-- 3`} />
+
+The request goes in on the line after the open, before anything has been written, which is
+where the stream underneath expects it. `4096` is a hint about the buffer and not a promise
+about it; the three rows arrive in the file either way, because the close hands over whatever
+was still waiting.
+
+### The scheme changes the timing, not the file
+
+<RunnableExample code={`local schemes = { "no", "full", "line" }\nlocal read_back = {}\n\nfor index, scheme in ipairs(schemes) do\n  local ledger_path = "io-file-setvbuf-example-" .. scheme .. ".txt"\n  local writing = assert(io.open(ledger_path, "w"))\n  writing:setvbuf(scheme)\n  writing:write("cocoa,2\\n")\n  writing:close()\n\n  local reading = assert(io.open(ledger_path, "r"))\n  read_back[index] = reading:read()\n  reading:close()\n  os.remove(ledger_path)\nend\n\nprint(read_back[1])\nprint(read_back[1] == read_back[2])\nprint(read_back[2] == read_back[3])\n-- Expected output:\n-- cocoa,2\n-- true\n-- true`} />
+
+Three files, three schemes, one row each, and the same row read back from all three. What the
+schemes differ about is the moment that row left for the file, which is over and settled by
+the time the handle is closed — so a program that only ever looks at a finished file has no
+reason to touch this call.
+
+### A scheme the call does not know
+
+<RunnableExample code={`local memo_path = "io-file-setvbuf-example-memo.txt"\n\nlocal writing = assert(io.open(memo_path, "w"))\nlocal asked, complaint = pcall(function() return writing:setvbuf("some") end)\nprint(asked)\nprint(type(complaint))\nprint(writing:setvbuf("no"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(memo_path, "r"))\nprint(reading:read())\nreading:close()\nos.remove(memo_path)\n-- Expected output:\n-- false\n-- string\n-- true\n-- cocoa,2`} />
+
+A name outside the three raises rather than answering, so a scheme read out of a configuration
+file wants checking before it gets here. The message is the library's own and its wording is
+not something to write code against; what the card looks at is that the call did not go
+through. The handle is untouched by the refusal, and the request made afterwards goes in
+normally.
+
+## Gotchas
+
+<Gotcha title="Ask before anything has happened on the handle">
+The stream underneath expects to be told about its buffer between the file being opened and
+the first thing done through it. Once a program has written or read through the handle, what a
+request here does is the C library's affair — and the answer is no guide, because a call that
+changed nothing can still come back `true`. The reliable place for it is the line after the
+open.
+</Gotcha>
+
+<Gotcha title="The line scheme asks for something narrower than its name suggests">
+`"line"` is a request about the stream's own buffer, not a guarantee that anything watching the
+file sees a line the instant it is written. What counts as a finished line, and whether it
+is applied to a file that is not a terminal, are settled below Lua. Where a partial file has to
+be readable at a definite moment — a log another program is following, output somebody is
+waiting on — [`file:flush()`](/docs/standard-library/io/file-flush) after each entry is the
+thing that says so.
+</Gotcha>
+
+<Gotcha title="It changes when writes leave, not what arrives">
+No scheme here adds anything to the file, drops anything from it, or reorders it. A program
+that is reading a file back after closing it will find the same bytes under all three, so a
+difference between two runs is not something this call caused. What it does change is how much
+of the file exists at any moment *before* the close, which is what a scheme is chosen for.
+</Gotcha>
+
+<Gotcha title="The answer is true, not the file">
+`file:setvbuf("full")` hands back a boolean, so a further call cannot be written onto the end
+of it — `writing:setvbuf("full"):write(row)` is an attempt to index a boolean and has nothing
+to do with files. The handle is still in the variable it was in; the call is a statement on its
+own line.
+</Gotcha>
+
+## See also
+
+- [`file:flush()`](/docs/standard-library/io/file-flush#what-flushing-does) — asking for one handover now, instead of a standing scheme
+- [`file:write()`](/docs/standard-library/io/file-write) — the writes whose timing this settles
+- [`file:close()`](/docs/standard-library/io/file-close) — handing over what is waiting and ending the handle
+- [`io.open()`](/docs/standard-library/io/open) — where the handle comes from, and the line this call belongs after
+- [`file:seek()`](/docs/standard-library/io/file-seek) — moving the point in the file that writing happens at
+- [`io.flush()`](/docs/standard-library/io/flush) — the single handover, aimed at the default output file

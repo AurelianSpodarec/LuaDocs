@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.3": "A `size` given as a number with a fractional part is now refused. Earlier versions cut the fraction off and asked for the whole part as the buffer size."
+  }
+}

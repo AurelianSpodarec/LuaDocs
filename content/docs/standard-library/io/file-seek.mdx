@@ -1,8 +1,187 @@
 ---
 title: file:seek()
-description: ""
+description: Move the point in a file where the next read or write happens, and report where it ended up.
+lua-compat: io.file-seek
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-file:seek
 ---
 
-{/* Not yet written. */}
+Moves the position of the file it is called on — the point the next read or write starts
+from — and reports where that position ended up, counted in bytes from the start of the
+file. With nothing in the parentheses it reports the position and leaves it alone.
+
+<RunnableExample code={`local ledger_path = "io-file-seek-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\nsugar,3\\n")\nwriting:close()\n\nlocal reading = assert(io.open(ledger_path, "r"))\nprint(reading:seek())\nprint(reading:read())\nprint(reading:seek())\nprint(reading:seek("set"))\nprint(reading:read())\nreading:close()\nos.remove(ledger_path)\n-- Expected output:\n-- 0\n-- cocoa,2\n-- 8\n-- 0\n-- cocoa,2`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so each one
+writes the file it is about to read and removes it afterwards. Nothing on this page touches
+a file on your own machine.
+</Note>
+
+## Syntax
+
+```lua
+file:seek([whence [, offset]])
+```
+
+<Parameters>
+  <Param name="whence">The point `offset` is counted from: `"set"` for the start of the file, `"cur"` for the position as it stands, `"end"` for the end of the file. Left out, or given as `nil`, it is `"cur"`.</Param>
+  <Param name="offset">How many bytes past that point to land on. A negative number moves back towards the start. Left out, it is `0`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="integer">Where the position ended up, in bytes from the start of the file.</Return>
+  <Return type="nil">Where the move was not made — the first of the values describing why.</Return>
+  <Return type="string">The system's own description of what stopped it, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `whence` is a string other than the three names. A number written there is turned into its digits and refused by the same test, so `file:seek(10)` asks for a base named `"10"` rather than for byte 10.
+- <Since v="5.2" /> Raises when `offset` has no exact integer representation — a fraction, or a value outside the range a file position can be held in.
+- Raises when `offset` is a value that is neither a number nor a string that reads as one.
+- Raises when the handle has already been closed.
+- Raises when it is called on something that is not a file handle. Writing the call with a `.` where the `:` belongs does exactly that: nothing arrives where the file belongs, and what was meant as `whence` arrives there instead.
+- A move the system would not make does not raise. It arrives through the return values, and the position is left where it was.
+
+</Errors>
+
+## Description
+
+A file handle carries a position: the point in the file that the next
+[read](/docs/standard-library/io/file-read) or
+[write](/docs/standard-library/io/file-write) starts from. Reading and writing both move it
+past whatever they got through, and this call is what moves it anywhere else.
+
+The position is a count of bytes from the start of the file, so `0` sits in front of the
+first byte and the file's own length is the point just past the last one. Nothing here is
+measured in lines, fields or characters. A program that wants the fifth line reads four and
+asks where it has got to, or goes back to a position it was handed earlier.
+
+The move and the answer come from the same call, which is what makes the argument-free form
+worth knowing: `file:seek()` moves by `0` from where it already is, so it reports the
+position without disturbing it. The same call also reports where a move landed, so a program
+rarely needs to track the position itself.
+
+## Where the position is measured from
+
+`whence` names a base and `offset` is the distance from it; the position the call lands on is
+the two added together.
+
+| `whence` | The base it counts from |
+|---|---|
+| `"set"` | the start of the file, so the offset *is* the position |
+| `"cur"` | the position as it stands, so the offset is a step forwards or backwards |
+| `"end"` | the end of the file, so a negative offset counts back from there |
+
+Both arguments have defaults, and between them they make three calls that need no arguments
+spelled out:
+
+- `file:seek()` — `"cur"` and `0`: where has this handle got to?
+- `file:seek("set")` — the start and `0`: back to the beginning, answering `0`.
+- `file:seek("end")` — the end and `0`: the far end of the file, answering how many bytes it holds.
+
+An offset that would land in front of the start of the file is not a position, and the call
+answers rather than clamping: `nil`, a description and a code come back, and the handle is
+left where it was. Landing *past* the end is a different case and goes through — a read from
+there finds nothing, and a write there extends the file, with whatever the system puts in the
+gap it leaves behind.
+
+## Finding out how big the file is
+
+`file:seek("end")` lands on the far end and answers the position there, which is the number
+of bytes the file holds. That answer costs the position: the handle is now at the end, and a
+read from it comes back with nothing. Where the program was part-way through something, the
+shape that keeps its place is to ask, measure, then go back to what the first call answered.
+
+<RunnableExample code={`local inventory_path = "io-file-seek-example-inventory.txt"\n\nlocal writing = assert(io.open(inventory_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\n")\nwriting:close()\n\nlocal reading = assert(io.open(inventory_path, "r"))\nprint(reading:read())\nlocal resume_at = reading:seek()\nprint(reading:seek("end"))\nreading:seek("set", resume_at)\nprint(reading:read())\nreading:close()\nos.remove(inventory_path)\n-- Expected output:\n-- cocoa,2\n-- 16\n-- flour,1`} />
+
+A program measuring a file it is itself writing gets a length that takes in what it has
+written, whether or not the system has been handed those bytes yet — moving the position
+settles that first. The number counts bytes, so on a system that translates line endings on
+the way out it is the length of the file rather than the length of the text the program
+wrote.
+
+## Examples
+
+### Reading the tail of a file
+
+<RunnableExample code={`local journal_path = "io-file-seek-example-journal.txt"\n\nlocal writing = assert(io.open(journal_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\nsugar,3\\n")\nwriting:close()\n\nlocal reading = assert(io.open(journal_path, "r"))\nprint(reading:seek("end", -8))\nprint(reading:read())\nprint(reading:seek("cur", -16))\nprint(reading:read())\nreading:close()\nos.remove(journal_path)\n-- Expected output:\n-- 16\n-- sugar,3\n-- 8\n-- flour,1`} />
+
+`"end"` with a negative offset counts backwards from the far end, which is how a program
+reaches the last few bytes of a large file without reading the rest of it. The second move is
+relative again: the read left the handle at the end, and `-16` steps back over the eight bytes
+just read and the eight before them.
+
+### Changing something in place
+
+<RunnableExample code={`local receipt_path = "io-file-seek-example-receipt.txt"\n\nlocal writing = assert(io.open(receipt_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\n")\nwriting:close()\n\nlocal updating = assert(io.open(receipt_path, "r+"))\nupdating:seek("set", 6)\nupdating:write("9")\nupdating:close()\n\nlocal reading = assert(io.open(receipt_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\nos.remove(receipt_path)\n-- Expected output:\n-- cocoa,9\n-- flour,1`} />
+
+A handle opened for both reading and writing can be moved back over what is already there,
+and a write at that position replaces the bytes it covers rather than pushing them along. The
+file does not change length here, because one byte went where one byte was. Writing something
+longer than what it covers overwrites the bytes that follow, which is why this shape suits
+fixed-width records and not much else.
+
+### A move the system will not make
+
+<RunnableExample code={`local memo_path = "io-file-seek-example-memo.txt"\n\nlocal writing = assert(io.open(memo_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal reading = assert(io.open(memo_path, "r"))\nlocal landed, complaint = reading:seek("set", -1)\nprint(landed)\nprint(type(complaint))\nprint(reading:seek())\nprint(reading:read())\nreading:close()\nos.remove(memo_path)\n-- Expected output:\n-- nil\n-- string\n-- 0\n-- cocoa,2`} />
+
+Byte `-1` is in front of the file, so the move is reported rather than made: `nil` comes back
+with a description and a code behind it. The handle is untouched — it is still at `0`, and the
+read that follows gets the first line. A program that seeks to a position it computed should
+look at the first value before trusting the handle to be where it asked.
+
+## Gotchas
+
+<Gotcha title="A number on its own is a whence, not an offset">
+`file:seek(10)` does not move to byte 10. The single argument goes into the `whence` slot,
+where it is turned into the string `"10"` and refused as a base name, so the call raises
+instead of moving. The offset is the *second* argument and needs a base in front of it:
+`file:seek("set", 10)` for byte 10, `file:seek("cur", 10)` for ten bytes further on.
+</Gotcha>
+
+<Gotcha title="Asking how big the file is moves the handle to the end of it">
+`file:seek("end")` is how a program measures a file, and it is not a question — it moves the
+position to the far end as it answers, and a read after it finds nothing. Where the handle was
+part-way through something, save `file:seek()` first and put the position back with
+`file:seek("set", saved)` afterwards.
+</Gotcha>
+
+<Gotcha title="A position counts bytes, not lines or characters">
+There is no seeking to a line, a field or a character: the numbers here count bytes. On a
+system that translates line endings, the bytes in the file and the characters a program reads
+through a handle opened without `b` are not the same run, so a position worked out by counting
+what was read can land in the wrong place. The positions that are safe to hand back to
+`"set"` on such a handle are the ones this call produced — which is what makes saving
+`file:seek()` and restoring it the reliable shape, and arithmetic on the saved number the
+unreliable one.
+</Gotcha>
+
+<Gotcha title="A handle opened for appending writes at the end wherever the position is">
+Moving the position on a handle opened with `"a"` goes through, and the number that comes back
+is where the position now is — and the next write still lands at the end of the file. The two
+facts sit oddly together and the second is the one that governs.
+[The mode string](/docs/standard-library/io/open#the-mode-string) is what decides it, and this
+call cannot undo the choice: a program that needs to write somewhere other than the end has to
+have opened the file for that.
+</Gotcha>
+
+<Gotcha title="Turning from reading to writing on one handle goes through here">
+A handle opened with `+` does both, and the stream underneath it will not have a read followed
+straight away by a write. A seek in between is what makes the turn legal — even
+`file:seek("cur")`, which moves nothing at all. Turning the other way, from writing to reading,
+[`file:flush()`](/docs/standard-library/io/file-flush) settles it as well as a seek does.
+Skipping the step is not something Lua reports; what the stream does then is the C library's to
+decide, and it need not be an error.
+</Gotcha>
+
+## See also
+
+- [`file:read()`](/docs/standard-library/io/file-read) — reading from the position this moves, and moving it past what was read
+- [`file:write()`](/docs/standard-library/io/file-write) — writing at the position this moves
+- [`file:lines()`](/docs/standard-library/io/file-lines#the-handle-is-yours-to-close) — a loop that leaves the position wherever it stopped
+- [`file:flush()`](/docs/standard-library/io/file-flush) — handing over what has been written, without moving anything
+- [`io.open()`](/docs/standard-library/io/open#the-mode-string) — the modes, and which of them let a position be written at
+- [`io.close()`](/docs/standard-library/io/close) — ending the handle this is called on
