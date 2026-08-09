@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "A file handle can now be held in a to-be-closed variable, which reaches this call through the handle it hands back. The metatable for file handles gained a `__close` metamethod beside the finalizer it has always carried, so a handle declared `<close>` is closed when its block ends, however the block ends. Here that is a sharper tool than it looks: the handle this call opens is also the default input file, so closing it at the end of a block leaves the default input pointing at a closed file and every later read in the program raising. The declaration suits a handle a program keeps to itself; the file behind the default input still wants the old value put back before anything is closed. Earlier versions have no such declaration, and nothing but an explicit close or the collector shuts the file there."
+  }
+}

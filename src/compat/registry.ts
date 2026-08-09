@@ -141,6 +141,11 @@ import ioFileLines from './data/io.file-lines.json';
 import ioLines from './data/io.lines.json';
 import ioFileSeek from './data/io.file-seek.json';
 import ioFileSetvbuf from './data/io.file-setvbuf.json';
+import ioInput from './data/io.input.json';
+import ioOutput from './data/io.output.json';
+import ioStdin from './data/io.stdin.json';
+import ioStdout from './data/io.stdout.json';
+import ioStderr from './data/io.stderr.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1351,6 +1356,95 @@ const raw: Record<string, unknown> = {
   // than a stale message. v5.5.0 and v5.5.1 are byte-identical for both functions.
   'io.file-seek': ioFileSeek,
   'io.file-setvbuf': ioFileSetvbuf,
+
+  // The two calls that name the default files, and the three handles those files start as.
+  // `io.input` and `io.output` are one C function reached from two names — `io_input` is
+  // `g_iofile(L, IO_INPUT, "r")` and `io_output` is `g_iofile(L, IO_OUTPUT, "w")` at all 26
+  // releases — and `io.stdin`/`io.stdout`/`io.stderr` are three `createstdfile` calls in
+  // `luaopen_io`. The manual says as much from its side: `io.output`'s whole passage is
+  // "Similar to `io.input`, but operates over the default output file", which is why
+  // **`io.input` owns opening by name** and `io.output` links to it and adds the one thing
+  // that genuinely differs — the mode is `"w"`, so a name truncates.
+  //
+  // `liolib.c` read at the **repo root** for every tag in every line — v5.1, v5.1.1, v5.2.0
+  // through v5.2.3, v5.3.0 through v5.3.6, v5.4.0 through v5.4.8, v5.5.0 and v5.5.1 — plus
+  // the two shipped releases with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1` and
+  // `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). **All 25 consecutive whole-file
+  // diffs were generated and read**, not function bodies: `IO_INPUT` and `IO_OUTPUT` are
+  // `#define`s and they change *kind* at 5.2, which is exactly the class a body diff misses.
+  //
+  // **`g_iofile` has not changed behaviour once in 26 releases.** Byte-identical from v5.2.0
+  // to v5.5.1, and behaviourally identical to 5.1's:
+  //
+  //     if (!lua_isnoneornil(L, 1)) {
+  //       const char *filename = lua_tostring(L, 1);
+  //       if (filename) opencheck(L, filename, mode);
+  //       else { tofile(L); lua_pushvalue(L, 1); }
+  //       lua_setfield(L, LUA_REGISTRYINDEX, f);
+  //     }
+  //     lua_getfield(L, LUA_REGISTRYINDEX, f);  return 1;
+  //
+  // Four facts fall straight out of it and are stated undated on both pages:
+  //
+  //   * **The call answers with the file it has just set**, not the one it replaced — the
+  //     `getfield` runs after the `setfield`. Probed: `io.output(sink) == sink` is `true`.
+  //     This is the batch's most useful Gotcha and no manual in any version mentions it.
+  //   * **`lua_isnoneornil`**, so `io.input(nil)` is `io.input()` and reports without setting.
+  //   * **`lua_tostring`**, so a *number* is read as a file name: `io.input(2024)` opens a
+  //     file called `2024`. Anything else falls to `tofile` and raises `FILE* expected`.
+  //   * **A failed open raises**, on every line — `fileerror` → `luaL_argerror` at 5.1,
+  //     `opencheck` → `luaL_error` from v5.2.0. Message only; both raise. This is the fact
+  //     I4 recorded for these two entries and it is confirmed here at every tag.
+  //
+  // What moved and is **not** a delta: the slot lives in the library's environment table at
+  // 5.1 (`lua_rawgeti(L, LUA_ENVIRONINDEX, IO_INPUT)`) and in the registry from v5.2.0
+  // (`IO_PREFIX "_IO_"`), which is unreachable from Lua; `getiofile`'s raise text goes from
+  // `standard %s file is closed` to `default %s file is closed` at **v5.4.0**; `luaL_pushfail`
+  // replaces `lua_pushnil` at 5.4; and "without parameters" becomes "without arguments" in the
+  // manual at 5.3. The **no-argument form cannot fail** — it is a bare `getfield` — and it
+  // will hand back a *closed* handle where the program closed the default file. Probed.
+  //
+  // **The three standard handles are `createstdfile(L, stdin, IO_INPUT, "stdin")` and its two
+  // neighbours**, so `io.input() == io.stdin` and `io.output() == io.stdout` are `true` on a
+  // fresh state *by identity* — the same userdata is stored in the `io` table and in the slot.
+  // Nothing points at `io.stderr`; its `k` argument is `0` at 5.1 and `NULL` from v5.2.0.
+  // **No manual in any version says the default files start as the standard handles**; it is
+  // ADR 0010 rule 3, from `luaopen_io` at all 26 releases plus a probe.
+  //
+  // **A close is refused and answered rather than raised**: `io_noclose` pushes `nil` (from
+  // 5.4 `luaL_pushfail`) plus the literal `cannot close standard file` and returns 2, and from
+  // v5.2.0 it puts `p->closef` back so the handle stays open. **Residual: v5.1 and v5.1.1 have
+  // no `io_noclose` at all** — their standard handles close like any other file, and only
+  // `io_gc` guards `stdin`/`stdout`/`stderr` against the *finalizer*. The protection arrives
+  // inside the 5.1 line, by 5.1.5, through `newfenv(L, io_noclose)`; `lua.org/source/5.1`
+  // serves 5.1.5, so 5.1 as this site means it refuses and the entries say so unscoped. I1
+  // recorded this for `io.close`; it is re-derived here rather than inherited.
+  //
+  // **The one dated fact on all five is `__close` at v5.4.0**, the propagation duty I1's fix
+  // round recorded. `metameth` gains `{"__close", f_gc}` beside `{"__gc", f_gc}` at v5.4.0 and
+  // is byte-identical to v5.5.1. On `io.input`/`io.output` it reaches the reader through the
+  // handle they hand back, and the note says what a `<close>` over *that* handle costs — it
+  // leaves the default file closed, which is the section's worst trap written in new syntax.
+  // On the three constants the metamethod is `f_gc`, whose `aux_close` reaches `io_noclose`,
+  // so the close is refused and nothing propagates: probed, `local marker <close> = io.stdout`
+  // runs clean and leaves `io.type(io.stdout)` reading `file`. The note says the declaration
+  // is accepted and does nothing, which is the honest form of the fact.
+  //
+  // **None of the five appears in any Incompatibilities chapter.** 5.2's, 5.3's, 5.4's and
+  // 5.5's §8 sliced from `<a name="8">` to end of file and searched line by line for `io.`,
+  // `stdin`, `stdout`, `stderr`, `default input`, `default output`, `input file` and
+  // `output file`: the only hits in four chapters are `io.read`'s dropped `*` at 5.3 and
+  // `io.lines`' four values at 5.4, which are I2's and I4's.
+  //
+  // Buffering is **not** carried as a fact about any of the three. Which scheme a standard
+  // stream arrives with is the host C library's arrangement, not Lua's, and I1's rule forbids
+  // a card asserting one; the entries say the arrangement is inherited and point at
+  // `file:setvbuf`, which owns what buffering is.
+  'io.input': ioInput,
+  'io.output': ioOutput,
+  'io.stdin': ioStdin,
+  'io.stdout': ioStdout,
+  'io.stderr': ioStderr,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

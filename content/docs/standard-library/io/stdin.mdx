@@ -1,8 +1,132 @@
 ---
 title: io.stdin
-description: ""
+description: The file handle on the program's standard input, open before the first line of Lua runs.
+lua-compat: io.stdin
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.stdin
 ---
 
-{/* Not yet written. */}
+The file handle on the stream the system calls *standard input* — whatever the program was fed,
+be that someone typing, a file redirected into it, or another program's output. It is open
+before the first line of Lua runs, and it is what the *default input file* starts out as, so an
+[`io.read()`](/docs/standard-library/io/read) in a program that has never called
+[`io.input()`](/docs/standard-library/io/input) reads here.
+
+<RunnableExample code={`print(io.type(io.stdin))\nprint(io.input() == io.stdin)\n-- Expected output:\n-- file\n-- true`} />
+
+## Value
+
+A file handle — the same kind of value [`io.open()`](/docs/standard-library/io/open) hands back,
+carrying the same metatable and therefore the same methods, so `io.stdin:read(...)` and
+`io.stdin:lines()` mean what they mean on any other handle.
+[`type()`](/docs/standard-library/globals/type) answers `"userdata"` for it and
+[`io.type()`](/docs/standard-library/io/type) answers `"file"`. What separates it from a handle a
+program opened is where it came from and what may be done to it: the process handed it over
+already open, and the library will not close it — see
+[The library never closes these three](/docs/standard-library/io/stdout#the-library-never-closes-these-three).
+
+It is also an ordinary field of the `io` table, so `io.stdin = something` is an assignment that
+succeeds silently and leaves every later read of `io.stdin` giving whatever was put there. The
+*default* input file is a separate slot such an assignment does not touch.
+
+## Description
+
+Reading through this handle explicitly — `io.stdin:read()` — is the way to read what the program
+was fed regardless of where the default input file currently points. It is what a filter wants:
+a program that reads its input and writes its output, with the caller deciding on both ends by
+redirecting them from outside rather than by naming files inside.
+
+What a read does here is [`file:read()`](/docs/standard-library/io/file-read)'s subject in full —
+the formats, the values, and what arrives at the end of the input. One thing about this stream in
+particular is worth saying: it is not a file on disk and need not behave like one. There may be
+nothing to read yet rather than nothing to read at all, and a read then waits until something
+arrives or the far end goes away, which is why a program that meant to read a named file and
+forgot to say so appears to hang rather than to fail. Seeking is the other half of the same fact —
+[`file:seek()`](/docs/standard-library/io/file-seek) asks the system to move a position that a
+stream arriving from a terminal or a pipe does not have, and the answer is a refusal rather than
+a new position.
+
+## What this handle is not
+
+It is not the *default input file*, though it starts out as its value. The default input is a
+slot [`io.input()`](/docs/standard-library/io/input#the-default-input-file) writes into, and
+`io.stdin` is one possible value for that slot — the one it holds until something changes it.
+After `io.input(inventory_path)` the two are different files: `io.read()` reads the inventory and
+`io.stdin:read()` still reads what the program was fed.
+
+That distinction is what makes restoring possible. A redirect moves the slot and leaves the handle
+untouched, so `io.input(io.stdin)` puts the default input back where it started. Saving the
+previous value first — `local previous_input = io.input()` — is the version that also behaves when
+it is called from code that had already redirected, and is what the examples across this section
+use.
+
+It is also not the only route into the program from outside.
+[`os.getenv()`](/docs/standard-library/os/getenv) reads the environment, and the command line
+reaches a script through a global the interpreter sets rather than through any file at all;
+neither travels through this handle, and a program that wants a *file name* from its caller
+usually wants one of those rather than a line of input.
+
+## Examples
+
+### The close is refused, and the handle stays open
+
+<RunnableExample code={`local closed, complaint = io.stdin:close()\nprint(closed)\nprint(type(complaint))\nprint(io.type(io.stdin))\n-- Expected output:\n-- nil\n-- string\n-- file`} />
+
+Two values and no raise, and the handle is still open afterwards. Cleanup code handed this one
+finds out by reading the answer, where a handle that was already closed would have raised
+instead — the two failures are different shapes and need different guards.
+
+### The slot moves and the handle does not
+
+<RunnableExample code={`local ledger_path = "io-stdin-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nio.input(ledger_path)\n\nprint(io.input() == io.stdin)\nprint(io.read())\n\nlocal opened = io.input()\nio.input(previous_input)\nopened:close()\n\nprint(io.input() == io.stdin)\nprint(io.type(io.stdin))\n\nos.remove(ledger_path)\n-- Expected output:\n-- false\n-- cocoa,2\n-- true\n-- file`} />
+
+While the redirection is in force the default input is the ledger, and `io.stdin` is exactly what
+it was. The last two prints are the check worth copying into any code that redirects: the slot is
+back where it started, and the standard input was never in danger.
+
+### It is one of three, and they are three different handles
+
+<RunnableExample code={`print(io.stdin == io.stdout)\nprint(io.stdin == io.stderr)\nprint(getmetatable(io.stdin) == getmetatable(io.stdout))\n-- Expected output:\n-- false\n-- false\n-- true`} />
+
+Three separate values on three separate streams, built the same way and sharing one metatable —
+which is why the same methods work on all of them, and why
+[`io.type()`](/docs/standard-library/io/type) recognises all three.
+
+## Gotchas
+
+<Gotcha title="Reading it can stop the program rather than fail it">
+A stream that is still open and simply has nothing in it yet has not ended, so a read waits
+rather than answering. A program run from a terminal stops at the first `io.stdin:read()` until
+a line is typed, and one whose input is attached to something that never sends and never closes
+stops there and stays stopped. That is a hang rather than an error, and it is the harder failure
+to recognise from outside the program.
+
+Where the input is closed or empty instead, the read answers with nothing and the program carries
+straight on. So the same line has two quite different failure modes according to what the program
+was attached to, which is why code that needs a particular file is better off naming it.
+</Gotcha>
+
+<Gotcha title="It is a starting value, not a synonym for the default input">
+`io.stdin` and [`io.input()`](/docs/standard-library/io/input) answer the same handle only for as
+long as nothing has redirected. Code that reads `io.stdin` when it meant *the input this program
+was pointed at*, or calls `io.read()` when it meant *what the program was fed*, works perfectly
+until the first redirection and then reads the wrong file with no complaint anywhere.
+</Gotcha>
+
+<Gotcha title="It is not a file, so file-shaped operations may be refused">
+Whether a position can be moved at all depends on what the standard input is attached to — a
+redirected file, a pipe, a terminal.
+[`file:seek()`](/docs/standard-library/io/file-seek) on a stream that has no position answers
+`nil` and a message rather than moving anything, so code that seeks to measure a size or to read
+the input twice works when the input is a file and stops working the moment it is a pipe.
+</Gotcha>
+
+## See also
+
+- [`io.stdout`](/docs/standard-library/io/stdout) — the same arrangement on the writing side, and where what the three share is set out
+- [`io.stderr`](/docs/standard-library/io/stderr) — the third of the three
+- [`io.input()`](/docs/standard-library/io/input) — pointing the default input somewhere else, and back
+- [`io.read()`](/docs/standard-library/io/read) — reading the default input, which is this handle until something changes it
+- [`file:read()`](/docs/standard-library/io/file-read) — what a read does, in every shape it takes
+- [`file:lines()`](/docs/standard-library/io/file-lines) — looping over this handle instead of reading it a call at a time
+- [`io.close()`](/docs/standard-library/io/close#without-an-argument) — the close this handle refuses, and what the refusal answers with

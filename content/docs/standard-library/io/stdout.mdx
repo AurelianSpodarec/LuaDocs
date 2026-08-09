@@ -1,8 +1,146 @@
 ---
 title: io.stdout
-description: ""
+description: The file handle on the program's standard output, open before the first line of Lua runs.
+lua-compat: io.stdout
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.stdout
 ---
 
-{/* Not yet written. */}
+The file handle on the stream the system calls *standard output* — where a program's ordinary
+output goes when nothing has said otherwise. It is open before the first line of Lua runs, and
+it is what the *default output file* starts out as, so an
+[`io.write()`](/docs/standard-library/io/write) in a program that has never called
+[`io.output()`](/docs/standard-library/io/output) arrives here.
+
+<RunnableExample code={`print(io.type(io.stdout))\nprint(io.output() == io.stdout)\n-- Expected output:\n-- file\n-- true`} />
+
+## Value
+
+A file handle — the same kind of value [`io.open()`](/docs/standard-library/io/open) hands back,
+carrying the same metatable and therefore the same methods, so `io.stdout:write(...)`,
+`io.stdout:flush()` and `io.stdout:setvbuf(...)` all mean what they mean on any other handle.
+[`type()`](/docs/standard-library/globals/type) answers `"userdata"` for it and
+[`io.type()`](/docs/standard-library/io/type) answers `"file"`. What separates it from a handle
+a program opened is where it came from and what may be done to it: the process handed it over
+already open, and the library will not close it.
+
+It is also an ordinary field of the `io` table. Nothing guards it, so `io.stdout = something`
+is an assignment that succeeds silently, and every later read of `io.stdout` in the program gives
+whatever was put there. The *default* output file is a separate slot that such an assignment does
+not touch — [`io.write()`](/docs/standard-library/io/write) goes on reaching the real stream.
+
+## Description
+
+Writing to this handle explicitly — `io.stdout:write("cocoa,2\n")` — is the way to reach the
+program's own output without depending on where the default output file currently points, which
+is what a function that must report to the user rather than into whatever file its caller
+redirected wants. Everything under
+[What can be written](/docs/standard-library/io/file-write#what-can-be-written) applies: strings
+and numbers, run together with nothing between them, nothing put through `tostring` on the way,
+and no newline added at the end.
+
+[`print()`](/docs/standard-library/globals/print) reaches the same stream by a different route.
+It does not go through this handle and it does not go through the default output file, so
+neither an assignment over `io.stdout` nor an
+[`io.output()`](/docs/standard-library/io/output) redirect changes where `print()` lands. The two
+routes also differ in what they do with their arguments: `print()` separates with tabs, ends with
+a newline and converts anything it is given, and a write does none of the three.
+
+## The library never closes these three
+
+[`io.stdin`](/docs/standard-library/io/stdin), `io.stdout` and
+[`io.stderr`](/docs/standard-library/io/stderr) are one set, and this is what they share. Each is
+a stream the process was started with and handed to Lua already open; none of them was opened by
+a call in the program, and none of them is the program's to give back. The library keeps them
+open for as long as it runs, and it does not close them on the way out either.
+
+An attempt to close one is refused rather than obeyed, and refused *by answering*:
+[`io.close(io.stdout)`](/docs/standard-library/io/close#without-an-argument) and
+`io.stdout:close()` both hand back `nil` and a message, and the handle is still open afterwards.
+Cleanup code handed one of these three therefore learns about it from the return values, where
+the same code handed an *already-closed* handle would learn about it from a raise instead. Two
+different mistakes in two different shapes, which is why code that has to survive both asks
+[`io.type()`](/docs/standard-library/io/type) before it closes anything.
+
+Where the three differ is what the library wires them to. The default input file starts as
+`io.stdin` and the default output file starts as `io.stdout`, which is why
+[`io.read()`](/docs/standard-library/io/read) and
+[`io.write()`](/docs/standard-library/io/write) work in a program that has set neither. Nothing
+starts as `io.stderr`: it has no slot of its own, and it is reached by naming it. And a
+redirection moves the slot, never the handle — after `io.output(sink)`, `io.stdout` is the same
+open handle it always was, and putting it back is a matter of writing it into the slot again.
+
+## Nothing here decides the buffering
+
+How much of a write waits before it reaches the outside world is not settled by Lua for any of
+the three. Each arrives with whatever arrangement the C library the program was linked against
+made for its own standard streams, and that arrangement need not be the same for all three or
+the same from one host to another — output that has plainly been written but has not appeared is
+the shape the question usually takes.
+
+[`file:setvbuf()`](/docs/standard-library/io/file-setvbuf#what-buffering-is) is how a program
+stops depending on what it happened to be given, and
+[`file:flush()`](/docs/standard-library/io/file-flush#what-flushing-does) is how it hands over
+what is waiting right now. Both are methods on the handle, so both work here.
+
+## Examples
+
+### The close is refused, and the handle stays open
+
+<RunnableExample code={`local closed, complaint = io.stdout:close()\nprint(closed)\nprint(type(complaint))\nprint(io.type(io.stdout))\n-- Expected output:\n-- nil\n-- string\n-- file`} />
+
+Two values and no raise. The third line is the part worth having: after the refusal the handle
+still reads as an open file, and writing through it goes on working. Code that closes whatever
+handle it was given can therefore be handed this one without bringing the program's own output
+down, so long as it reads the answer rather than assuming it.
+
+### The slot moves and the handle does not
+
+<RunnableExample code={`local note_path = "io-stdout-example-note.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(note_path, "w"))\nio.output(sink)\n\nprint(io.output() == io.stdout)\nprint(io.type(io.stdout))\n\nio.output(previous_output)\nsink:close()\nprint(io.output() == io.stdout)\n\nos.remove(note_path)\n-- Expected output:\n-- false\n-- file\n-- true`} />
+
+While the redirection is in force the default output is the file, and `io.stdout` is exactly what
+it was: open, usable, and one `io.output()` away from being the default again. The middle print is
+the one worth keeping in mind — a redirect never puts the standard output out of reach.
+
+### An ordinary field, with nothing guarding it
+
+<RunnableExample code={`local kept = io.stdout\n\nio.stdout = "not a file at all"\nprint(type(io.stdout))\n\nio.stdout = kept\nprint(io.type(io.stdout))\nprint(io.output() == io.stdout)\n-- Expected output:\n-- string\n-- file\n-- true`} />
+
+The assignment succeeds and nothing complains, which is what makes this worth knowing rather than
+worth doing. Code that writes through `io.stdout` after something has overwritten it fails at the
+write, a long way from the line responsible.
+
+## Gotchas
+
+<Gotcha title="Writing here is not writing to the default output">
+`io.stdout:write(...)` and [`io.write(...)`](/docs/standard-library/io/write) agree only for as
+long as nothing has called [`io.output()`](/docs/standard-library/io/output). After a redirect
+they go to two different files, and a program that used them interchangeably discovers it when
+half its output is in a file and half is on the screen. Naming the handle is the right answer when
+the output has to reach the user; `io.write()` is the right answer when it should follow whatever
+the program was pointed at.
+</Gotcha>
+
+<Gotcha title="Putting the default output back means writing it back">
+Restoring after a redirect is an assignment into a slot, not an undo: `io.output(io.stdout)` is
+what returns the default output to the standard output, and saving the previous value with
+`local previous_output = io.output()` beforehand is the version that also survives being called
+from code that had already redirected.
+</Gotcha>
+
+<Gotcha title="A refused close is not a failed close">
+`io.stdout:close()` answering `nil` is the library declining, not the system reporting trouble.
+Cleanup code written as `if not handle:close() then error(...) end` therefore turns an ordinary,
+harmless call into a failure. Testing [`io.type()`](/docs/standard-library/io/type) first, or
+simply letting the answer be, is what such code wants.
+</Gotcha>
+
+## See also
+
+- [`io.stdin`](/docs/standard-library/io/stdin) — the same arrangement on the reading side
+- [`io.stderr`](/docs/standard-library/io/stderr) — the third of the three, and the one nothing is wired to
+- [`io.output()`](/docs/standard-library/io/output) — pointing the default output somewhere else, and back
+- [`io.write()`](/docs/standard-library/io/write) — writing to the default output, which is this handle until something changes it
+- [`print()`](/docs/standard-library/globals/print) — reaching the same stream by a different route, with tabs and a newline
+- [`io.close()`](/docs/standard-library/io/close#without-an-argument) — the close this handle refuses, and what the refusal answers with
+- [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf#what-buffering-is) — deciding how much of a write waits, rather than inheriting it

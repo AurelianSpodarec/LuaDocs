@@ -1,8 +1,183 @@
 ---
 title: io.output()
-description: ""
+description: Point the default output file at a file, by name or by handle, or ask which file it currently is.
+lua-compat: io.output
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.output
 ---
 
-{/* Not yet written. */}
+Points the *default output file* at a file, or — called with nothing — hands back the file it
+already points at. That file is where every [`io.write()`](/docs/standard-library/io/write) goes,
+what [`io.flush()`](/docs/standard-library/io/flush) hands over and what
+[`io.close()`](/docs/standard-library/io/close#without-an-argument) with no argument closes.
+
+<RunnableExample code={`local summary_path = "io-output-example-summary.txt"\n\nlocal previous_output = io.output()\nio.output(summary_path)\n\nio.write("north,412\\n")\n\nlocal opened = io.output()\nio.output(previous_output)\nopened:close()\n\nlocal reading = assert(io.open(summary_path, "r"))\nprint(reading:read())\nreading:close()\nos.remove(summary_path)\n-- Expected output:\n-- north,412`} />
+
+## Syntax
+
+```lua
+io.output([file])
+```
+
+<Parameters>
+  <Param name="file">A file name or an open file handle. A name is opened for writing, in text mode, and the handle that comes of it becomes the default output file — see [Naming a file empties it](#naming-a-file-empties-it). A handle is pointed at as it stands, with nothing opened. Left out — or written as `nil` — nothing is set and the call only reports.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="file">The default output file as it stands when the call finishes: the handle just opened, the handle just pointed at, or the one that was already there. One value on every path, and a [file handle](/docs/standard-library/io/type#what-a-file-handle-is) on all of them — though not necessarily an open one, where the program had closed the default output.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a name is given and the file cannot be opened for writing. That is the difference worth knowing between this call and [`io.open()`](/docs/standard-library/io/open#when-the-open-fails), which answers with `nil` and a message instead of raising; [`io.input()`](/docs/standard-library/io/input) and [`io.lines()`](/docs/standard-library/io/lines) behave as this one does.
+- Raises when the argument is a value Lua reads as neither a name nor a file handle — a boolean, a table, a function. A *number* is not among them: it is read as a name, so `io.output(2024)` writes to a file called `2024`.
+- Raises when the argument is a file handle that has already been closed.
+- Does not raise for a handle that cannot be written to. A file opened for reading is a perfectly good argument here, and it is the write that fails afterwards, by answering rather than raising — see [What a write hands back](/docs/standard-library/io/file-write#what-a-write-hands-back).
+- The form with no argument reports what is there without touching it, so nothing about it can go wrong. It will hand back a closed handle where the program closed the default output, which is a state a program can get into and this call will not complain about.
+
+</Errors>
+
+## Description
+
+This is [`io.input()`](/docs/standard-library/io/input)'s counterpart, in the same three shapes
+and with the same answer: a name to open, a handle to point at, or nothing at all to report.
+What differs is the file it governs and the mode a name is opened in, and the second of those is
+easy to walk into — [Naming a file empties it](#naming-a-file-empties-it) below.
+
+The library's writing side has the same two arrangements its reading side has. A program can
+hold a handle and write through it —
+[`io.open()`](/docs/standard-library/io/open) then
+[`file:write()`](/docs/standard-library/io/file-write) — or it can write without naming a file,
+through [`io.write()`](/docs/standard-library/io/write) and
+[`io.flush()`](/docs/standard-library/io/flush). The second arrangement needs somewhere to keep
+*which* file is meant, and this call is how a program reads and writes that place.
+
+One thing this call does not govern: [`print()`](/docs/standard-library/globals/print) writes to
+the program's standard output directly, not through the default output file, so redirecting
+here leaves `print()` exactly where it was.
+
+## The default output file
+
+The default output file is one piece of state, shared by the whole program. It starts out as
+the program's standard output — the same handle
+[`io.stdout`](/docs/standard-library/io/stdout) names — and it stays that until this call points
+it somewhere else. From that moment every [`io.write()`](/docs/standard-library/io/write)
+anywhere in the program writes to the new file, including in code that never asked for the
+change and has no reason to look for it.
+
+Two consequences are worth separating.
+
+*The state belongs to the program, not to the function that set it.* A function that redirects
+the default output and does not put it back has redirected its caller's output, and what the
+caller meant to print ends up in a file it has never heard of. Saving the old value first and
+restoring it afterwards is the discipline:
+
+```lua
+local previous_output = io.output()
+io.output(summary_path)
+
+io.write("north,412\n")
+
+local opened = io.output()
+io.output(previous_output)
+opened:close()
+```
+
+*The handle and the slot are different things.* Pointing the default output at a new file does
+nothing to the handle that was there — it stays open, and `previous_output:write(...)` still
+writes through it. Closing that handle, on the other hand, closes the file the slot names, and
+the next `io.write()` in the program raises rather than writing anywhere. That is why the
+restore comes before the close in the listing above, and it is a sharper trap here than on the
+reading side, because a program that writes at all writes often: the failure surfaces on
+whichever line happens to write next.
+
+## Naming a file empties it
+
+A name given here is opened for writing, which is
+[`io.open(name, "w")`](/docs/standard-library/io/open#the-mode-string) — the mode that creates
+the file if it is not there and truncates it to nothing if it is. So `io.output(daybook_path)`
+on a file that already holds a day's records leaves an empty file and starts again, before a
+single `io.write()` has run.
+
+That is the same behaviour `io.open` has under the same mode, and it is easier to walk into here
+because this call reads like *send output to this file* rather than like an open. Where the
+intention is to add to what is already there, the file has to be opened explicitly in append
+mode and the handle handed over:
+
+```lua
+io.output(assert(io.open(daybook_path, "a")))
+```
+
+[`io.input()`](/docs/standard-library/io/input#opening-by-name) has the other half of this story:
+what a name is opened as, what happens when that open fails, and the fact that each call opens
+afresh rather than reusing a file it opened before. All three hold here, with `"w"` in place of
+`"r"`.
+
+## Examples
+
+### The file is emptied before anything is written
+
+<RunnableExample code={`local daybook_path = "io-output-example-daybook.txt"\n\nlocal writing = assert(io.open(daybook_path, "w"))\nwriting:write("yesterday,318\\n")\nwriting:close()\n\nlocal previous_output = io.output()\nio.output(daybook_path)\nio.write("today,412\\n")\n\nlocal opened = io.output()\nio.output(previous_output)\nopened:close()\n\nlocal reading = assert(io.open(daybook_path, "r"))\nprint(reading:read())\nprint(reading:read())\nreading:close()\nos.remove(daybook_path)\n-- Expected output:\n-- today,412\n-- nil`} />
+
+Yesterday's line is gone, and the second read shows there is nothing behind today's. The card
+never deleted anything; naming the file did.
+
+### Pointing at a handle the program opened
+
+<RunnableExample code={`local receipt_path = "io-output-example-receipt.txt"\n\nlocal sink = assert(io.open(receipt_path, "w"))\nlocal previous_output = io.output()\n\nprint(io.output(sink) == sink)\nio.write("cocoa,2\\n")\n\nio.output(previous_output)\nsink:close()\nprint(io.output() == io.stdout)\n\nlocal reading = assert(io.open(receipt_path, "r"))\nprint(reading:read())\nreading:close()\nos.remove(receipt_path)\n-- Expected output:\n-- true\n-- true\n-- cocoa,2`} />
+
+Opening the file separately is what lets the mode be chosen, and it is what makes the handle
+available to close without asking for it back. The first print is the thing to notice: what the
+setting call answers with is the file it has just set, which is why the old value was asked for
+on its own line above.
+
+### The default output is where a redirect left it
+
+<RunnableExample code={`local note_path = "io-output-example-note.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(note_path, "w"))\nio.output(sink)\n\nprint(io.output() == io.stdout)\nprint(io.output() == sink)\n\nio.output(previous_output)\nsink:close()\nprint(io.output() == io.stdout)\n\nos.remove(note_path)\n-- Expected output:\n-- false\n-- true\n-- true`} />
+
+Three questions about the same slot, at three moments. `print()` goes on reaching the reader
+throughout, which is the point made above: it does not travel through the default output file,
+so a redirect that captures every `io.write()` in the program captures none of the prints.
+
+## Gotchas
+
+<Gotcha title="It hands back the file it just set, not the one it replaced">
+`local previous_output = io.output(summary_path)` reads like a swap and is not one: the value
+that comes back is the file the call has just installed, so `previous_output` holds the new
+default rather than the old one, and restoring from it restores nothing. The old value has to be
+asked for *before* the change — `local previous_output = io.output()` on its own line, and the
+redirect on the next.
+</Gotcha>
+
+<Gotcha title="A name here truncates, and there is no mode argument to say otherwise">
+This call takes a file name and no mode, and the mode it uses is the one that empties the file.
+There is no spelling of `io.output(path)` that appends. Where the file's existing contents
+matter, open it with [`io.open()`](/docs/standard-library/io/open#the-mode-string) and pass the
+handle.
+</Gotcha>
+
+<Gotcha title="Closing the default output takes every later write with it">
+A program that redirects the default output, writes, and closes the handle without restoring is
+left with a closed file as its default — and the next `io.write()` anywhere in it raises, on a
+line that has nothing to do with the close. Restoring first and closing second is the order that
+avoids it; [`io.close()`](/docs/standard-library/io/close#without-an-argument) with no argument
+closes precisely this file, which is the same trap written more briefly.
+</Gotcha>
+
+<Gotcha title="Nothing local about the default output">
+There is one default output file per program, so a function that changes it changes where every
+later [`io.write()`](/docs/standard-library/io/write) goes, in code it has never seen and has no
+reason to look. Where more than one file is being written, holding handles and using
+[`file:write()`](/docs/standard-library/io/file-write) says which file is meant at the point of
+writing, where this call says it somewhere else entirely.
+</Gotcha>
+
+## See also
+
+- [`io.input()`](/docs/standard-library/io/input) — the same three shapes, for the default input file, and where opening by name is set out
+- [`io.write()`](/docs/standard-library/io/write) — writing to the file this call chooses
+- [`io.flush()`](/docs/standard-library/io/flush) — handing over what is waiting in that same file
+- [`io.close()`](/docs/standard-library/io/close#without-an-argument) — closing it, which the argument-free form of that call does
+- [`io.stdout`](/docs/standard-library/io/stdout) — the handle the default output starts as
+- [`io.open()`](/docs/standard-library/io/open) — opening a file without touching the default output, and choosing the mode while doing it
+- [`file:write()`](/docs/standard-library/io/file-write) — writing through a handle, with no program-wide state in the way

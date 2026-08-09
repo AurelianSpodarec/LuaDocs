@@ -1,8 +1,185 @@
 ---
 title: io.input()
-description: ""
+description: Point the default input file at a file, by name or by handle, or ask which file it currently is.
+lua-compat: io.input
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.input
 ---
 
-{/* Not yet written. */}
+Points the *default input file* at a file, or — called with nothing — hands back the file it
+already points at. That file is the one [`io.read()`](/docs/standard-library/io/read) reads, and
+the one a bare [`io.lines()`](/docs/standard-library/io/lines#without-a-file-name) starts looping
+over, so this is the call that settles what those two are talking about.
+
+<RunnableExample code={`local ledger_path = "io-input-example-ledger.txt"\n\nlocal writing = assert(io.open(ledger_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nio.input(ledger_path)\n\nprint(io.read())\nprint(io.read())\n\nlocal opened = io.input()\nio.input(previous_input)\nopened:close()\nos.remove(ledger_path)\n-- Expected output:\n-- cocoa,2\n-- flour,1`} />
+
+## Syntax
+
+```lua
+io.input([file])
+```
+
+<Parameters>
+  <Param name="file">A file name or an open file handle. A name is opened for reading, in text mode, and the handle that comes of it becomes the default input file; a handle is pointed at as it stands, with nothing opened. Left out — or written as `nil` — nothing is set and the call only reports.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="file">The default input file as it stands when the call finishes: the handle just opened, the handle just pointed at, or the one that was already there. One value on every path, and a [file handle](/docs/standard-library/io/type#what-a-file-handle-is) on all of them — though not necessarily an open one, where the program had closed the default input.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when a name is given and the file cannot be opened. That is the difference worth knowing between this call and [`io.open()`](/docs/standard-library/io/open#when-the-open-fails), which answers with `nil` and a message instead of raising; [`io.lines()`](/docs/standard-library/io/lines) and [`io.output()`](/docs/standard-library/io/output) behave as this one does.
+- Raises when the argument is a value Lua reads as neither a name nor a file handle — a boolean, a table, a function. A *number* is not among them: it is read as a name, so `io.input(2024)` looks for a file called `2024`, and raises because there is no such file rather than because a number was wrong here.
+- Raises when the argument is a file handle that has already been closed.
+- The form with no argument reports what is there without touching it, so nothing about it can go wrong. It will hand back a closed handle where the program closed the default input, which is a state a program can get into and this call will not complain about.
+
+</Errors>
+
+## Description
+
+Reading in this library comes in two arrangements. A program can hold a handle and read through
+it — [`io.open()`](/docs/standard-library/io/open) then
+[`file:read()`](/docs/standard-library/io/file-read) — or it can read without naming a file at
+all, through [`io.read()`](/docs/standard-library/io/read) and
+[`io.lines()`](/docs/standard-library/io/lines#without-a-file-name). The second arrangement
+needs somewhere to keep *which* file is meant, and this call is how a program reads and writes
+that place.
+
+Three shapes, and they do different amounts of work. Given a name, the call opens the file
+itself. Given a handle, it points at one the program already has. Given nothing, it changes
+nothing and reports. All three hand back the same kind of value, which is what makes the
+save-and-restore idiom below short.
+
+## The default input file
+
+The default input file is one piece of state, shared by the whole program. It starts out as the
+program's standard input — the same handle [`io.stdin`](/docs/standard-library/io/stdin) names —
+and it stays that until this call points it somewhere else. From that moment every
+[`io.read()`](/docs/standard-library/io/read) anywhere in the program reads the new file,
+including in code that never asked for the change and has no reason to look for it.
+
+Two consequences are worth separating.
+
+*The state belongs to the program, not to the function that set it.* A function that redirects
+the default input and does not put it back has redirected its caller's input, and the symptom
+turns up somewhere else entirely — as a read that answers with something the caller never wrote,
+or with nothing at all. Saving the old value first and restoring it afterwards is the discipline
+that keeps that from happening:
+
+```lua
+local previous_input = io.input()
+io.input(inventory_path)
+
+local first_line = io.read()
+
+local opened = io.input()
+io.input(previous_input)
+opened:close()
+```
+
+*The handle and the slot are different things.* Pointing the default input at a new file does
+nothing to the handle that was there — it stays open, and `previous_input:read()` still reads
+through it. Closing that handle, on the other hand, closes the file the slot names, and the
+next `io.read()` in the program raises. That is why the restore comes before the close in the
+listing above: a default input left pointing at a closed file makes the failure surface on
+whichever line happens to read next, rather than on the line that closed it.
+
+## Opening by name
+
+Handed a name, this call opens the file for reading and in text mode — the same open
+[`io.open(name, "r")`](/docs/standard-library/io/open#the-mode-string) performs — and makes the
+resulting handle the default input. The file is the program's to close afterwards; nothing in
+this call or in the reads that follow closes it, and pointing the default input elsewhere leaves
+it open. Asking `io.input()` with no argument while it is still the default is how a program
+gets hold of that handle, which is what the listing above does.
+
+*A failed open raises here rather than answering.* There is no `nil`-and-a-message path on
+this call: a name that does not resolve to a file the process may open for reading stops the
+program at this line. [`io.open()`](/docs/standard-library/io/open#when-the-open-fails) is the
+call that answers instead, and a program that wants to decide what to do about a missing file
+should open it there and hand the handle over:
+
+```lua
+local reading, complaint = io.open(inventory_path, "r")
+if not reading then
+  return nil, complaint
+end
+io.input(reading)
+```
+
+The other half of *opening* is that it happens every time. Two calls naming the same file open
+that file twice and produce two handles, each with its own reading position; the first is left
+open with nothing in the program referring to it, unless the program kept a copy. That is how a
+loop naming the same file on each turn ends up holding several open handles on it.
+
+## Examples
+
+### Reporting without setting
+
+<RunnableExample code={`print(io.input() == io.stdin)\nprint(io.type(io.input()))\n-- Expected output:\n-- true\n-- file`} />
+
+Nothing has redirected the default input, so it is still the handle it started as. The second
+line is the check a program makes before deciding it is safe to read: what comes back is a file
+handle, and [`io.type()`](/docs/standard-library/io/type) says whether it is still open.
+
+### A name that is not there
+
+<RunnableExample code={`local set_it, complaint = pcall(io.input, "io-input-example-missing.txt")\nprint(set_it)\nprint(type(complaint))\nprint(io.input() == io.stdin)\n-- Expected output:\n-- false\n-- string\n-- true`} />
+
+The call raises, so it has to be wrapped in [`pcall()`](/docs/standard-library/globals/pcall) to
+be looked at rather than tested with `if`. The third line is the reassuring half: a call that
+raised set nothing, and the default input is where it was.
+
+### Two calls, two handles
+
+<RunnableExample code={`local stock_path = "io-input-example-stock.txt"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("north,412\\n")\nwriting:close()\n\nlocal previous_input = io.input()\nlocal first = io.input(stock_path)\nlocal second = io.input(stock_path)\n\nprint(first == second)\nprint(io.type(first))\nprint(io.input() == second)\n\nio.input(previous_input)\nfirst:close()\nsecond:close()\nos.remove(stock_path)\n-- Expected output:\n-- false\n-- file\n-- true`} />
+
+The same name twice gives two different handles on the same file. The card holds on to both so
+it can close both; a program that did not would be left with the first one open and unreachable,
+waiting for the collector to notice.
+
+## Gotchas
+
+<Gotcha title="It hands back the file it just set, not the one it replaced">
+`local previous_input = io.input(inventory_path)` reads like a swap and is not one: the value
+that comes back is the file the call has just installed, so `previous_input` holds the new
+default rather than the old one, and restoring from it restores nothing. The old value has to be
+asked for *before* the change — `local previous_input = io.input()` on its own line, and the
+redirect on the next.
+</Gotcha>
+
+<Gotcha title="Nothing local about the default input">
+There is one default input file per program, so a function that changes it changes what every
+later [`io.read()`](/docs/standard-library/io/read) reads, in code it has never seen and has no
+reason to look. A library that redirects and does not restore has quietly taken over its caller's input.
+Where more than one file is being read, holding handles and using
+[`file:read()`](/docs/standard-library/io/file-read) says which file is meant at the point of
+reading, where this call says it somewhere else entirely.
+</Gotcha>
+
+<Gotcha title="Closing the default input is not the same as putting it back">
+Closing the handle the default input names leaves the slot pointing at a closed file, and every
+later read raises — on whichever line reads next, which is usually nowhere near the close, and
+with a complaint about the default input rather than about anything the failing line did.
+`io.input()` with no argument still answers there, and answers
+with the closed handle rather than raising, so a program that checks the default input has to
+ask [`io.type()`](/docs/standard-library/io/type) about it rather than merely test that it is
+there.
+</Gotcha>
+
+<Gotcha title="Left alone, this is the program's standard input">
+Until something calls this, reading the default input reads whatever the program was fed —
+someone typing at a terminal, a file redirected into it, another program's output. A program
+that meant to read a *particular* file and forgot to say so therefore appears to hang rather
+than to fail, because it is waiting for input that is never coming.
+</Gotcha>
+
+## See also
+
+- [`io.output()`](/docs/standard-library/io/output) — the same three shapes, for the default output file
+- [`io.read()`](/docs/standard-library/io/read) — reading the file this call chooses
+- [`io.lines()`](/docs/standard-library/io/lines#without-a-file-name) — looping over that same file instead of reading it a call at a time
+- [`io.stdin`](/docs/standard-library/io/stdin) — the handle the default input starts as
+- [`io.open()`](/docs/standard-library/io/open) — opening a file without touching the default input, and answering rather than raising when it cannot
+- [`file:read()`](/docs/standard-library/io/file-read) — reading through a handle, with no program-wide state in the way

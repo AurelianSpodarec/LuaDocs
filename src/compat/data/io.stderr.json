@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "A file handle can now be held in a to-be-closed variable, and this one is a file handle like any other. The metatable for file handles gained a `__close` metamethod beside the finalizer it has always carried, so a handle declared `<close>` is closed when its block ends. On a standard handle the close it asks for is the one the library refuses: the block ends, the handle answers as it always would, and the stream stays open. So the declaration is accepted here and does nothing, which is worth knowing mainly because it reads like cleanup. Earlier versions have no such declaration at all."
+  }
+}

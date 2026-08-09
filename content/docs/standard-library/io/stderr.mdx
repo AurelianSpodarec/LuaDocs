@@ -1,8 +1,146 @@
 ---
 title: io.stderr
-description: ""
+description: The file handle on the program's error stream, open before the first line of Lua runs and wired to nothing.
+lua-compat: io.stderr
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.stderr
 ---
 
-{/* Not yet written. */}
+The file handle on the stream the system calls *standard error* — the second output a process is
+given, kept separate from the first so that a program's complaints do not land in the middle of
+its results. It is open before the first line of Lua runs, and unlike the other two standard
+handles nothing in the library points at it on its own: reaching it means naming it.
+
+<RunnableExample code={`print(io.type(io.stderr))\nprint(io.stderr == io.stdout)\nprint(io.output() == io.stderr)\n-- Expected output:\n-- file\n-- false\n-- false`} />
+
+## Value
+
+A file handle — the same kind of value [`io.open()`](/docs/standard-library/io/open) hands back,
+carrying the same metatable and therefore the same methods, so `io.stderr:write(...)`,
+`io.stderr:flush()` and `io.stderr:setvbuf(...)` all mean what they mean on any other handle.
+[`type()`](/docs/standard-library/globals/type) answers `"userdata"` for it and
+[`io.type()`](/docs/standard-library/io/type) answers `"file"`. What separates it from a handle a
+program opened is where it came from and what may be done to it: the process handed it over
+already open, and the library will not close it — see
+[The library never closes these three](/docs/standard-library/io/stdout#the-library-never-closes-these-three).
+
+It is also an ordinary field of the `io` table, so `io.stderr = something` is an assignment that
+succeeds silently and leaves every later read of `io.stderr` giving whatever was put there.
+
+## Description
+
+This is where a program says what went wrong. Splitting the two streams is what lets a caller do
+something with a program's results — send them to a file, pipe them into the next program —
+without the diagnostics being mixed into them, and what lets the diagnostics still be seen when
+the results have gone somewhere out of sight. A message that a program produces *about* its work
+belongs here; the work itself belongs on
+[`io.stdout`](/docs/standard-library/io/stdout) or in a file the program opened.
+
+Writing is a method call, because nothing routes here on its own:
+
+```lua
+io.stderr:write("stocktake: row 12 has no quantity; skipping it\n")
+```
+
+Everything under [What can be written](/docs/standard-library/io/file-write#what-can-be-written)
+applies — strings and numbers, run together with nothing between them, nothing put through
+`tostring` on the way, and no newline added at the end, which is why the one above is written by
+hand. A message meant for a person is usually worth prefixing with the program's own name, since
+the reader is looking at a stream that several programs may be writing to.
+
+## The one the library does not point at
+
+The other two standard handles have a slot behind them. The *default input file* starts as
+[`io.stdin`](/docs/standard-library/io/stdin) and the *default output file* starts as
+[`io.stdout`](/docs/standard-library/io/stdout), which is what makes
+[`io.read()`](/docs/standard-library/io/read) and
+[`io.write()`](/docs/standard-library/io/write) work in a program that has set neither. There is
+no *default error file*, no call that reads or writes one, and no short spelling of a write that
+lands here: naming the handle is how a write reaches this stream.
+
+The practical consequence is a good one. Because no slot points here, this is not a handle a
+redirect elsewhere can move by accident — an
+[`io.output()`](/docs/standard-library/io/output) somewhere else in the program moves where
+`io.write()` goes and leaves this handle exactly where it was. A diagnostic written through
+this handle reaches the error stream whatever the rest of the program has done to its output.
+
+The handle can still be made the default output deliberately —
+`io.output(io.stderr)` is an ordinary call and does what it says — but that is a choice a program
+makes rather than a state it can drift into.
+
+## Two nearby routes to the same stream
+
+[`warn()`](/docs/standard-library/globals/warn) is Lua's own warning system, and the warning
+function Lua ships with writes to this same stream — while the system is switched on, which in
+the interpreter Lua ships with it is not to begin with. The difference is who decides. A warning
+travels through a system that can be turned off, turned back on, or replaced wholesale by a host,
+so it may arrive here, somewhere else, or nowhere; a write here goes out. A program reporting on
+its own behalf usually wants the write, and a *library* reporting on behalf of a program it does
+not own usually wants the warning, so that the program is the one deciding what becomes of it.
+
+[`error()`](/docs/standard-library/globals/error) writes nothing anywhere. It raises, and what
+reaches the error stream afterwards is whatever the code that caught it does — nothing at all
+where a [`pcall()`](/docs/standard-library/globals/pcall) took it, and whatever the host makes of
+an uncaught error where nothing did. Code that both raises and complains here about the same
+problem is reporting it twice.
+
+## Examples
+
+### Nothing is wired to it, and it can be wired to deliberately
+
+<RunnableExample code={`print(io.input() == io.stderr)\nprint(io.output() == io.stderr)\n\nlocal previous_output = io.output()\nio.output(io.stderr)\nprint(io.output() == io.stderr)\n\nio.output(previous_output)\nprint(io.output() == io.stdout)\n-- Expected output:\n-- false\n-- false\n-- true\n-- true`} />
+
+The first two prints are the entry's subject: neither default file is this handle, and neither
+becomes it without being told to. The last two show the telling, and the putting back.
+
+### The close is refused, and the handle stays open
+
+<RunnableExample code={`local closed, complaint = io.stderr:close()\nprint(closed)\nprint(type(complaint))\nprint(io.type(io.stderr))\n-- Expected output:\n-- nil\n-- string\n-- file`} />
+
+Two values and no raise, and the handle is still open afterwards. That matters more here than on
+the other two: an error stream that a cleanup routine had managed to close is an error stream that
+cannot report the next thing that goes wrong.
+
+### A redirect elsewhere leaves it alone
+
+<RunnableExample code={`local report_path = "io-stderr-example-report.txt"\n\nlocal previous_output = io.output()\nlocal sink = assert(io.open(report_path, "w"))\nio.output(sink)\n\nio.write("north,412\\n")\nprint(io.output() == sink)\nprint(io.type(io.stderr))\n\nio.output(previous_output)\nsink:close()\n\nlocal reading = assert(io.open(report_path, "r"))\nprint(reading:read())\nreading:close()\nos.remove(report_path)\n-- Expected output:\n-- true\n-- file\n-- north,412`} />
+
+The results went to the file, as the last print shows, and the error stream was untouched by the
+redirection that sent them there. That is the arrangement worth building on: results wherever the
+caller asked for them, complaints somewhere the caller can still see.
+
+## Gotchas
+
+<Gotcha title="There is no io.write for this stream">
+[`io.write()`](/docs/standard-library/io/write) writes to the default output file, which is never
+this handle unless a program has said so. A diagnostic written with `io.write()` therefore joins
+the program's results, and disappears into whatever file or pipe they were sent to. The method
+call is not an abbreviation waiting to be found: short of pointing the default output at this
+handle deliberately, naming it is how a write gets here.
+</Gotcha>
+
+<Gotcha title="A write here adds no newline">
+A write adds nothing after the last value it is given, so a message written without a trailing
+`\n` runs into the next one. That reads as a lost message rather than as a formatting slip,
+because the two complaints arrive as one line.
+[`print()`](/docs/standard-library/globals/print) is the call that adds the newline, and it writes
+to the other stream.
+</Gotcha>
+
+<Gotcha title="Complaining here does not stop anything">
+Writing a message is only writing a message: the function returns normally, the caller carries on,
+and nothing about how the program ends has changed.
+[`error()`](/docs/standard-library/globals/error) is what abandons the work and
+[`os.exit()`](/docs/standard-library/os/exit) is what ends the program with a status a caller can
+test. A program that reports and continues is telling its caller two different things at once.
+</Gotcha>
+
+## See also
+
+- [`io.stdout`](/docs/standard-library/io/stdout) — the stream the results go on, and where what the three share is set out
+- [`io.stdin`](/docs/standard-library/io/stdin) — the third of the three
+- [`file:write()`](/docs/standard-library/io/file-write) — what a write does, and everything it accepts
+- [`warn()`](/docs/standard-library/globals/warn) — Lua's own route to this stream, through a system a program can replace
+- [`os.exit()`](/docs/standard-library/os/exit) — ending the program with a status, once the complaint has gone out
+- [`io.close()`](/docs/standard-library/io/close#without-an-argument) — the close this handle refuses, and what the refusal answers with
+- [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf#what-buffering-is) — deciding how much of a write waits, rather than inheriting it
