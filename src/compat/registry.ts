@@ -146,6 +146,10 @@ import ioOutput from './data/io.output.json';
 import ioStdin from './data/io.stdin.json';
 import ioStdout from './data/io.stdout.json';
 import ioStderr from './data/io.stderr.json';
+import ioFileClose from './data/io.file-close.json';
+import ioPopen from './data/io.popen.json';
+import ioTmpfile from './data/io.tmpfile.json';
+import ioLibrary from './data/io.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1445,6 +1449,117 @@ const raw: Record<string, unknown> = {
   'io.stdin': ioStdin,
   'io.stdout': ioStdout,
   'io.stderr': ioStderr,
+
+  // The four that close the `io` section: `file:close`, the two functions that hand back a
+  // handle nobody named, and the section overview. `liolib.c` read at the **repo root** for
+  // every tag in every line — v5.1, v5.1.1, v5.2.0–v5.2.3, v5.3.0–v5.3.6, v5.4.0–v5.4.8,
+  // v5.5.0, v5.5.1 — plus the two shipped releases with no tag, 5.1.5 and 5.2.4, from
+  // `www.lua.org/source/5.1` and `/5.2` (the *minor* line; `/source/5.1.5/` is a 404). All 25
+  // consecutive whole-file diffs generated and read, which is what caught the popen mode
+  // check below: it is an inline `luaL_argcheck` at one release and a `#define` at the next,
+  // and a function-body diff sees only one half of that.
+  //
+  // **`file:close` and `io.close` are one operation on every line.** Through 5.3.4 they are
+  // literally the same C function (`io_close` registered in `iolib` *and* as `flib`'s
+  // `"close"`); **v5.3.5** splits `f_close` out and `io_close` becomes a `getfield` on the
+  // default output followed by `f_close(L)`. A refactor, not a delta. So `io.close` owns
+  // `#what-closing-a-file-does` and `file:close` links to it; what `file:close` carries in its
+  // own right is the popen note, because 5.2 added that sentence to **`file:close`'s** passage
+  // and to no other.
+  //
+  // **The popen status note, at 5.2, on all three of `io.close`, `file:close` and `io.popen`.**
+  // 5.1's `io_pclose` is `pushresult(L, lua_pclose(L, *p), NULL)` with
+  // `#define lua_pclose(L,file) ((void)L, (pclose(file) != -1))` in `luaconf.h` — a *boolean*,
+  // so the answer is `true` whenever the close itself went through, whatever status the
+  // program exited with, and it is **one** value on that path (`pushresult` returns 1 on
+  // success, 3 on failure). From **v5.2.0** it is `luaL_execresult(L, …)`: three values on
+  // both paths, and the same four answers `os.execute` gained in that release, the fourth
+  // being the one where the program could never be started. Entries must not enumerate three
+  // — that was I1's fix round's Important 1, twice.
+  //
+  // **`io.popen`'s mode check arrives at 5.3, not at 5.4.** This corrects the fact I1's fix
+  // round handed forward. Read at every tag:
+  //
+  //   * v5.1 … v5.3.5, and **v5.4.0**: no check at all. `mode` reaches `popen`/`_popen` as
+  //     written, and a spelling the system will not have comes back as a failed *start* —
+  //     a false value, a message and a code — rather than as a raise.
+  //   * **v5.3.6**: an inline `luaL_argcheck(L, ((mode[0]=='r' || mode[0]=='w') &&
+  //     mode[1]=='\0'), 2, "invalid mode")`. It is the **only** change in the whole file
+  //     between v5.3.5 and v5.3.6.
+  //   * **v5.4.1**: the same test, moved behind `#if !defined(l_checkmodep)`. Absent again at
+  //     v5.4.0, which is a one-release regression inside the 5.4 line.
+  //   * **v5.4.3** onwards: the Windows arm gains `[rw][bt]?`; the default arm stays `[rw]`.
+  //     Both arms sit behind `#if !defined`, so what a build takes past `"r"` and `"w"` is the
+  //     build's own setting.
+  //
+  // A line is credited with what its **final** release has, and 5.3.6 is the last 5.3 — so the
+  // observable boundary on this site's granularity is **5.3**, and the note says so. The
+  // Windows extension is **not** a second chip: on a POSIX build there is no difference at all
+  // between 5.3 and 5.4, which makes it the `l_fseek` shape I5 ruled on — a build fact, not a
+  // version fact. Probed at both ends: on the 5.4 wasm runtime and on a native 5.3.6,
+  // `io.popen(cmd, "rb")` and `io.popen(cmd, "z")` both raise `invalid mode`, and the check
+  // runs *before* anything is started.
+  //
+  // **`io.popen` is the one name in this library the manual declines to promise is present.**
+  // "This function is system dependent and is not available on all platforms" is in all five
+  // manuals, and `system dependent` occurs exactly once in each of the five, here. Where the
+  // build has no way to start a program the ISO C arm is
+  // `luaL_error(L, "'popen' not supported")` (`LUA_QL("popen") " not supported"` before 5.3) —
+  // so the call **raises**; it is not absent, and `if io.popen then` is true everywhere.
+  // **Probed in a throwaway process, per the brief.** In the harness's own
+  // `new LuaFactory().createEngine()` this is exactly what happens: `type(io.popen)` is
+  // `function`, `pcall(io.popen, "echo hi")` returns `false, "'popen' not supported"`, and the
+  // engine **survives** — ten calls in a row and it is still running. `io.popen` is therefore
+  // *not* the `os.execute` hazard: it reaches `popen`, not `system`, and it raises catchably
+  // rather than aborting the wasm engine. **No card may call it all the same**, because the
+  // answer here is the ISO C arm's refusal, which is a build fact, and an expected-output
+  // comment recording it would teach every reader on a POSIX or Windows Lua the opposite of
+  // what they get. `os/execute.mdx`'s shape is followed instead: fenced listings for the real
+  // idiom, and `usesEntry={false}` cards standing in for it.
+  //
+  // **Closing a popen handle waits for the program — confirmed, and this discharges the one
+  // claim I1 left resting on `pclose`'s contract.** Probed on a native Lua 5.3.6 with a
+  // working `popen`: `io.popen("ping -n 3 127.0.0.1 > nul && echo done > marker")` comes back
+  // at once and the marker file does **not** exist; the marker exists immediately after
+  // `close()` returns, with two wall seconds spent inside the close. A second shape confirms
+  // it from the other side — a program that exits 5 after two seconds reports `nil, "exit", 5`,
+  // which cannot be known before it has ended. Also probed there: a command the processor
+  // cannot carry out still **succeeds** at `io.popen` and disappoints at the close
+  // (`nil, "exit", 1`), the program's error stream does not come through the handle, and
+  // `io.popen(42)` runs a command called `42` (`luaL_checkstring` coerces a number).
+  //
+  // **`io.tmpfile` has not moved in 26 releases.** `newfile(L)` plus `tmpfile()` plus
+  // `pushresult` / `luaL_fileresult`, with an `errno = 0;` hoisted in at **v5.4.7** and
+  // nothing else. The manual gained "In case of success," at 5.3, which is documentation
+  // catching up: 5.1's `pushresult(L, 0, NULL)` already answers three values on the failing
+  // path. **It works in the sandbox** — probed: the handle reads `"file"`, writing then
+  // seeking then reading works, sixty of them can be held open at once, arguments are ignored
+  // rather than refused, and `local scratch <close> = io.tmpfile()` runs clean. That is what
+  // lets this entry carry ordinary cards where `io.popen` cannot.
+  //
+  // **`__close` at v5.4.0 is the last of I1's propagation list**, discharged here for
+  // `io.popen` and `io.tmpfile`. `metameth` gains `{"__close", f_gc}` beside `{"__gc", f_gc}`
+  // at v5.4.0 and is byte-identical to v5.5.1, and both of these calls reach it through the
+  // handle they hand back (`newprefile` sets `LUA_FILEHANDLE` on the popen handle too). On a
+  // popen handle the note has a cost worth stating: `f_gc` returns **0**, so the three values
+  // describing how the program ended are discarded, and the block does not end until the
+  // program has. `file:close` deliberately carries **no** 5.4 note, matching its twin
+  // `io.close`, which carries none either — the declaration does not go through either call.
+  //
+  // **None of the four appears in any Incompatibilities chapter.** 5.2's, 5.3's, 5.4's and
+  // 5.5's §8 sliced from `<a name="8">` to end of file (head and tail printed to verify the
+  // slice) and searched line by line for `popen`, `tmpfile`, `close`, `io.` and `file:`: the
+  // only hits in four chapters are `io.read`'s dropped `*` at 5.3, `io.lines`' four values at
+  // 5.4, and 5.5's `lua_closethread`, which is a C API item.
+  //
+  // **`io.library` records membership and there is none to record.** `grep -o 'pdf-io\.[a-z]*'`
+  // and `grep -o 'pdf-file:[a-z]*'` over all five manuals return the same fourteen and the same
+  // seven every time, so the `io` table's membership has not moved once — the `os.library`
+  // shape, `support` only and no matrix on the overview page.
+  'io.file-close': ioFileClose,
+  'io.popen': ioPopen,
+  'io.tmpfile': ioTmpfile,
+  'io.library': ioLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

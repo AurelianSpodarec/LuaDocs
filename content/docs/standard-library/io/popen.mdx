@@ -1,8 +1,195 @@
 ---
 title: io.popen()
-description: ""
+description: Start a program alongside this one and get a file handle joined to it, to read what it prints or to feed what it reads.
+lua-compat: io.popen
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.popen
 ---
 
-{/* Not yet written. */}
+Starts `prog` as a separate program running alongside this one, and hands back a file handle
+joined to it. Reading from that handle reads what the program prints; writing to it feeds what
+the program reads. Which of the two the handle is for is settled when it is made, by `mode`, and
+cannot be changed afterwards.
+
+```lua
+local tags = assert(io.popen("git tag --list", "r"))
+
+for line in tags:lines() do
+  print(line)
+end
+
+print(tags:close())
+```
+
+<Note>
+The sandbox these examples run in cannot start another program, so no card on this page calls
+`io.popen()`. The listings that do are shown rather than run, and the cards under
+[Examples](#examples) work on a handle opened another way and on the values a close hands back.
+</Note>
+
+## Syntax
+
+```lua
+io.popen(prog [, mode])
+```
+
+<Parameters>
+  <Param name="prog">The command, written the way the system's command processor reads commands. It is handed over as text and nothing in Lua looks at it — see [The string is command text, not a list of arguments](#gotchas).</Param>
+  <Param name="mode">Which direction the handle goes in: `"r"` to read what the program prints, `"w"` to write what it reads. Left out, `"r"`.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="file">A handle joined to the program. It is a file handle in the ordinary sense — [`io.type()`](/docs/standard-library/io/type#what-a-file-handle-is) answers `"file"` for it, and it is read from or written to with the same methods a handle from [`io.open()`](/docs/standard-library/io/open) takes. Where it parts company with one is what it is joined to, which is the last Gotcha below, and what closing it means, which is [Closing it is where the program is reported](#closing-it-is-where-the-program-is-reported).</Return>
+  <Return type="nil">Where nothing could be started at all, and the system said why. A command the processor cannot carry out is *not* this case — that one succeeds here and disappoints at the close, which is the second Gotcha below.</Return>
+  <Return type="string">The system's own description of why, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `prog` is a value other than a string or a number.
+- <Since v="5.3" /> Raises when `mode` is a spelling this call does not recognise. `"r"` and `"w"` are recognised everywhere; whether a build takes anything after them is the build's own business, and the portable pair is those two on their own.
+- Raises on a system where the library has no way to start another program at all. The manual says outright that this function is not available everywhere, and where it is not the call refuses rather than answering — so a program that has to survive on such a system checks with [`pcall()`](/docs/standard-library/globals/pcall) rather than by testing the result.
+- A command the processor cannot carry out does not raise, and does not come back as a failure here either. That answer arrives when the handle is closed.
+
+</Errors>
+
+## Description
+
+Two programs end up running at once: this one, and the one `prog` names. The handle is the
+join between them, and it carries bytes in one direction only. Nothing is waited for at this
+point — the call comes back as soon as the program has been started, which is why the program's
+output is something to be *read* rather than something the call returns, and why how the program
+ended is not known until [the close](#closing-it-is-where-the-program-is-reported).
+
+The command goes to the system's command processor, which reads it the way it reads any command.
+Which processor that is, and what counts as a command in it, belong to the system rather than to
+Lua, and a command written against one is not something to expect another to understand.
+
+Once the handle exists, nothing about working it is particular to this call.
+[`file:read()`](/docs/standard-library/io/file-read#the-formats) takes the same formats,
+[`file:lines()`](/docs/standard-library/io/file-lines#what-one-step-reads) drives the same loop,
+and [`file:write()`](/docs/standard-library/io/file-write) writes the same values. What differs
+is what the handle is joined to: a program's output arrives as the program produces it rather
+than sitting in a file waiting, and it can only be gone through once.
+
+[`os.execute()`](/docs/standard-library/os/execute) is the call for when the output is not the
+point. It hands a command to the same processor, waits for it, and reports how it ended, without
+giving the program anything to read or write.
+
+## Reading or writing, one or the other
+
+`mode` is not the mode string [`io.open()`](/docs/standard-library/io/open#the-mode-string)
+takes. There is no reading-and-writing form here and no `+` spelling: a handle made with `"r"`
+reads what the program prints, and one made with `"w"` writes what the program reads. Going the
+other way through either is not something this call sets up, and what the system makes of the
+attempt is the system's business rather than Lua's. A program that needs both directions needs
+two programs, or a file for one of the directions to go through.
+
+Which spellings a build recognises past `"r"` and `"w"` is the build's own setting, and it is
+not something to write portable code against. `"r"` and `"w"` are the pair every build takes,
+and leaving `mode` out asks for `"r"`.
+
+## Closing it is where the program is reported
+
+Closing this handle is not the small operation closing a file is. It waits for the program on
+the other end to finish, and then reports how that went — which is why a program that wants to
+know whether the work succeeded has to close the handle and read the answer, rather than
+stopping when it has read all the output it wanted.
+
+Those are the same values [`os.execute()`](/docs/standard-library/os/execute#what-the-three-results-mean)
+hands back, and that section sets them out: whether it ended well, which kind of ending it was,
+and the number belonging to that kind — plus the fourth answer, where the two positions carry
+the system's own description and code instead. Either spelling of the close reaches them:
+[`file:close()`](/docs/standard-library/io/file-close#when-there-is-a-program-on-the-other-end)
+and [`io.close()`](/docs/standard-library/io/close) are the same operation, and both report on
+the program rather than on the file.
+
+A handle nobody closes is a program nobody waited for. The finalizer eventually gets to it, but
+[at a moment nothing in the program chooses](/docs/standard-library/io/close#what-closing-a-file-does),
+and until then the answer the close would have carried is not available anywhere.
+
+## Where this call is, and where it is not
+
+Whether this call can do anything at all depends on the system Lua was built for, and the manual
+says so outright rather than leaving it to be discovered. That is unusual: it is the one name in
+this library whose *presence* the manual declines to promise, and it means what it says. A Lua
+built for a system with no way to start another program still has `io.popen` as a function, and
+calling it refuses rather than answering, because there is nothing for it to do.
+
+So the check a portable program writes is not `if io.popen then`, which is true everywhere. It is
+a [protected call](/docs/standard-library/globals/pcall) around the call itself, with a plan for
+what to do when there is no program to be had.
+
+## Examples
+
+### Going through the output a line at a time
+
+<RunnableExample usesEntry={false} code={`-- Stands in for: local reported = assert(io.popen("git tag --list", "r"))\nlocal listing_path = "io-popen-example-listing.txt"\nlocal writing = assert(io.open(listing_path, "w"))\nwriting:write("north,412\\nsouth,208\\neast,95\\n")\nwriting:close()\n\nlocal reported = assert(io.open(listing_path, "r"))\n\nlocal rows = 0\nfor line in reported:lines() do\n  rows = rows + 1\nend\n\nprint(rows)\nprint(reported:close())\n\nos.remove(listing_path)\n-- Expected output:\n-- 3\n-- true`} />
+
+The card writes a file first, because it cannot start a program; from the second handle onwards
+it is the listing at the top of this page. That is the point of showing it — going through a
+program's output is the loop a file gets, unchanged. What differs is where the handle came from,
+and what its close has to say afterwards.
+
+### The close is a different answer on the two kinds of handle
+
+<RunnableExample usesEntry={false} code={`local note_path = "io-popen-example-note.txt"\n\nlocal function close_a_program_handle()\n  return nil, "exit", 1\nend\n\nlocal ordinary = assert(io.open(note_path, "w"))\nprint(select("#", ordinary:close()))\nprint(select("#", close_a_program_handle()))\n\nlocal finished, how, code = close_a_program_handle()\nprint(finished)\nprint(how)\nprint(code)\n\nos.remove(note_path)\n-- Expected output:\n-- 1\n-- 3\n-- nil\n-- exit\n-- 1`} />
+
+The first close is real and the second is stood in for, because this page cannot start a program.
+The contrast is the point: an ordinary file's close says whether the close worked, and a program
+handle's close says whether the *program* worked, in three values that have to be read to be
+of any use.
+
+### Nothing started, and what that looks like
+
+<RunnableExample usesEntry={false} code={`local function start_the_program()\n  -- Stands in for io.popen() on a system that could not spare a process\n  return nil, "not enough memory to start a process", 12\nend\n\nlocal reported, complaint, code = start_the_program()\n\nif not reported then\n  print("nothing started")\n  print(type(complaint))\n  print(type(code))\nelse\n  print(reported:read())\nend\n-- Expected output:\n-- nothing started\n-- string\n-- number`} />
+
+The failing answer here is the library's ordinary one — a false first value with a description
+and a code behind it — and the branch that checks it is what keeps the next line from calling a
+method on `nil`. It is worth writing even though it fires rarely: the case it catches is the
+machine being unable to start anything at all, which is exactly when a program should stop
+rather than carry on.
+
+## Gotchas
+
+<Gotcha title="The string is command text, not a list of arguments">
+Nothing in Lua quotes, escapes or splits `prog`. A file name pasted into it is read by the
+command processor as command text, so a name holding a space becomes two words and one holding a
+separator becomes a second command. Building the string out of values that came from somewhere
+else — a listing, a configuration file, anything a person typed — is where that stops being a
+formatting problem and becomes a hole. [`string.format()`](/docs/standard-library/string/format)'s
+`%q` quotes for *Lua* and is not the tool for this;
+[`os.execute()`](/docs/standard-library/os/execute) has the same hazard for the same reason.
+</Gotcha>
+
+<Gotcha title="A command that cannot be carried out still gives you a handle">
+Starting the program means starting the command processor, and whether the command inside it
+names anything real is the processor's business rather than Lua's. So asking for a program that
+is not installed usually succeeds here, hands back a handle, and produces no output worth
+reading — and the disappointment arrives at the close, as whatever status the processor chose.
+Code that treats a handle as proof the work is under way has already gone wrong by then.
+</Gotcha>
+
+<Gotcha title="It is one pass forward, and one stream">
+The handle is joined to a running program, not to something sitting on a disk. What has been
+read has gone, there is nothing behind the reading position to go back to, and what
+[`file:seek()`](/docs/standard-library/io/file-seek) makes of such a handle is the C library's
+to decide rather than something to build on. A program that needs the output twice keeps it —
+in a table, or in a file of its own.
+
+The join carries one stream, too. Whatever the program writes to its *error* stream does not come
+through this handle; it goes wherever the calling program's own error output goes, which is
+usually straight to the terminal. A program that wants those bytes has to arrange for them
+inside `prog` itself, in whatever way the command processor offers.
+</Gotcha>
+
+## See also
+
+- [`os.execute()`](/docs/standard-library/os/execute) — running a program when its output is not what is wanted
+- [`file:close()`](/docs/standard-library/io/file-close#when-there-is-a-program-on-the-other-end) — the close that waits for the program and reports how it ended
+- [`io.close()`](/docs/standard-library/io/close) — the same close, written as a call rather than a method
+- [`file:lines()`](/docs/standard-library/io/file-lines) — the loop the card above uses, driven by a handle rather than a name
+- [`file:read()`](/docs/standard-library/io/file-read#the-formats) — the shapes a read of this handle can take
+- [`io.open()`](/docs/standard-library/io/open) — a handle on a file, where the mode means something else
+- [`pcall()`](/docs/standard-library/globals/pcall) — surviving a system where this call refuses

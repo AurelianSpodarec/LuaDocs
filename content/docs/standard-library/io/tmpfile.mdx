@@ -1,8 +1,159 @@
 ---
 title: io.tmpfile()
-description: ""
+description: A scratch file with no name, open for reading and writing, taken away when the program ends.
+lua-compat: io.tmpfile
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-io.tmpfile
 ---
 
-{/* Not yet written. */}
+Makes a scratch file and hands back a handle on it. The file has no name the program is told
+about, it is open for reading as well as writing, and it is taken away when the program ends —
+so nothing has to choose a place to put it and nothing has to remember to delete it.
+
+<RunnableExample code={`local scratch = io.tmpfile()\n\nscratch:write("cocoa,2\\n")\nscratch:write("flour,1\\n")\nscratch:seek("set")\n\nprint(scratch:read())\nprint(scratch:read())\nprint(scratch:close())\n-- Expected output:\n-- cocoa,2\n-- flour,1\n-- true`} />
+
+Written, then read back, through one handle — and the `seek` between the two halves is the part
+that is easy to leave out. See [Reading back what was just written](#reading-back-what-was-just-written).
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem. Nothing on this page
+touches a file on your own machine, and nothing on it needs removing afterwards, which is the
+point of the call.
+</Note>
+
+## Syntax
+
+```lua
+io.tmpfile()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="file">A handle on the new file, open for both reading and writing. It is a file handle like any other — [`io.type()`](/docs/standard-library/io/type#what-a-file-handle-is) answers `"file"` for it, the methods on a handle work on it, and it is the program's to close.</Return>
+  <Return type="nil">Where the system would not make the file — the first of the three values that describe that.</Return>
+  <Return type="string">The system's own description of why, in the system's wording rather than Lua's.</Return>
+  <Return type="integer">The system's numeric code for the same thing, which differs from one system to the next.</Return>
+</Returns>
+
+<Errors>
+
+- A system that will not make the file does not raise. It answers with the three values above, the way the rest of this library reports trouble.
+- Arguments are ignored rather than refused. The call reads none, so `io.tmpfile(path)` is not a way to choose where the file goes — it is `io.tmpfile()` with a value written next to it.
+
+</Errors>
+
+## Description
+
+This is the one call in the library that produces a file without being told anything about it.
+[`io.open()`](/docs/standard-library/io/open) needs a name and a mode; this needs neither,
+because there is no name to give and the mode is settled: the handle can be written to and read
+from, in either order, as often as the program likes.
+
+What that buys is a place to put data that is too big or too awkward to keep in a table and has
+no business outliving the program — a sort that spills, a response being assembled before it is
+sent on, a file being built up in pieces before its final form is known. The handle behaves
+exactly like one from `io.open()` from there on:
+[`file:write()`](/docs/standard-library/io/file-write),
+[`file:read()`](/docs/standard-library/io/file-read),
+[`file:lines()`](/docs/standard-library/io/file-lines),
+[`file:seek()`](/docs/standard-library/io/file-seek) and
+[`file:close()`](/docs/standard-library/io/file-close) all work on it and mean what they usually
+mean.
+
+What it does not buy is a file anything else can find. See [A file with no name](#a-file-with-no-name).
+
+## A file with no name
+
+The program is never told where the file is, and that is the arrangement rather than an omission
+in it. Nothing in the program can open the file a second time, rename it or delete it, because
+all three of those want a name and there is none to be had —
+[`os.remove()`](/docs/standard-library/os/remove) has nothing it could be handed. The handle is
+the program's only way to the file, and a program that loses the handle has lost the file.
+
+The manual's promise about the end of it is that the file is taken away when the program ends.
+Closing the handle is still the right thing to do, for the reason closing any handle is: it
+gives the system its hold on the file back, and a process may only keep so many files open at
+once. A program that makes a scratch file per request and never closes any of them runs out of
+handles long before it runs out of disk.
+
+Where a *name* is what is wanted — because another program has to read the file, or because it
+has to survive this one — [`os.tmpname()`](/docs/standard-library/os/tmpname) is the call that
+produces one, and the file it names is then an ordinary file with an ordinary lifetime and the
+program's own responsibility to remove.
+
+## Reading back what was just written
+
+Writing leaves the position at the end of what was written, and reading starts wherever the
+position is. So a handle that has just been written to is a handle positioned past everything
+in the file, and a read there finds nothing — not because the file is empty, but because there
+is nothing *after* where the reading would start.
+[`file:seek()`](/docs/standard-library/io/file-seek#where-the-position-is-measured-from) is what
+moves it, and `scratch:seek("set")` is the line that turns a written file back into a readable
+one.
+
+This is true of a handle opened for both reading and writing however it was opened; it is worth stating here because
+this is the call that hands one back without being asked, so it is where a program first meets
+the two directions on one handle.
+
+## Examples
+
+### It starts empty, and at the beginning
+
+<RunnableExample code={`local scratch = io.tmpfile()\n\nprint(io.type(scratch))\nprint(scratch:seek())\nprint(scratch:read())\n\nscratch:write("sugar,3\\n")\nprint(scratch:seek())\n\nscratch:close()\n-- Expected output:\n-- file\n-- 0\n-- nil\n-- 8`} />
+
+A fresh scratch file holds nothing and the position is at the top of it, so the first read finds
+nothing at all. The write then leaves the position past what it put down — which is where the
+next read would start from, and why the card above seeks back before reading.
+
+### Two calls, two files
+
+<RunnableExample code={`local first = io.tmpfile()\nlocal second = io.tmpfile()\nprint(first == second)\n\nfirst:write("north,412\\n")\nsecond:write("south,208\\n")\n\nfirst:seek("set")\nsecond:seek("set")\nprint(first:read())\nprint(second:read())\n\nfirst:close()\nsecond:close()\n-- Expected output:\n-- false\n-- north,412\n-- south,208`} />
+
+Each call makes its own file. There is no single scratch file the library hands round, so a
+program that wants two independent buffers asks twice and keeps both handles.
+
+### Writing, reading, and writing again
+
+<RunnableExample code={`local scratch = io.tmpfile()\n\nscratch:write("cocoa,2\\n")\nscratch:seek("set")\nprint(scratch:read())\n\nscratch:seek("end")\nscratch:write("flour,1\\n")\n\nscratch:seek("set")\nprint(scratch:read())\nprint(scratch:read())\nprint(scratch:close())\n-- Expected output:\n-- cocoa,2\n-- cocoa,2\n-- flour,1\n-- true`} />
+
+Reading does not use the handle up. The two directions share one position, so a program that
+alternates between them says where it wants to be each time it changes its mind — here, back to
+the end before adding a row, and back to the start before reading the pair.
+
+## Gotchas
+
+<Gotcha title="This is not os.tmpname()">
+The two calls are answers to different questions.
+[`os.tmpname()`](/docs/standard-library/os/tmpname) hands back a *name*, and everything after
+that — opening, using, removing — is the program's; this hands back an *open handle* and no
+name at all. Reaching for `os.tmpname()` where nothing outside the program needs to see the file
+buys a name that has to be cleaned up and a file that survives a crash with nobody left to tidy
+it. Reaching for this one where another program does need to see the file leaves nothing to tell
+it about.
+</Gotcha>
+
+<Gotcha title="Nothing arrives to say the file could not be made">
+The three-value answer means a call written `local scratch = io.tmpfile()` carries on with
+`nil` in the variable, and the failure shows up later as an attempt to index a `nil` value
+somewhere else entirely. `assert(io.tmpfile())` raises at the call instead, carrying the
+system's own description of what stopped it — which is worth the six characters on a call whose
+failure is otherwise silent.
+</Gotcha>
+
+<Gotcha title="The promise names the end of the program, which is no help to one that runs for a long time">
+A program that stops after a second's work can leave its scratch files to the promise. One that
+runs for a week — a server, a loop over a work queue — cannot, because what it has open it keeps
+open, and a process may hold only so many files at once. The close is the moment such a program
+chooses for itself, and it belongs as soon as the scratch file has served its purpose rather
+than at the end of the run.
+</Gotcha>
+
+## See also
+
+- [`io.open()`](/docs/standard-library/io/open) — a file by name, with a mode chosen for it
+- [`os.tmpname()`](/docs/standard-library/os/tmpname) — a temporary file's *name*, for when something outside the program needs one
+- [`file:seek()`](/docs/standard-library/io/file-seek) — moving between what was written and what is about to be read
+- [`file:close()`](/docs/standard-library/io/file-close) — giving the handle back, which this file still needs
+- [`io.type()`](/docs/standard-library/io/type) — asking whether the handle is still open
+- [`os.remove()`](/docs/standard-library/os/remove) — the call a named temporary file needs and this one has nothing to hand

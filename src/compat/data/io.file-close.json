@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Closing a handle that came from `io.popen()` now reports on the program rather than on the close, in the three values `os.execute()` hands back: `true` or `nil` first, then `\"exit\"` or `\"signal\"` with the status or the signal number behind it — or, where the program could never be started, the system's own description and code in those same two positions. Earlier versions answer `true` on their own whenever the close itself went through, whatever the program made of its work, and `nil` plus a message and a system code when it did not — so code that reads a status out of the second and third values finds nothing there, and a program that failed looks to it like a program that succeeded. Closing an ordinary file is unaffected, on either line."
+  }
+}

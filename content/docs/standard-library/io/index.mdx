@@ -1,8 +1,129 @@
 ---
 title: io
-description: ""
+description: The library that reads and writes files — handles a program holds, default files it does not, and the three streams it starts with.
+lua-compat: io.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.9
 ---
 
-{/* Not yet written. */}
+This is the library that reads and writes files. It opens a file by name and hands back a
+*handle* on it; it reads lines, numerals, byte counts and whole files; it writes strings and
+numbers; and it gives the file back when the program has finished with it. It reaches one thing
+that is not a file — a program started alongside this one, whose output arrives through a handle
+like any other — and past that it does not go.
+
+Everything here is written in one of two styles, and the split runs through the entry list
+below. In the first, the program holds a handle and every operation is a method on it:
+`writing:write(row)`, `reading:read()`, `writing:close()`. In the second, the program holds
+nothing and the operations are functions in the table `io`, working on a *default input file*
+and a *default output file* the library keeps on its behalf: `io.write(row)`, `io.read()`.
+Eleven functions and three handles live in the table `io`; seven more operations are methods on
+a file handle, and five of those seven have a same-named function in the table beside them.
+Beside, not instead of: a method and its same-named function are separate entries here because
+they are not always the same call, and each pair's two pages say where they part.
+
+The library starts with three file handles already open —
+[`io.stdin`](/docs/standard-library/io/stdin), [`io.stdout`](/docs/standard-library/io/stdout)
+and [`io.stderr`](/docs/standard-library/io/stderr) — and it never closes them. The two default
+files start as two of those three. And there is a shape almost everything here reports trouble
+in: a false value first, then a description of what went wrong, then a system code for it, with
+some non-false value where it worked. *Almost* is doing real work in that sentence — a few of
+these calls raise instead of answering, and
+[one of them](/docs/standard-library/io/file-write#what-a-write-hands-back) has a fourth value to
+add on the failing path — so each entry says what its own answer is.
+
+<RunnableExample code={`local stock_path = "io-index-example-stock.csv"\n\nlocal writing = assert(io.open(stock_path, "w"))\nwriting:write("cocoa,2\\n")\nwriting:write("flour,1\\n")\nprint(writing:close())\n\nlocal total = 0\nfor line in io.lines(stock_path) do\n  total = total + tonumber(line:match(",(%d+)$"))\nend\nprint(total)\n\nprint(os.remove(stock_path))\n-- Expected output:\n-- true\n-- 3\n-- true`} />
+
+Both styles, one after another. The writing goes through a handle the program opened and closed
+itself; the reading goes through a name, with the library doing the opening and the closing on
+the program's behalf. The `true` at the top is the close, and it is the moment the file is
+complete — which, on a file being written, is not the moment the last `write` came back.
+
+<Note>
+That last point is the one that catches people out, and it is not a detail of any single entry.
+What a program has written and what the file holds
+[can be two different things](/docs/standard-library/io/file-setvbuf#what-buffering-is) while
+the handle is open: writes are held back and handed over in batches, which is what makes writing
+a line at a time affordable. [`file:flush()`](/docs/standard-library/io/file-flush) asks for a
+handover now, [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) changes the rule the
+batches follow, and closing does the handover on its way out. A file that looks short while the
+program that is writing it is still running is usually this and not a bug.
+</Note>
+
+Which names this table holds has not moved at all: the same twenty-one, on every Lua line this
+site documents. What has moved is behaviour — what a call accepts, what it hands back, and how
+much of a file's life it takes responsibility for — and it has moved on most of them, often in
+ways that change how the surrounding code has to be written rather than only what it prints.
+Each entry's own version support says where its line falls.
+
+## Opening a file, and finishing with it
+
+Where a handle comes from, what to ask it about, and how to give it back. A program that opens a
+file itself is the one that has to close it, and these are both ends of that.
+
+- [`io.open()`](/docs/standard-library/io/open) — a file by name, and a handle to read or write it through
+- [`io.tmpfile()`](/docs/standard-library/io/tmpfile) — a scratch file with no name, open for both directions, taken away when the program ends
+- [`io.close()`](/docs/standard-library/io/close) — a handle closed, or the default output file when handed nothing
+- [`file:close()`](/docs/standard-library/io/file-close) — the same close, written as a method on the file it acts on
+- [`io.type()`](/docs/standard-library/io/type) — whether a value is a file handle at all, and whether its file is still open
+
+## Reading
+
+Four ways to get bytes out of a file: two that read once and two that drive a `for` loop, and in
+each pair one takes a handle the program is holding while the other needs none.
+
+- [`file:read()`](/docs/standard-library/io/file-read) — a line, a numeral, a count of bytes or everything left, from the file a handle refers to
+- [`io.read()`](/docs/standard-library/io/read) — the same reading, aimed at the default input file instead
+- [`file:lines()`](/docs/standard-library/io/file-lines) — a `for` loop over the same handle, which the program still holds when the loop ends
+- [`io.lines()`](/docs/standard-library/io/lines) — a `for` loop over a file named rather than held, closed again once the reading reaches the end
+
+## Writing
+
+The same pairing on the way out, plus the two calls that say *hand it over now* rather than
+waiting for whenever it would have gone anyway.
+
+- [`file:write()`](/docs/standard-library/io/file-write) — strings and numbers written to a handle, one after another, with nothing put between them
+- [`io.write()`](/docs/standard-library/io/write) — the same writing, aimed at the default output file instead
+- [`file:flush()`](/docs/standard-library/io/file-flush) — what has been written and is still waiting, handed over without closing anything
+- [`io.flush()`](/docs/standard-library/io/flush) — the same handover, aimed at the default output file
+
+## Moving about a file, and holding writes back
+
+Two methods with no function in the table beside them. One says *where* in the file the next
+operation happens; the other says *when* what has been written leaves.
+
+- [`file:seek()`](/docs/standard-library/io/file-seek) — the point where the next read or write happens, moved and reported
+- [`file:setvbuf()`](/docs/standard-library/io/file-setvbuf) — one of three buffering schemes asked for, and how much to hold back under it
+
+## The default input and output files
+
+The two files the implicit style works on. Each of these reports which file that currently is,
+and can point it somewhere else.
+
+- [`io.input()`](/docs/standard-library/io/input) — the default input file, read or pointed at a file by name or by handle
+- [`io.output()`](/docs/standard-library/io/output) — the default output file, the same two ways, with a named file emptied first
+
+## Another program on the other end
+
+One call, and it sits on its own because what it produces is not a file. It is also the only
+name here the manual declines to promise is present at all.
+
+- [`io.popen()`](/docs/standard-library/io/popen) — a program started alongside this one, with a handle joined to what it prints or to what it reads
+
+## Constants
+
+Three handles rather than three calls, open before the first line of Lua runs and never closed
+by this library.
+
+- [`io.stdin`](/docs/standard-library/io/stdin) — the handle on the program's standard input, and what the default input file starts as
+- [`io.stdout`](/docs/standard-library/io/stdout) — the handle on the program's standard output, and what the default output file starts as
+- [`io.stderr`](/docs/standard-library/io/stderr) — the handle on the program's error stream, which nothing in this library points at
+
+## See also
+
+- [`os`](/docs/standard-library/os) — the same reach outwards, worked on names rather than on open handles
+- [`os.remove()`](/docs/standard-library/os/remove) — taking a file away once nothing has it open
+- [`os.execute()`](/docs/standard-library/os/execute) — running a program when what it prints is not the point
+- [`string.format()`](/docs/standard-library/string/format) — assembling the text these calls write
+- [Method calls](/docs/language/expressions/method-calls) — the `:` form seven of these entries are written in
+- [Protected calls](/docs/language/error-handling/protected-calls) — surviving the calls here that raise rather than answer

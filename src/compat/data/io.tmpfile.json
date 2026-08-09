@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "The handle can now be held in a to-be-closed variable. The metatable for file handles gained a `__close` metamethod beside the finalizer it has always carried, so `local scratch <close> = assert(io.tmpfile())` gives the file up when the block ends, whether it ends normally or through an error. This is the handle that suits the declaration best: nothing outside the block can reach a file with no name, and there is no default file to be left closed behind it. Earlier versions have no such declaration, and nothing but an explicit close or the collector gives the scratch file back before the program ends."
+  }
+}
