@@ -4,7 +4,11 @@ import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { nitro } from 'nitro/vite';
-import { CONTENT_TREE, contentTreeUrls } from './src/content-tree/manifest';
+// Extension included deliberately. Vite's `configLoader: 'native'` — planned to become
+// the default in a future major — loads this file through Node, which will not resolve an
+// extensionless relative import. The same applies to anything the config pulls in
+// transitively, which is why `manifest.ts` spells out its own import too.
+import { CONTENT_TREE, contentTreeUrls } from './src/content-tree/manifest.ts';
 
 export default defineConfig({
   server: {

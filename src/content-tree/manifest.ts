@@ -4,7 +4,9 @@
  * compat data. Nothing here touches the filesystem.
  */
 
-import type { LuaVersion } from '../compat/schema';
+// Extension included because `vite.config.ts` imports this module, so Node's native
+// config loader has to resolve it. See the note there.
+import type { LuaVersion } from '../compat/schema.ts';
 
 /** Which section order from `docs/research/page-structure.md` an entry follows. */
 export const ENTRY_TYPES = ['function', 'construct', 'constant', 'overview', 'guide'] as const;

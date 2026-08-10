@@ -9,6 +9,9 @@
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "types": ["vite/client"],
     "isolatedModules": true,
+    // `vite.config.ts` and the modules it pulls in spell out their `.ts` extensions, so
+    // Vite's native config loader can resolve them. Safe here because nothing is emitted.
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ES2022",
