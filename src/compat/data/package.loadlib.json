@@ -1,0 +1,10 @@
+{
+  "support": {
+    "lua": {
+      "version_added": "5.1"
+    }
+  },
+  "changed_in": {
+    "5.2": "A `funcname` of `\"*\"` now asks for the library to be linked and nothing more, making the symbols it exports available to libraries linked after it, and `true` comes back where a function would have. Earlier versions read that spelling as an ordinary symbol name and looked inside the library for a function called `*`."
+  }
+}

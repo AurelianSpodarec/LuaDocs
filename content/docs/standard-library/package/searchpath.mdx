@@ -1,8 +1,165 @@
 ---
 title: package.searchpath()
-description: ""
+description: Walk a path of templates for a name and report the first file that can be opened, without loading any of it.
+lua-compat: package.searchpath
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.searchpath
 ---
 
-{/* Not yet written. */}
+Runs a name through a path of templates and hands back the first file name it can open for
+reading. It is the search [`require()`](/docs/standard-library/globals/require) does, offered
+as a call with the path handed in rather than read out of a field — and it stops the moment
+something is found. Nothing is compiled, nothing is run, and nothing is recorded anywhere.
+
+<RunnableExample code={`local module_path = "package-searchpath-example-postage.lua"\nlocal module_file = assert(io.open(module_path, "w"))\nmodule_file:write("return { overnight = 12 }")\nmodule_file:close()\n\nlocal found = package.searchpath("postage", "./package-searchpath-example-?.lua")\nprint(found)\n\nos.remove(module_path)\n-- Expected output: ./package-searchpath-example-postage.lua`} />
+
+## Syntax
+
+```lua
+package.searchpath(name, path [, sep [, rep]])
+```
+
+<Parameters>
+  <Param name="name">The name to look for. What happens to it before it goes into a template is decided by `sep` and `rep` — see [What sep and rep do](#what-sep-and-rep-do).</Param>
+  <Param name="path">The templates to search, written as one string with the list separator between them. Each is a file name, usually with a `?` in it that the adjusted name replaces; [what a template is](/docs/standard-library/package/path#what-a-template-is) sets out the rest, including what a template with no `?` does.</Param>
+  <Param name="sep">What counts as a step inside `name`. Left out, a dot. An empty string turns the replacement off altogether and `name` is used exactly as it was given.</Param>
+  <Param name="rep">What each `sep` becomes. Left out, the directory separator of the system Lua was built for, which is the first thing [`package.config`](/docs/standard-library/package/config) reports.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The file name the search stopped at, exactly as the template produced it. That file was opened for reading and closed again before the call came back — see [What the answer is, and what it is not](#what-the-answer-is-and-what-it-is-not).</Return>
+  <Return type="nil">Where no template produced a file that could be opened.</Return>
+  <Return type="string">A report of what was tried, on the failing path only. It is text meant for a person; the file names in it are the ones this call built and tried.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `name` is neither a string nor a number, including when it is left out. A number is read as the name it spells.
+- Raises when `path` is neither a string nor a number, including when it is left out.
+- Raises when `sep` or `rep` is given and is neither a string nor a number. `nil` in either position counts as leaving it out, so the default applies.
+- Nothing about the templates themselves is checked. A path naming directories this machine does not have, or holding no `?` at all, is searched and answered rather than refused; so is the empty string.
+
+</Errors>
+
+## Description
+
+The path is a list, written as a string. It is taken apart at the list separator, and each
+piece is a *template*: a file name with a `?` in it that stands for the name being looked for.
+[What a template is](/docs/standard-library/package/path#what-a-template-is) sets out the
+scheme — the substitution, first-hit-wins, and the open-and-close test — and this call is that
+scheme with the path supplied by the caller.
+
+Two things are worth knowing about which path to hand it. This call reads no field on its own:
+searching what `require()` would search means passing
+[`package.path`](/docs/standard-library/package/path) or
+[`package.cpath`](/docs/standard-library/package/cpath) in yourself, and passing anything else
+searches somewhere of the caller's own choosing. That is the point of the call — a program with its
+own list of places can use the same scheme against it, and a searcher of its own can use the
+same scheme to find whatever it is responsible for.
+
+The other is that the answer is a *file name*, not a module. Turning that file into something
+useful is a separate step, and the calls that do it are
+[`loadfile()`](/docs/standard-library/globals/loadfile) and
+[`dofile()`](/docs/standard-library/globals/dofile) — or, where the point is a module rather
+than a file, `require()` itself.
+
+## What sep and rep do
+
+These two are the arguments readers get wrong, and the mistake is usually the same one: `sep` is
+not the character between one template and the next. That separator belongs to the interpreter
+rather than to this call: it is the second thing `package.config` reports, and there is no
+argument here for it.
+
+`sep` and `rep` are about the *name*. Before the name goes anywhere near a template, every
+occurrence of `sep` in it is replaced by `rep` — and left alone, that pair is a dot and the
+system's own directory separator, which is exactly the adjustment that makes a dotted name mean
+a path through directories. `shop.orders` searched through `./?.lua` looks for `orders.lua`
+inside a `shop` directory because of these two arguments and nothing else.
+
+So the two are worth giving explicitly whenever the name is not a module name. A name whose
+parts are divided by something other than a dot needs its own `sep`; a search that should not
+descend into directories at all needs its own `rep`; and a name that is meant to be taken
+literally, dots and all, needs `sep` set to the empty string, which switches the replacement
+off.
+
+<RunnableExample code={`local dotted_file = assert(io.open("package-searchpath-example-shop-orders.lua", "w"))\ndotted_file:write("return {}")\ndotted_file:close()\nlocal literal_file = assert(io.open("package-searchpath-example-shop.orders.lua", "w"))\nliteral_file:write("return {}")\nliteral_file:close()\n\nlocal template = "./package-searchpath-example-?.lua"\nprint(package.searchpath("shop.orders", template, ".", "-"))\nprint(package.searchpath("shop.orders", template, ""))\n\nos.remove("package-searchpath-example-shop-orders.lua")\nos.remove("package-searchpath-example-shop.orders.lua")\n-- Expected output:\n-- ./package-searchpath-example-shop-orders.lua\n-- ./package-searchpath-example-shop.orders.lua`} />
+
+Two searches for one name, differing only in these two arguments. The first turns the dot into
+a hyphen and finds the file named that way; the second switches the replacement off and finds
+the file whose name really does have a dot in it.
+
+## What the answer is, and what it is not
+
+The test a template has to pass is small on purpose: the file is opened for reading, and if
+that worked it is closed again and its name is the answer. Nothing is read out of it, so a file
+that exists and holds nonsense passes, and a file that exists and cannot be *read* — because
+something else holds it, or because the program is not allowed to — fails and the search moves
+on to the next template.
+
+Two consequences follow, and both matter more than they look.
+
+The answer describes a moment that has already passed. Between the close inside this call and
+whatever the program does with the name, the file can be renamed, removed or replaced; a
+program that opens the name it was given still has to cope with the open failing. Asking here
+and opening later is two questions, not one.
+
+And nothing has been loaded. `require()`'s record is untouched, no chunk has been compiled, no
+C library has been linked. That is what makes this the call for *asking* — which of these
+places has the file, is this module available at all, where would it be found from — as opposed
+to the call for having it.
+
+## Examples
+
+### Nothing found, and what comes back then
+
+<RunnableExample code={`local found, complaint = package.searchpath("package_searchpath_example_absent", "./package-searchpath-example-?.lua")\nprint(found)\nprint(type(complaint))\nprint(#complaint > 0)\n-- Expected output:\n-- nil\n-- string\n-- true`} />
+
+The failing answer is two values rather than one, and the second is a report of the names that
+were tried. Note what is *not* printed here: that report is the library's own wording, so it is
+something to show a person and not something to compare against.
+
+### The order of the templates decides
+
+<RunnableExample code={`local first_file = assert(io.open("package-searchpath-example-first-ledger.lua", "w"))\nfirst_file:write("return { source = 'first' }")\nfirst_file:close()\nlocal second_file = assert(io.open("package-searchpath-example-second-ledger.lua", "w"))\nsecond_file:write("return { source = 'second' }")\nsecond_file:close()\n\nlocal both_places = "./package-searchpath-example-first-?.lua;./package-searchpath-example-second-?.lua"\nprint(package.searchpath("ledger", both_places))\nprint(package.loaded["ledger"])\n\nos.remove("package-searchpath-example-first-ledger.lua")\nos.remove("package-searchpath-example-second-ledger.lua")\n-- Expected output:\n-- ./package-searchpath-example-first-ledger.lua\n-- nil`} />
+
+Two files could have answered and the first template won, which is the same rule `require()`
+follows. The `nil` underneath is the other half of the point: a name came back, and the record
+of loaded modules never heard about it.
+
+## Gotchas
+
+<Gotcha title="The separator between templates is not the sep argument">
+`sep` divides the *name*; the list separator divides the *path*, and no argument here changes
+it. A path assembled with the wrong character between templates therefore arrives as one long
+template with that character inside it, and the search fails having tried a single file name
+with that character in the middle of it.
+[`package.config`](/docs/standard-library/package/config) is what reports the character
+actually in use, on its second line.
+</Gotcha>
+
+<Gotcha title="Left alone, the answer depends on the machine">
+`rep` defaults to the directory separator of the system Lua was built for, so a dotted name
+produces a different file name on a system that writes paths with a backslash than on one that
+writes them with a slash. A test comparing the result against a string written out by hand
+therefore passes on the machine it was written on and fails elsewhere. Where the exact answer
+matters, give `rep` explicitly, or build the expected name out of
+[`package.config`](/docs/standard-library/package/config)'s first line rather than out of a
+character typed into the source.
+</Gotcha>
+
+<Gotcha title="It answers with a name even when the file is useless">
+The whole test is that the file opened for reading. A file of zero bytes, a half-written
+download and a file holding a syntax error all pass it, and the first such file the path
+reaches shadows a good one further down it. Whatever goes wrong afterwards is reported by
+whatever reads the file, which is why this call's answer is a starting point rather than a
+guarantee.
+</Gotcha>
+
+## See also
+
+- [`package.path`](/docs/standard-library/package/path) — the templates `require()` searches for Lua files, and where [what a template is](/docs/standard-library/package/path#what-a-template-is) is set out
+- [`package.cpath`](/docs/standard-library/package/cpath) — the same for C libraries, searched with the same scheme
+- [`package.searchers`](/docs/standard-library/package/searchers) — the list this search is used by, and where a searcher of your own would call it
+- [`package.config`](/docs/standard-library/package/config) — the list separator, the mark and the directory separator this call works with
+- [`require()`](/docs/standard-library/globals/require) — the call that searches and then loads, where this one only searches
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — turning the file name this hands back into a function

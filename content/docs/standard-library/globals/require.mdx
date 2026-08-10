@@ -83,7 +83,7 @@ What the loader hands back is the module. Lua fills that list with four searcher
   function stored there is taken as the loader with nothing read from disk. It is how a module
   can be built into a program that has no filesystem to search.
 - *Lua files, through [`package.path`](/docs/standard-library/package/path).* That is a string of templates separated by semicolons,
-  each carrying a `?`. The `?` is replaced by the module name with every dot turned into a
+  most of them carrying a `?`. The `?` is replaced by the module name with every dot turned into a
   directory separator, and the first template whose file can be opened for reading is the one
   used.
 - *C libraries, through [`package.cpath`](/docs/standard-library/package/cpath).* The same template scheme against a separate string of

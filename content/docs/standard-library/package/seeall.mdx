@@ -1,8 +1,165 @@
 ---
 title: package.seeall()
-description: ""
+description: Give a module table a metatable that falls through to the globals, so the module can still see the standard library.
+lua-compat: package.seeall
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-package.seeall
 ---
 
-{/* Not yet written. */}
+Attaches a metatable to a module table whose `__index` is the table Lua looks global names up
+in, so a name the module does not hold is looked for among the globals instead of coming back as
+nothing. It exists for one purpose: to be handed to [`module()`](/docs/standard-library/globals/module)
+as an option, undoing the one awkward thing that call did to the file that made it. What stands
+in its place is not another call. A module written as an ordinary local table and returned never
+stops seeing the globals, so there is nothing to put back — and where a table really is wanted
+to fall through to them, `setmetatable(module_table, { __index = _G })` is this call written out.
+
+<RunnableExample usesEntry={false} code={`local parcel_rates = { overnight = 12 }\n\n-- package.seeall(parcel_rates) attached exactly this metatable\nsetmetatable(parcel_rates, { __index = _G })\n\nprint(parcel_rates.overnight)\nprint(parcel_rates.string == string)\n-- Expected output:\n-- 12\n-- true`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so
+they show the two lines it performed and name the old call in a comment beside them. The call
+itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+package.seeall(module)
+```
+
+<Parameters>
+  <Param name="module">The module table to give the fall-through to. It is changed where it stands — nothing is copied, and the table the caller is already holding is the one that changes.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing comes back. The table handed in is the table that changed, so it is the one to go on using; a caller expecting the module back from this call receives no value at all.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `module` is anything other than a table, including when it is left out.
+- Nothing else is refused. Handing it a table that already carries a metatable is not a mistake here and is not reported as one — see the first Gotcha below.
+
+</Errors>
+
+## Description
+
+Two steps, and both are ordinary Lua written in C. The table is given a metatable — its own if
+it already has one, a fresh empty one if it does not — and that metatable's `__index` field is
+set to the table holding the program's globals.
+
+From then on the module table answers to two sets of names. Ones it holds itself are found in it
+as before; ones it does not hold are looked for in the globals, and whatever is there is what
+comes back. That is [`__index`](/docs/language/metatables/index-metamethod) doing its ordinary
+job, and nothing about the arrangement is special to modules.
+
+The fall-through stays live. It refers to the globals table rather than to a copy of what was in
+it, so a global assigned after this call is reachable through the module from that moment on,
+and one that goes away stops being reachable. It also runs in one direction only: `__index` is
+consulted on reads, and nothing here touches `__newindex`, so a write to a name the module does
+not hold lands on the module table itself rather than reaching the globals.
+
+## What it was for
+
+[`module()`](/docs/standard-library/globals/module) made a file's own table the environment its
+global names resolved through. That is what let the file write `function cost(weight_kg)` and
+have the function become part of the module — and it is also what cut the file off from
+`print`, `string` and everything else the standard library puts in the globals, because those
+names now resolved through the module table, which held none of them.
+
+Handing this function to `module()` as an option was the fix, and
+[what the options were for](/docs/standard-library/globals/module#what-the-options-were-for)
+sets out how an option was applied. The call runs after the environment has been swapped, so by
+the time the file's first ordinary line executes the module table already answers to every
+global name and the file reads as though nothing had been moved. In practice most files written
+against that call were written with this option, which is a fair measure of how well the swap
+worked out.
+
+## What stands in its place
+
+Two answers, and the first is the one that matters.
+
+*The problem it solved does not arise any more.* A module is built as a local table, filled in,
+and returned; nothing swaps any environment, so the file reads `string.format` and `print` where
+every other file does and there is nothing to put back.
+[The pattern that replaced it](/docs/standard-library/globals/module#the-pattern-that-replaced-it)
+is the whole of that, and a file written that way needs no option, no metatable and no
+fall-through.
+
+*Where a table genuinely should fall through to the globals*, for its own reasons rather than to
+repair something, the two lines are ordinary Lua:
+
+```lua
+setmetatable(module_table, { __index = _G })
+```
+
+That is the same arrangement with two differences worth knowing. It hands the table a *new*
+metatable, discarding any the table already had, where this call kept an existing one and wrote
+into it — so on a table that already has behaviour of its own the two are not interchangeable.
+And it names [`_G`](/docs/standard-library/globals/_g) explicitly, which is a value the
+surrounding code can see and swap for something narrower: a table of exactly the names the
+module is meant to reach, rather than everything the program happens to have put in the globals.
+
+## Examples
+
+### Reads fall through and writes do not
+
+<RunnableExample usesEntry={false} code={`-- package.seeall(depot) is what put the fall-through there\nlocal depot = setmetatable({}, { __index = _G })\n\nprint(depot.select == select)\n\ndepot.warehouse_count = 4\nprint(rawget(depot, "warehouse_count"))\nprint(rawget(_G, "warehouse_count"))\n-- Expected output:\n-- true\n-- 4\n-- nil`} />
+
+A global read through the module answers, and a value written through it stays in the module.
+That asymmetry is the whole of what the arrangement does: it is a way of *seeing* the globals,
+never a way of joining them.
+
+### What the module answers to afterwards
+
+<RunnableExample usesEntry={false} code={`-- package.seeall(parcel_rates) is what put the fall-through there\nlocal parcel_rates = setmetatable({ overnight = 12 }, { __index = _G })\n\nprint(parcel_rates.overnight)\nprint(parcel_rates.standard)\nprint(parcel_rates.tostring == tostring)\n-- Expected output:\n-- 12\n-- nil\n-- true`} />
+
+Three reads of one table. The first is the module's own field, the second is a field it does not
+have and the globals do not either, and the third is a name that was never part of the module
+answering with a standard-library function. The module's callers see that third answer as
+readily as the module's own code does.
+
+### A module that needs none of it
+
+<RunnableExample usesEntry={false} code={`local depot_path = "package-seeall-example-depot.lua"\nlocal depot_file = assert(io.open(depot_path, "w"))\ndepot_file:write("local depot = {}\\n")\ndepot_file:write("function depot.summary(parcel_count)\\n")\ndepot_file:write("  return string.format('%d waiting', parcel_count)\\n")\ndepot_file:write("end\\n")\ndepot_file:write("return depot\\n")\ndepot_file:close()\n\nlocal depot = assert(loadfile(depot_path))()\nprint(depot.summary(3))\nprint(getmetatable(depot))\n\nos.remove(depot_path)\n-- Expected output:\n-- 3 waiting\n-- nil`} />
+
+The file reaches `string.format` with nothing arranged for it, and the table it hands back has no
+metatable at all. That is the replacement in full: not a different way of putting the globals
+back, but a shape that never took them away.
+
+## Gotchas
+
+<Gotcha title="A metatable the table already has is written into, not replaced">
+Only a table with no metatable gets a fresh one here. A table that already has one keeps it, and
+`__index` is written into it over whatever was there — so a module that had arranged its own
+`__index`, for defaults or for a lookup somewhere else, silently loses that arrangement and
+gains the globals instead. Everything else in the metatable stays, which makes the loss easy to
+miss: the table still has its `__tostring`, its `__eq` and its `__call`, and only the one field
+has been written over.
+</Gotcha>
+
+<Gotcha title="The module answers to every global name, to everybody">
+The fall-through is a property of the module table, and the module table is what callers hold.
+So a caller reading a field the module does not have gets whatever global shares that name: a
+read of `rates.tostring` answers with the standard library's function rather than with `nil`,
+and a check written as `if module_table.some_option then` can be answered by an unrelated
+global. A read that should have stopped at nothing carries on instead, on both sides of the
+module's boundary.
+</Gotcha>
+
+<Gotcha title="Whatever the globals hold later is what the module sees later">
+`__index` points at the globals table itself, not at a copy of what was in it. A program that
+assigns a global after this call has made that name reachable through the module; one that
+clears a global has taken a name away from it. So the set of names a module answers to is not
+settled when the fall-through is attached — it follows the program's globals for as long as the
+module exists.
+</Gotcha>
+
+## See also
+
+- [`module()`](/docs/standard-library/globals/module) — the call this was written as an option for, and where the pattern that replaced it is set out
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — the operation this performs, written out where the surrounding code can see it
+- [`_G`](/docs/standard-library/globals/_g) — the global environment the fall-through points into
+- [`require()`](/docs/standard-library/globals/require) — the call that hands a module to its callers, which is why the fall-through is visible to them too
+- [`rawget()`](/docs/standard-library/globals/rawget) — reading a field without the fall-through getting a say

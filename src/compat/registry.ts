@@ -157,6 +157,10 @@ import packageLoaded from './data/package.loaded.json';
 import packagePreload from './data/package.preload.json';
 import packageSearchers from './data/package.searchers.json';
 import packageLoaders from './data/package.loaders.json';
+import packageSearchpath from './data/package.searchpath.json';
+import packageLoadlib from './data/package.loadlib.json';
+import packageSeeall from './data/package.seeall.json';
+import packageLibrary from './data/package.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1705,6 +1709,94 @@ const raw: Record<string, unknown> = {
   'package.preload': packagePreload,
   'package.searchers': packageSearchers,
   'package.loaders': packageLoaders,
+
+  // ## `package.searchpath`, `package.loadlib`, `package.seeall` — and the section node
+  //
+  // Established the same way P1 and P2 established theirs: all five manuals on disk, every
+  // Incompatibilities chapter from 5.2 on read whole, and **26 artefacts of `loadlib.c`**
+  // diffed as whole files — every release tag from `v5.1` to `v5.5.1` plus shipped 5.1.5 and
+  // 5.2.4 from `lua.org/source/<line>/`.
+  //
+  // ### `package.searchpath` — one arrival, and nothing after it
+  //
+  // Absent from 5.1's manual and from all three 5.1 artefacts; present in every manual and
+  // every artefact from `v5.2.0`. **Its four arguments and their two defaults have never
+  // moved**: `ll_searchpath` is `luaL_checkstring(L, 1)`, `luaL_checkstring(L, 2)`,
+  // `luaL_optstring(L, 3, ".")`, `luaL_optstring(L, 4, LUA_DIRSEP)` at all 23 artefacts that
+  // have it, and the manual passage is word-identical in 5.2 and 5.3 and differs in 5.4 and
+  // 5.5 only by saying `fail` where the earlier two say `nil` — which is the same value under
+  // the vocabulary 5.4 introduced, the ruling `math.ult` and `math.type` already ship.
+  //
+  // One thing inside it genuinely moved at **5.4** and is deliberately *not* recorded.
+  // `v5.2.0`–`v5.3.6` split the path into templates first (`pushnexttemplate`) and substitute
+  // the mark into each template; `v5.4.0`–`v5.5.1` substitute the mark into the whole path at
+  // once (`luaL_addgsub`) and split afterwards (`getnextfilename`). The two differ only when
+  // the *name* being substituted itself contains the separator between templates — probed:
+  // `package.searchpath("a;b", "./p-?.lua")` tries one file on the older shape and two on the
+  // newer one. No manual states what such a name does, no page here opens the subject, and a
+  // note dating it would be G6's "Important 2" — a `changed_in` about something the base prose
+  // never says. The empty-template difference P1 recorded (skipped before 5.4, tried and failed
+  // from 5.4) is the same class and is likewise absent.
+  //
+  // ### `package.loadlib` — the `"*"` form arrives at 5.2, and both axes agree
+  //
+  // `version_added: "5.1"`: `pdf-package.loadlib` is a 5.1 entry, and 5.1 §7.2's
+  // "Function `loadlib` was renamed `package.loadlib`" is a 5.0-to-5.1 change, before the range
+  // this site documents. The one delta inside the range is the star: `ll_loadfunc` at `v5.1`,
+  // `v5.1.1` and shipped 5.1.5 has no `*` branch at all and always looks the symbol up, so
+  // `package.loadlib(lib, "*")` there searches the library for a symbol literally called `*`
+  // and fails; `*sym == '*'` appears in all 23 artefacts from `v5.2.0` on, and 5.2's manual
+  // adds the paragraph describing it. Mechanically scanned across all 26.
+  //
+  // Nothing else moved. The failing path is three values — a false first value, the system's
+  // own description, and a short word for the step that failed — at every one of the 26;
+  // `lua_pushnil` becomes `luaL_pushfail` at `v5.4.0`, which is the same `nil`. The 5.4 manual
+  // adds a paragraph calling the function inherently insecure and 5.5 rewrites the platform
+  // list, neither of which is a behaviour change. **The third value is build-decided, not
+  // version-decided**: `LIB_FAIL` is `"open"` under both `LUA_USE_DLOPEN` and `LUA_DL_DLL` and
+  // `"absent"` in the stub implementation, in every version — the third axis O4 named, and the
+  // reason the entry states the two cases as a property of the build rather than of a Lua line.
+  //
+  // ### `package.seeall` leaves at 5.2 — a version before `module`, and the reason is one sentence
+  //
+  // `seeall` occurs in exactly two places in all five manuals, and both are in 5.1: its own
+  // entry anchor and its own entry. **5.2's Incompatibilities chapter does not name it.** Under
+  // the settled ruling — a version has the symbol iff that version's manual says something
+  // asserting its existence, and deprecation asserts it while silence does not — that is a
+  // removal at 5.2. `module` is *named* in 5.2 §8.2 ("Function `module` is deprecated"), which
+  // asserts existence, so `globals.module` carries `version_removed: "5.3"`. The two therefore
+  // leave a version apart although one is the other's option, and the asymmetry rests entirely
+  // on which of the two that paragraph happens to mention.
+  //
+  // **The build axis disagrees at 5.2, and the manual wins.** `pk_funcs` registers `seeall`
+  // unguarded at all three 5.1 artefacts, behind `#if defined(LUA_COMPAT_MODULE)` at all twelve
+  // 5.2 and 5.3 artefacts including shipped 5.2.4, and not at all from `v5.4.0`. 5.2's
+  // `luaconf.h` defines `LUA_COMPAT_MODULE` inside its `LUA_COMPAT_ALL` block and 5.2's shipped
+  // `src/Makefile` passes `-DLUA_COMPAT_ALL`, so **a stock 5.2 build has `package.seeall`**;
+  // 5.3 puts the flag under `LUA_COMPAT_5_1` alone while its makefile passes
+  // `-DLUA_COMPAT_5_2`, so a stock 5.3 build does not. Same residual as `package.loaders` at
+  // 5.2 and `globals.unpack` at 5.2, and no manual in scope names `LUA_COMPAT_MODULE`, so the
+  // compatibility route stays out of the prose per T4's and M6's precedent.
+  //
+  // `ll_seeall` itself is behaviourally identical wherever it exists — reuse the table's
+  // metatable if it has one, otherwise make one, then set `__index` to the global table. The
+  // only edit is `lua_pushvalue(L, LUA_GLOBALSINDEX)` becoming `lua_pushglobaltable(L)` at
+  // `v5.2.0`, a C API spelling change one version after the entry's documented life ends.
+  //
+  // ### `package.library` — membership, and there is one change to record
+  //
+  // On the rule `string.library` set: the section's existence and its membership, never the
+  // union of its members' behaviour. Derived from the member datasets and checked independently
+  // against `grep -o 'pdf-package\.[a-z]*'` over all five manuals, which gives 5.1's
+  // `cpath loaded loaders loadlib path preload seeall` and, from 5.2 on,
+  // `config cpath loaded loadlib path preload searchers searchpath` unchanged through 5.5. So
+  // every membership move in this library happens at one version, and there is no 5.3, 5.4 or
+  // 5.5 note — even though `require()` grew a second result at 5.4 and a searcher's answer grew
+  // one at 5.2, which are behaviour and live on the members.
+  'package.searchpath': packageSearchpath,
+  'package.loadlib': packageLoadlib,
+  'package.seeall': packageSeeall,
+  'package.library': packageLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

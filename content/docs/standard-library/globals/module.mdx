@@ -79,7 +79,8 @@ of related modules assembles a tree of global tables between them.
 ## What the options were for
 
 An option is a function, and the call applies each one to the module table in the order the options
-were given. The library documents one such function: `package.seeall`, whose job is to undo the
+were given. The library documents one such function:
+[`package.seeall`](/docs/standard-library/package/seeall), whose job is to undo the
 side effect of the fourth step above.
 
 It gives the module table a metatable whose `__index` is the global environment. Names the module
@@ -180,4 +181,5 @@ replacement builds a local and hands it back rather than announcing itself.
 - [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling a file so it can be run and its value taken, which is what the pattern relies on
 - [`setfenv()`](/docs/standard-library/globals/setfenv) — the environment swap this call performed on its caller
 - [`_G`](/docs/standard-library/globals/_g) — the table the installed global name lands in
+- [`package.seeall()`](/docs/standard-library/package/seeall) — the fall-through option itself, and what it did to the module table
 - [`setmetatable()`](/docs/standard-library/globals/setmetatable) — the mechanism behind the fall-through option, in its own right

@@ -1,8 +1,206 @@
 ---
 title: package.loadlib()
-description: ""
+description: Link a C library into the running program by file name and take a function out of it, with no searching and no module system.
+lua-compat: package.loadlib
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.loadlib
 ---
 
-{/* Not yet written. */}
+Links a C library into the running program and hands back a function the library exports. It is
+the low-level end of the `package` library: it searches nowhere, adds nothing to the file name
+it was given, and leaves no trace in the record
+[`require()`](/docs/standard-library/globals/require) keeps.
+
+```lua
+local open_accelerator = assert(package.loadlib("./libaccelerate.so", "luaopen_accelerate"))
+local accelerate = open_accelerator()
+
+print(accelerate.checksum("north,412"))
+```
+
+<Note>
+The sandbox these examples run in has no way to link a C library, so no card on this page loads
+one. The listings that link a library are shown rather than run; the cards under
+[Examples](#examples) work on the shape of the answer, on the choice a program makes when the
+library is not there, and on what a program is left holding once the function has been taken out.
+</Note>
+
+## Syntax
+
+```lua
+package.loadlib(libname, funcname)
+```
+
+<Parameters>
+  <Param name="libname">The complete file name of the library, with whatever directories and whatever extension the system needs. It is used exactly as given — see [Nothing about the name is worked out for you](#nothing-about-the-name-is-worked-out-for-you).</Param>
+  <Only before="5.2">
+    <Param name="funcname">The name the library exports the function under, spelled exactly as the library exports it.</Param>
+  </Only>
+  <Only since="5.2">
+    <Param name="funcname">The name the library exports the function under, spelled exactly as the library exports it — or `"*"`, which asks for the library to be linked and nothing to be looked up inside it. See [Linking without taking anything out](#linking-without-taking-anything-out).</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Return type="function">The function the library exports under that name, ready to be called from Lua like any other. Nothing has called it yet: a library's opening function is what builds the library's table, and calling it is the caller's job.</Return>
+  <Only since="5.2">
+    <Return type="boolean">`true`, where `funcname` asked for the library alone. Nothing was looked up, so there is no function to hand back and this says only that the linking worked.</Return>
+  </Only>
+  <Return type="nil">Where the library could not be linked, or was linked and holds no name like that one.</Return>
+  <Return type="string">What the system said about it, in the system's own wording rather than Lua's.</Return>
+  <Return type="string">A short word for how far the call got: the library itself could not be linked, or the library was linked and the name was not inside it. This is the value to branch on, rather than the description beside it — see [What comes back when it does not work](#what-comes-back-when-it-does-not-work).</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `libname` is neither a string nor a number, including when it is left out.
+- Raises when `funcname` is neither a string nor a number, including when it is left out. Neither argument is optional.
+- A library that is missing, that cannot be linked, or that holds no such name does *not* raise. All three are reported as values, which is why the call is usually written inside an [`assert()`](/docs/standard-library/globals/assert).
+- A Lua built for a system with no dynamic linking at all does not raise either. The call is still there and still answers; it simply reports that it cannot do the job — see [Where this call can do anything, and where it cannot](#where-this-call-can-do-anything-and-where-it-cannot).
+
+</Errors>
+
+## Description
+
+Two things happen, in order. The library named by `libname` is linked into the running program,
+and then the name `funcname` is looked for inside it. The value that comes back is that
+library's function, adopted as a Lua function; from there it is called like anything else.
+
+What it is normally used for is a library's *opening* function — the one that builds and returns
+the library's table. That is the same function
+[`require()`](/docs/standard-library/globals/require) would have called had it found the library
+itself, which is why the usual shape is two lines: take the opener out, then call it.
+
+The rest of what `require()` does is missing here, and deliberately so. Nothing consults
+[`package.cpath`](/docs/standard-library/package/cpath) or any other path, nothing turns a
+module name into a file name, nothing is written into
+[`package.loaded`](/docs/standard-library/package/loaded), and no later `require()` will find
+what this call produced. A program that wants a C library *as a module* asks `require()` for it
+and arranges the paths so it can be found; a program that reaches for this call has a file it
+already knows the whole name of and wants nothing done on its behalf.
+
+## Nothing about the name is worked out for you
+
+`libname` is a file name and is used as one. No directory is prepended, no extension is
+appended, and no template is filled in — so a name that works because `require()` found it
+through a path template does not work here until it is written out in full, directories and
+extension and all.
+
+`funcname` is likewise the symbol the library exports, exactly as it exports it. The
+`luaopen_`-and-underscores spelling is not this call's rule: it is the rule
+[the searcher that reads `package.cpath`](/docs/standard-library/globals/require#how-a-module-is-found)
+follows when it turns a module name into a symbol to look for. Here the name is whatever the
+library's author actually exported, which for a library built to be `require()`d will usually be
+that same spelling and for anything else need not be.
+
+The exported name can also depend on the compiler and the linker the library was built with,
+which is one of the reasons this call is a poor foundation for anything meant to be portable.
+
+## Linking without taking anything out
+
+A `funcname` of `"*"` means *link this library and stop*. Nothing is looked up, `true` comes
+back in place of a function, and the symbols the library exports are made available to
+libraries linked after it.
+
+That is the arrangement for a set of libraries that depend on one another: link the shared one
+first, by itself, and the ones that need its symbols can then be linked and will find them.
+
+```lua
+assert(package.loadlib("./libshared.so", "*"))
+
+local open_plugin = assert(package.loadlib("./libplugin.so", "luaopen_plugin"))
+local plugin = open_plugin()
+```
+
+Note what the answer is on that path. `true` is not a function, so code written to take an
+opener out and call it goes wrong on the *next* line rather than on this one.
+
+## What comes back when it does not work
+
+The failing answer is three values, not one: a false first value, a description from the system,
+and a short word for the step that failed. The third is the useful one, because it separates two
+situations a program usually wants to treat differently — the library was not there at all, or
+the library was there and did not export what was asked for. The first is a deployment problem;
+the second is a build or packaging mismatch between the program and a library it did find.
+
+The description beside it is the system's, not Lua's. It is worth showing to a person and worth
+nothing to a comparison: the same missing file produces different wording on different systems,
+and the word naming the step is what code should branch on.
+
+## Where this call can do anything, and where it cannot
+
+Dynamic linking is not something the C standard provides, so whether Lua can do it at all is a
+property of the build. Where the build has it, the call links libraries. Where it does not, the
+function is still there and still takes its two arguments — and it reports, on each call, that
+this Lua cannot link anything, whatever file name it was handed. The word naming the step is
+where that shows: a build with no dynamic linking uses a different one from a build that tried
+and failed.
+
+So the check a program writes is not `if package.loadlib then`, which is true everywhere. It is
+to make the call and read what came back, with something to fall back on when the answer is a
+false value.
+
+## Examples
+
+### The shape of an answer that did not work
+
+<RunnableExample code={`local opened, complaint, step = package.loadlib("package-loadlib-example-nothing.so", "luaopen_nothing")\n\nprint(opened)\nprint(type(complaint))\nprint(type(step))\n-- Expected output:\n-- nil\n-- string\n-- string`} />
+
+There is no such library, so this is the failing path — and it is the part of the call this
+page can perform rather than only describe. Three values come back, and the two after the first
+are both text: the system's account of what went wrong, and the word naming how far the call
+got. Neither is printed, because both belong to the machine the code is running on.
+
+### Carrying on without the library
+
+<RunnableExample usesEntry={false} code={`local function link_the_accelerator()\n  -- Stands in for: return package.loadlib("./libaccelerate.so", "luaopen_accelerate")\n  return nil, "cannot open shared object file: no such file", "open"\nend\n\nlocal opener, complaint, step = link_the_accelerator()\n\nif opener then\n  print("linked")\nelse\n  print("carrying on without it")\n  print(step)\n  print(type(complaint))\nend\n-- Expected output:\n-- carrying on without it\n-- open\n-- string`} />
+
+An optional accelerator is the case this call is most often written for, and the branch is the
+whole of the technique: read the first value, and where it is false decide from the third which
+kind of trouble it was. A program that treats a false first value as fatal has turned an
+optional library into a required one.
+
+### What you are holding afterwards, and what nobody else is
+
+<RunnableExample usesEntry={false} code={`local library_name = "package_loadlib_example_accelerator"\n\nlocal function link_the_accelerator()\n  -- Stands in for: return package.loadlib("./libaccelerate.so", "luaopen_accelerate")\n  return function() return { encode = function() return "encoded" end } end\nend\n\nlocal opener = link_the_accelerator()\nlocal accelerator = opener()\n\nprint(accelerator.encode())\nprint(package.loaded[library_name])\n-- Expected output:\n-- encoded\n-- nil`} />
+
+The opener is called and its table is what the program now holds — as an ordinary local, reached
+by whatever name this file gave it. The `nil` underneath is the part worth noticing: nothing was
+recorded, so nothing else in the program can reach this table by asking for it, and two files
+that both want it either share the value or make the call twice.
+
+## Gotchas
+
+<Gotcha title="Nothing is checked about what is on the other end">
+Lua takes the symbol it found and treats it as a function it can call. Nothing verifies that the
+name refers to a function at all, or that the function was written to be called from Lua, and
+there is no way for Lua to find out. A name that turns out to be data, or a function of a
+different shape, does not fail politely — the process misbehaves or stops, and no
+[protected call](/docs/standard-library/globals/pcall) catches that, because nothing was raised.
+This is why the call is worth pointing only at libraries the program already trusts, named by
+paths a stranger cannot choose.
+</Gotcha>
+
+<Gotcha title="It is not require(), and afterwards nothing knows it happened">
+[`package.loaded`](/docs/standard-library/package/loaded) is untouched, so the library is not a
+module and no `require()` will hand it back. The value is a local like any other, and two parts
+of a program that both want it have to share it themselves — or each make this call for
+themselves, which is not the shared record `require()` would have given them.
+</Gotcha>
+
+<Gotcha title="A link that succeeded is not a library that fits">
+The link succeeds when the file is there and the symbol is there. Whether the library was built
+against the Lua the program is running, against the same C library, or with the same compiler is
+not something this call can ask — and a mismatch that gets past the link shows up later, as
+behaviour that makes no sense. Where a program can be wrong about which build it found, it is
+worth asking the library itself what it is as the first thing done with it.
+</Gotcha>
+
+## See also
+
+- [`require()`](/docs/standard-library/globals/require) — the call that searches for a C library, links it and records the result, which this one does none of
+- [`package.cpath`](/docs/standard-library/package/cpath) — the templates the searcher for C libraries runs through, and where the `luaopen_` naming rule is met
+- [`package.searchpath`](/docs/standard-library/package/searchpath) — finding a library's file name through a path, which can then be handed to this call
+- [`package.loaded`](/docs/standard-library/package/loaded) — the record this call leaves alone
+- [`package.config`](/docs/standard-library/package/config) — the directory separator a file name written for this call has to use
+- [`assert()`](/docs/standard-library/globals/assert) — turning the false first value into a raise, which is how the listings above are written

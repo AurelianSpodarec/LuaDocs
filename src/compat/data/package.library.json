@@ -1,0 +1,10 @@
+{
+  "support": {
+    "lua": {
+      "version_added": "5.1"
+    }
+  },
+  "changed_in": {
+    "5.2": "Adds `package.searchpath` and `package.config`, renames `package.loaders` to `package.searchers`, and drops `package.seeall`."
+  }
+}

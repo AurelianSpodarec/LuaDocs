@@ -1,8 +1,106 @@
 ---
 title: package
-description: ""
+description: The library behind require() — the paths a module is looked for in, the record of what is already loaded, and the search functions that do the work.
+lua-compat: package.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.4
 ---
 
-{/* Not yet written. */}
+This is the library that turns a module's *name* into the module's value: it decides where a
+module is looked for, in what order, and what happens to the result once it has been found.
+Nearly all of it lives in the table `package`. What a program actually calls does not:
+[`require()`](/docs/standard-library/globals/require) is put straight
+into the global environment, which is why its page sits in the
+[globals](/docs/standard-library/globals) section rather than in this one, and why this section
+is very largely the machinery behind a call documented somewhere else.
+
+Almost nothing here is a call. The two path strings, the record of what has been loaded, the
+table of loaders registered by hand and the list of search functions are values rather than
+functions, and changing what they hold is how a program teaches `require()` about somewhere
+new — with each entry's page saying what changing it actually means, because they do not all
+answer to being assigned over. The calls beside them are an assorted set rather than a family:
+they share no subject, and each one's page says what it is for.
+
+The index below has a shape worth knowing before reading it. Most of what this library holds is
+values rather than functions, which is not true of any other library here. Two of its entries are
+one thing under two spellings, because the list of search functions was renamed and both names
+have a page here. And one entry belongs to a second job this library once did as well as
+loading modules: setting a file up as one. That job's own call is
+[`module()`](/docs/standard-library/globals/module), documented with the globals because it too
+was put straight into the global environment; what is here is the option it took, and it is the
+last page below.
+
+<RunnableExample code={`local original_path = package.path\nlocal module_path = "package-index-example-depot_rates.lua"\n\nlocal module_file = assert(io.open(module_path, "w"))\nmodule_file:write("return { overnight = 12, standard = 4 }")\nmodule_file:close()\n\npackage.path = "package-index-example-?.lua;" .. original_path\n\nlocal depot_rates = require("depot_rates")\nprint(depot_rates.overnight)\nprint(package.loaded["depot_rates"] == depot_rates)\n\npackage.path = original_path\npackage.loaded["depot_rates"] = nil\nos.remove(module_path)\n-- Expected output:\n-- 12\n-- true`} />
+
+Two of the library's values doing what they are usually seen doing: a template put in front of
+the search path so that a file sitting here can be found by name, and the record afterwards
+holding the very table that file returned. The last three lines are the card putting back what
+it changed, which on this library is not optional tidiness.
+
+<Note>
+Everything in this table is shared by the whole program. There is one set of search paths, one
+list of searchers and one record of loaded modules, and every module a program loads is looking at the
+same ones — so a library that writes to any of them writes for its callers too, and one that
+assigns over a path rather than adding to it takes the rest of the program's modules away. It is
+also why nothing here can be scoped: there is no per-module path and no private record, and a
+program that needs two answers to the same module name needs two names.
+</Note>
+
+Which names this table holds moved once, and moved a good deal in that one go: a name was
+retired, a name was renamed, and two arrived. Each entry's own version support says where its
+line falls, and the sidebar dims what your selected version does not have.
+
+## Where a module is looked for
+
+These describe *places*. Two of them are lists of file names with a gap in each for the module
+name, and the other reports the characters those lists are punctuated and filled in with, so a
+program can take one apart without writing the punctuation out by hand.
+
+- [`package.path`](/docs/standard-library/package/path) — the templates searched when the module wanted is written in Lua
+- [`package.cpath`](/docs/standard-library/package/cpath) — the same scheme against a separate list, for a module written in C
+- [`package.config`](/docs/standard-library/package/config) — the separator, the mark and the other characters those two lists are built out of, on the lines that have it
+
+## What is already loaded, and what needs no looking
+
+Two tables `require()` reads rather than searches. The first is the record that makes a second
+request for a module cheap; the second is where a module can be put so that no file is looked
+for at all.
+
+- [`package.loaded`](/docs/standard-library/package/loaded) — the record of what each loaded module produced, and what a later request for a name it already counts as loaded is answered from
+- [`package.preload`](/docs/standard-library/package/preload) — loaders registered by hand, read before any path is
+
+## The search itself
+
+The list of functions that do the finding, and the call that performs the standard kind of
+search on a path handed to it rather than on one of the fields above. Both of these are newer
+than the library around them: an older Lua searches in the same way, but it reaches the list
+under the other name at the foot of this page and has no call of this kind at all.
+
+- [`package.searchers`](/docs/standard-library/package/searchers) — the search functions `require()` works through in order, which a program can add to and reorder
+- [`package.searchpath()`](/docs/standard-library/package/searchpath) — a name run through a path of templates, answering with the first file that opens and loading none of it
+
+## Reaching a C library without any of this
+
+One function, and it sits on its own because it is the only thing here that goes round
+everything above rather than taking part in it. No path is read, no name is turned into a file
+name, and nothing is recorded afterwards.
+
+- [`package.loadlib()`](/docs/standard-library/package/loadlib) — a C library linked by its complete file name, and a function taken out of it by the name the library exports
+
+## Names best written another way
+
+Two the library has carried at one time or another and newer Lua no longer does. Each has
+something to write in its place, and for one of the two that replacement is the same thing under
+a different spelling.
+
+- [`package.loaders`](/docs/standard-library/package/loaders) — the earlier name of `package.searchers`: one list under two spellings, so the change is the name, with one thing worth re-reading while it is made
+- [`package.seeall()`](/docs/standard-library/package/seeall) — the option that let a module built by `module()` see the globals again, which the way modules are written now has no need of
+
+## See also
+
+- [`require()`](/docs/standard-library/globals/require) — the call everything here serves, put into the global environment rather than into this table
+- [`module()`](/docs/standard-library/globals/module) — the older way a file declared itself a module, and the call the last entry above was an option to
+- [`dofile()`](/docs/standard-library/globals/dofile) — running a file named outright, with no searching and nothing recorded
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling a file named outright without running it
+- [`os.getenv()`](/docs/standard-library/os/getenv) — reading the environment variables that can decide the two path strings before a program starts
+- [The stand-alone interpreter](/docs/standalone) — where those variables are read, and where the paths a program starts with are settled
