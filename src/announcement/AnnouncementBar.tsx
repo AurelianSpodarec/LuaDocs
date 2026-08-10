@@ -37,13 +37,27 @@ export function AnnouncementBar({
       // Namespaced because this becomes a DOM id and a `localStorage` key.
       id={`luadocs-announcement-${id}`}
       variant="normal"
-      className="z-50 gap-2 border-b ps-4 pe-12"
+      // 2.5rem rather than the 3rem fumadocs ships. This is one line of small text and
+      // a pill; at 3rem it read as a strip of empty space with a sentence in it, and it
+      // is 8px taken off the top of every entry on the site.
+      height="2.5rem"
+      className={[
+        'z-50 gap-2 border-b',
+        // Symmetric padding, wide enough for the close button to sit inside it. The
+        // button is positioned against the right edge, so clearing it with `pe` alone
+        // would centre the sentence in what is left and leave it visibly off-centre.
+        'px-12',
+        // Fumadocs draws the close button at half-opacity muted, which on this surface
+        // is a grey smudge — the one control in the bar, and the hardest thing in it to
+        // see. Full foreground colour, and a hit area that lights up.
+        '[&>button]:text-fd-foreground [&>button]:hover:bg-fd-accent',
+      ].join(' ')}
     >
       <span className="rounded-full bg-fd-primary px-2 py-0.5 text-xs font-semibold text-fd-primary-foreground">
         {badge}
       </span>
-      {/* One sentence, two lengths. The bar is a fixed 3rem, so on a phone the clause
-          after the dash would wrap into a third line and be clipped rather than shown. */}
+      {/* One sentence, two lengths. The bar is a fixed height, so on a phone the clause
+          after the dash would wrap onto a second line and be clipped rather than shown. */}
       <span className="max-sm:hidden">{message}</span>
       <span className="sm:hidden">{shortMessage}</span>
       <a

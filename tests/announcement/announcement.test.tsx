@@ -88,7 +88,7 @@ describe('ANNOUNCEMENT', () => {
   it('keeps the short message short enough for a phone', () => {
     if (!ANNOUNCEMENT) return;
 
-    // The bar is a fixed 3rem. Anything that wraps past two lines is clipped, not shown.
+    // The bar is one fixed-height line. Anything that wraps is clipped, not shown.
     expect(ANNOUNCEMENT.shortMessage.length).toBeLessThanOrEqual(28);
   });
 });
