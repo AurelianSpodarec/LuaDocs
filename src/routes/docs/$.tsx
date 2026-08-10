@@ -34,6 +34,7 @@ import { scopeToDestination, liveAreaUrls, visibleDestinations } from '@/sidebar
 import { countEntries, filterPageTree } from '@/sidebar/filterPageTree';
 import { filterUnwritten } from '@/sidebar/filterUnwritten';
 import { DestinationsBlock, SidebarFilter } from '@/sidebar/SidebarHeader';
+import { UnwrittenEntry } from '@/content/UnwrittenEntry';
 import { ThemeSwitch } from 'fumadocs-ui/layouts/shared/slots/theme-switch';
 
 export const Route = createFileRoute('/docs/$')({
@@ -182,8 +183,17 @@ function Content({
 }
 
 function Page() {
-  const { pageTree, path, markdownUrl, luaCompat, compatByUrl, source: sourceUrl, reviewed } =
-    useFumadocsLoader(Route.useLoaderData());
+  const {
+    pageTree,
+    path,
+    markdownUrl,
+    luaCompat,
+    compatByUrl,
+    source: sourceUrl,
+    reviewed,
+    indexable,
+    title,
+  } = useFumadocsLoader(Route.useLoaderData());
   const SidebarItem = useMemo(() => createSidebarItem(compatByUrl), [compatByUrl]);
   const { pathname } = useLocation();
   const [query, setQuery] = useState('');
@@ -252,14 +262,21 @@ function Page() {
         }}
       >
         <Link to={markdownUrl} hidden />
-        <Suspense>
-          <Content
-            path={path}
-            luaCompat={luaCompat}
-            sourceUrl={sourceUrl}
-            reviewed={reviewed}
-          />
-        </Suspense>
+        {indexable ? (
+          <Suspense>
+            <Content
+              path={path}
+              luaCompat={luaCompat}
+              sourceUrl={sourceUrl}
+              reviewed={reviewed}
+            />
+          </Suspense>
+        ) : (
+          // The entry chrome stays — sidebar, version switcher, title — and only the body
+          // is replaced. The page still carries `noindex`, so this changes what a person
+          // sees and nothing a crawler indexes.
+          <UnwrittenEntry title={title} sourceUrl={sourceUrl} />
+        )}
       </DocsLayout>
     </FilteringContext.Provider>
   );
