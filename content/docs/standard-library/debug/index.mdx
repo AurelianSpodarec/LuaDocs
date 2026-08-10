@@ -1,8 +1,134 @@
 ---
 title: debug
-description: ""
+description: Lua's debug interface handed to a Lua program — the call stack, the variables a call and a closure are holding, metatables the ordinary calls will not touch, and what C code keeps out of sight.
+lua-compat: debug.library
 entry-type: overview
 source: https://www.lua.org/manual/5.5/manual.html#6.11
 ---
 
-{/* Not yet written. */}
+Lua keeps an interface for the things a debugger and a profiler need, and this library is that
+interface handed to a Lua program. Through it a program can ask where execution has got to and
+what the calls that led there are, read and write the local variables a call is holding while it
+is still running, reach the variables a function closed over, read and replace the metatable of a
+value of any type, and have Lua call a function of yours as the program runs — at every call,
+every return, every new line, or every so many instructions.
+
+All of it lives in the table `debug`. Six of these take an optional first argument naming a
+*thread* to work on and default to the one that is running: the two that describe a stack, the
+two that reach a call's variables, and the two that hold a thread's hook settings.
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo#looking-at-another-thread) explains what
+naming a thread changes for the calls that count stack levels, and it is more than which stack
+gets looked at. The rest take no thread at all, because what they ask about belongs to a value,
+or to the whole state, rather than to a stack.
+
+A few of these pages cannot show you their subject working, and it is worth knowing before you
+reach them. [`debug.debug()`](/docs/standard-library/debug/debug) reads lines from standard
+input, so nothing on its page is offered to run. The two that reach the values attached to a full
+userdata need a userdata, and a Lua program cannot make one — only the host can — so on both of
+those pages the working case is a listing rather than something that runs. And
+[`debug.getregistry()`](/docs/standard-library/debug/getregistry) hands back the live table every
+C library in the program is sharing, which is why nothing on its page writes into it.
+
+<RunnableExample code={`local function report_frame()\n  local frame = debug.getinfo(2, "S")\n  local held = {}\n  local position = 1\n  while true do\n    local name, value = debug.getlocal(2, position)\n    if not name then break end\n    held[#held + 1] = name .. "=" .. tostring(value)\n    position = position + 1\n  end\n  return frame.what, table.concat(held, ", ")\nend\n\nlocal function post_invoice(customer, amount_due)\n  local reference = "INV" .. amount_due\n  local kind, holding = report_frame()\n  print(kind)\n  print(holding)\nend\n\npost_invoice("Ravi", 40)\n-- Expected output:\n-- Lua\n-- customer=Ravi, amount_due=40, reference=INV40`} />
+
+One call describing the call a step out from it, and another walking that call's variables by
+position until the positions run out. What comes back is ordinary Lua — a string here, a table
+there, values the program can go on to compute with — though it is a report about the program
+rather than part of what the program is working out. The report is a copy taken at that instant
+and nothing keeps it up to date; the variables are the running call's own, which is why a write
+through [`debug.setlocal()`](/docs/standard-library/debug/setlocal) is felt by the call that is
+holding them.
+
+<Note>
+Several of these functions break assumptions the rest of the language lets a program rely on —
+that a function's local variables cannot be reached from outside it, that a userdata's metatable
+cannot be changed from Lua, that a Lua program does not crash — and so they can compromise code
+that is otherwise secure. It is *several*, and not the table as a whole: asking where execution
+has got to changes nothing about the program, while replacing the metatable of a whole type,
+writing into the table every C library in the state shares, and pointing one closure's captured
+variable at another's each change something well outside the call that made them. Each entry says
+what its own reach is.
+</Note>
+
+Which names this table holds moved once, and moved a good deal in that one go: two left and four
+arrived together. Each entry's own version support says where its line falls, and the sidebar
+dims what your selected version does not have.
+
+## Where the program is
+
+Two ways of asking where the program has reached. The first answers about one function, or about
+one level of the stack, as a table of fields; the second describes the stack as a whole, as text
+meant for a person to read.
+
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — what Lua knows about a function, or about a call that is running: where it was defined, the name it was called under, the line it has reached
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — the call stack as it stands, written out as a string, with a message put on the front of it, and a rule of its own for a message that is not text
+
+## Watching a program run
+
+Interrupting the program while it works. One of these installs a function Lua calls at moments
+named in advance and another reads back what a thread has installed; the third stops at a point
+you chose and reads what you type.
+
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — a function of yours called as the program runs, at whichever of entering a call, leaving one, reaching a new line and counting off instructions you ask for
+- [`debug.gethook()`](/docs/standard-library/debug/gethook) — what a thread's hook is set to at the moment, in the order it can be written straight back in
+- [`debug.debug()`](/docs/standard-library/debug/debug) — the program stopped where it is, reading lines from standard input and running each one, until a line says `cont`
+
+## The variables a call is holding
+
+A call in progress has parameters and locals, and these two reach them by position rather than by
+name. Reading before writing is the usual order, because the position that answers with the name
+you were after is the one worth writing to.
+
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal) — the name and the value of one local variable of a call that is running, found by position
+- [`debug.setlocal()`](/docs/standard-library/debug/setlocal) — a value written into one of them, with the name of the variable written to coming back
+
+## The variables a function captured
+
+A closure holds on to the local variables it uses from outside itself, and they outlive the block
+that declared them. These four read one, write one, ask whether two closures are holding the same
+one, and make two closures hold the same one.
+
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) — the name and the value of one of the variables a function closed over, found by position
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — a value written into one of them, with the name of the variable written to coming back
+- [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) — a value standing for one captured variable, equal for two closures reading the same variable and unequal for two reading their own, on the lines that have it
+- [`debug.upvaluejoin()`](/docs/standard-library/debug/upvaluejoin) — one closure's captured variable pointed at another's, so that from then on the two are reading and writing a single variable, on the lines that have it
+
+## Metatables, whatever the value
+
+Both of these go round the `__metatable` field the basic library's pair honours, which is a
+statement about what callers are invited to depend on rather than a barrier. The writing half
+reaches further still: it takes a value of any type rather than a table alone, which for every
+type but tables and full userdata means
+[one metatable for that whole type](/docs/standard-library/debug/setmetatable#one-metatable-for-a-whole-type)
+rather than one for the value in hand.
+
+- [`debug.getmetatable()`](/docs/standard-library/debug/getmetatable) — the metatable really attached to a value, with a `__metatable` field not looked for
+- [`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) — a metatable attached to a value of any type, or taken away again, with a `__metatable` field stopping neither
+
+## What C code is keeping
+
+A C library keeps Lua values in places a Lua program is not otherwise given: attached to a
+userdata it handed out, and in one table shared by everything in the state. These three are how a
+program reaches both.
+
+- [`debug.getuservalue()`](/docs/standard-library/debug/getuservalue) — one of the Lua values a full userdata is carrying beside its block of memory, on the lines that have it
+- [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) — one of those values replaced, on the lines that have it
+- [`debug.getregistry()`](/docs/standard-library/debug/getregistry) — the registry handed over as an ordinary table: the live one, the same table every C library in the state is using
+
+## Functions best written another way
+
+Two the library has carried at one time or another and newer Lua no longer does. They read and
+replaced whatever a value used as its *environment*, and no one call reaches all of that now —
+what to write instead depends on what was carrying the table.
+
+- [`debug.getfenv()`](/docs/standard-library/debug/getfenv) — the environment table of anything that had one, read now as a function's captured `_ENV` or as a value attached to a userdata, depending on which it was
+- [`debug.setfenv()`](/docs/standard-library/debug/setfenv) — a table put under an object as its environment, written now through [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) or [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue), and split the same way
+
+## See also
+
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable) — the metatable question asked the ordinary way, with a `__metatable` field answered for
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — attaching one the ordinary way, to a table, with that field honoured
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — running a handler while the failing stack is still standing, which is what makes a traceback worth taking
+- [`coroutine`](/docs/standard-library/coroutine) — where the threads several of these functions can be pointed at come from
+- [`_G`](/docs/standard-library/globals/_g) — the table global names are read out of, reached by name rather than through this library
+- [`os.clock()`](/docs/standard-library/os/clock) — the processor time a profiler counts in, which nothing here reports

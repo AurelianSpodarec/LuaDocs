@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Adds `debug.getuservalue`, `debug.setuservalue`, `debug.upvalueid` and `debug.upvaluejoin`, and drops `debug.getfenv` and `debug.setfenv`."
+  }
+}

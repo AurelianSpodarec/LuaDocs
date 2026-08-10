@@ -21,6 +21,8 @@ Done against a condition nothing would ever meet.
 | 2 | Page anatomy — piloted on `string` | [2026-08-05-page-anatomy-string.md](2026-08-05-page-anatomy-string.md) | Done |
 | 2.5 | `string` section — the remaining sixteen entries | [2026-08-05-string-section.md](2026-08-05-string-section.md) | Done |
 | 2.6 | `table` and `math` sections | [2026-08-05-table-and-math.md](2026-08-05-table-and-math.md) | Done — see below |
+| 2.6.1 | `globals` section | [2026-08-06-globals.md](2026-08-06-globals.md) | Done — see below |
+| 2.6.2 | The remaining six libraries | [2026-08-06-remaining-libraries.md](2026-08-06-remaining-libraries.md) | Done — see below |
 | 2.7 | The bespoke UI — replacing Fumadocs's chrome | — | Not started |
 | 3 | Content pipeline | — | Not started |
 | 4 | Search + `llms.txt` | — | Not started |
@@ -470,3 +472,137 @@ of authoring rather than as review.
   prints differently and nothing on the site says so. Site-wide; `math` is where it first bites.
 - **`string/format.mdx` phrases a claim by error-message text**, which the rules forbid — found
   in passing, outside this slice's files, and left for whoever edits that entry next.
+
+## The standard library is finished (2026-08-10)
+
+All ten sections are written: `string` 20, `table` 13, `math` 36, `globals` 32, `coroutine` 9,
+`utf8` 7, `os` 12, `io` 22, `package` 11 and `debug` 19 — **181 entries**, each with its own
+compat dataset, and 739 runnable examples all executed against their expected-output comments on
+every run of the suite. Every entry was written from the five manuals with a batch report beside
+it, adversarially reviewed, and fixed. The detail is in
+`.superpowers/sdd/2026-08-05-table-and-math/`; what follows is what outlives it.
+
+**One stub is left under `content/docs/standard-library/`, and it is the front door**:
+`standard-library/index.mdx`, the chapter's own page. It is not a section overview — it would
+index ten sections rather than nineteen entries, `overview-index.test.ts` does not apply to it,
+and nothing in these slices claimed it. It belongs with the top-level navigation work.
+
+### Three things built during the later sections that the `table`/`math` debts asked for
+
+- **`<Only since="…" before="…">` scopes a Syntax line, a `<Param>` or a `<Return>` to a version
+  range** (`src/version/versionScope.ts`). This discharges the first debt logged above — there
+  was no version-conditional form for anything but an `<Errors>` bullet, and two entries shipped
+  wrong because of it. `since` is inclusive and `before` exclusive, so a pair is an exact
+  complement. It **shows and hides and renders no chip**: the dataset's `changed_in` already
+  reaches the reader on the support strip, in the inline note and in the matrix, and a chip would
+  be a fourth telling in a second voice. `<Parameters>` and `<Returns>` decide their heading from
+  what survives scoping, so a version with no returns no longer renders an empty Return-values
+  block. `debug.setmetatable` is the worked example: a `<Return type="boolean">` before 5.2 and a
+  `<Return type="any">` from it, the exact complement, verified in the browser both ways.
+- **`tests/content/fragment-links.test.ts` checks every in-repo `#anchor` link.** The
+  shared-rule-owner convention — one entry owns a rule under a named H2 and everyone else links
+  to it — produced cross-page fragment links that nothing verified, and retitling one heading
+  broke every link to it *silently*: no test failed, no build error, the link simply landed at
+  the top of the page while the sentence went on promising a section by name. Sixteen entries
+  point at `math.floor#which-subtype-comes-back` alone. The guard runs the real MDX compiler and
+  the real heading plugin rather than reimplementing the slug rule, because a hand-written regex
+  would pass links the reader finds broken.
+- **`version_restored`** is described under `table` and `math` above and needed nothing further.
+
+### The absolutist sweep grew two more legs, and they are where the defects were
+
+The sweep recorded above is one leg: read each hit against the entry's own Description and
+examples. The later sections added two, and by the end the split was not close.
+
+2. **Read the hit against the manual passage the clause depends on.** This is the commonest
+   Critical in the whole effort: a claim entirely consistent with its own page and false against
+   the manual. Roughly half the Criticals found, and *every one of them passed leg 1*.
+3. **Read the hit against the entry's own `changed_in`** — including any register that borrows a
+   fact belonging to *another* entry's dataset, which is the shape that hides best. A
+   `file:flush` page carrying no `changed_in` of its own asserted that `file:write` hands the
+   file back, which is false on the oldest line, with no surface anywhere on that page to date
+   it. A borrowed fact arrives without the surface that dates it.
+
+Two refinements worth carrying: **a See-also gloss and an index gloss are component bodies for
+all three legs** — structurally the most exposed register on any page, because a gloss states a
+fact whose dated surface lives on someone else's page, and two Criticals shipped there — and
+**when leg 3 fires once on an entry, re-run it over every component body on that entry**, because
+a batch that caught the shape twice in one `<Errors>` list stopped there and shipped a third
+instance in a `<Return>` body of the same file.
+
+### Two more page forks, both built and both with worked examples
+
+- **The method fork** (`io/file-read.mdx` and six siblings). These document methods on a file
+  handle rather than functions in a table; their manual anchors are `pdf-file:read`, and five of
+  the seven have a same-named library function that is **not** the same call. Each pair is two
+  entries, not one, and each pair's two pages say where they part.
+- **The rename fork** (`package/loaders.mdx` against `package/searchers.mdx`). One list under two
+  spellings. It is not the removal fork — nothing was replaced, so "what to write instead" is the
+  same object under a different name — and it is not two entries about two different things
+  either. The older spelling carries the removal bounds and the explanation of the change; the
+  newer carries the behaviour.
+
+### The removal ruling held everywhere, and its shorthand would not have
+
+The ruling stated under `table` and `math` — *a version has the symbol iff that version's manual
+says something asserting its existence; deprecation asserts existence, silence does not* — was
+applied to `globals`' five departures, `package`'s two and `debug`'s two, and needed no
+amendment. **The forbidden shorthand** ("the first version whose manual does not mention the
+symbol at all") would have been wrong twice: `loadstring` and `module` have no anchor in the 5.2
+manual and are named there as *deprecated*, so the shorthand puts them out a whole line early.
+One paragraph of an Incompatibilities chapter can carry three different verbs for five symbols;
+read it verb by verb.
+
+The one place it is worth recording the evidence rather than the rule: `debug.getfenv` and
+`debug.setfenv` are removed by **silence**, not by 5.2 §8.2. That sentence is about the basic
+library's pair and §8.3's is about the C API's; the `debug` pair is absent from `ldblib.c` from
+`v5.2.0` on, with no compatibility switch on any line, and that is the evidence.
+
+### The overview fork after ten sections
+
+Settled, and nothing strained it: group counts from three to nine, group sizes from one to eight,
+and a legacy group on exactly five of the ten. Three additions to what is recorded above:
+
+- **A one-bullet H2 is allowed.** Prefer a pairing; ship a singleton rather than a forced pair,
+  because a junk-drawer heading is not a task and the reader loses the scent.
+- **A section whose own preamble is thin should look one level up.** `globals` took its defining
+  fact from the chapter preamble, because the Basic Functions preamble is four lines about C
+  hosts in every manual.
+- **The index and the sidebar can be made to agree, and it is worth aiming at.** On `debug` all
+  eighteen rows agree at every version: the two removals are quarantined in the legacy group and
+  dimmed from 5.2, and the four arrivals carry "on the lines that have it" and are dimmed on 5.1
+  and nowhere else. `globals` managed the same. `table` left three plain bullets beside dimmed
+  rows and `math` five.
+
+### Debts still open
+
+The `table`/`math` list above still stands except for its first item, which `<Only>` discharged.
+Four more, all logged rather than solved:
+
+- **A card cannot be scoped to a version.** `<Only>` hides a card from a reader, but
+  `examples-run.test.ts` executes every card in the tree regardless of scoping and compares it
+  against its comment — so an example that uses a version-scoped feature *of its own entry* still
+  has to record the runtime's output, and a card wrapped in `<Only before="5.4">` is not a
+  solution to anything. Three sections hit this from different directions and each worked around
+  it with a non-runnable fenced listing. What is wanted is the example-variant delta form.
+- **An overview's index still makes no per-entry version claim.** Unchanged from above, now on
+  ten pages, and the editorial rules narrow it without closing it.
+- **The compat schema cannot state a value *at* `version_added`.** `_VERSION` is the case:
+  `changed_in` carries its 5.2, 5.3, 5.4 and 5.5 strings and there is nowhere to put the 5.1 one,
+  so the value a reader on the oldest line wants is derivable from the pattern and stated
+  nowhere. Every note the schema holds is a *change*, and the first value of anything is not one.
+- **Thirteen C-API and language pages are empty stubs, and much of `debug`'s subject matter
+  belongs on them.** `c-api/debug-interface.mdx` is where `lua_getinfo`, `lua_Hook`,
+  `lua_getlocal` and `lua_getupvalue` are documented — for several `debug` entries that C-API
+  passage *is* the manual source, and 5.4 and 5.5 point it back at `debug.getupvalue`.
+  `c-api/references-and-registry.mdx`, `c-api/userdata.mdx`, `language/metatables/metatable.mdx`
+  and `language/garbage-collection/finalizers.mdx` are the others that will overlap heavily. Two
+  facts have no owner at all today: the 5.2 rule that a userdata's finalizer must already be in
+  the metatable when it is attached, and where `__metatable` is actually defined.
+
+### What it cost
+
+Roughly 4–6 entries an hour was the handoff's estimate and it held. Every batch of every section
+needed a fix round. What kept failing was never the version reasoning and almost never the
+research: it was an unqualified prose generalisation in an entry whose specifics were already
+right. The sweep is the answer, it is cheap, and it belongs to authoring rather than to review.

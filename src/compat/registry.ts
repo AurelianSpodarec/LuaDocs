@@ -179,6 +179,7 @@ import debugSetmetatable from './data/debug.setmetatable.json';
 import debugDebug from './data/debug.debug.json';
 import debugGetfenv from './data/debug.getfenv.json';
 import debugSetfenv from './data/debug.setfenv.json';
+import debugLibrary from './data/debug.library.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -2307,6 +2308,73 @@ const raw: Record<string, unknown> = {
   'debug.debug': debugDebug,
   'debug.getfenv': debugGetfenv,
   'debug.setfenv': debugSetfenv,
+
+  // ## `debug.library` — batch DB6: the section's own node, and the last of the library
+  //
+  // On the rule `string.library` set and every section since has followed: the library's
+  // existence and its **membership**, never the union of its members' behaviour. This
+  // section is where that rule is easiest to break — twelve of the nineteen entries carry a
+  // `changed_in` of their own, and the temptation is to summarise them here. None of it is
+  // here; each fact lives on the entry where it is observable.
+  //
+  // ### Membership, derived twice
+  //
+  // `grep -o 'pdf-debug\.[a-z]*' <each>.html | sort -u`, over all five manuals on disk. DB1
+  // did this first and DB5 reproduced it; this batch reproduced it a third time, and the
+  // result is unchanged:
+  //
+  // | Manual | The `debug` table |
+  // |---|---|
+  // | 5.1 | `debug` `getfenv` `gethook` `getinfo` `getlocal` `getmetatable` `getregistry` `getupvalue` `setfenv` `sethook` `setlocal` `setmetatable` `setupvalue` `traceback` — 14 |
+  // | 5.2 | the 14, less `getfenv` and `setfenv`, plus `getuservalue` `setuservalue` `upvalueid` `upvaluejoin` — 16 |
+  // | 5.3 / 5.4 / 5.5 | identical to 5.2 |
+  //
+  // **Every membership move in this library happens at 5.2**, which is why there is one
+  // `changed_in` and no other. Two leave and four arrive in the same release, so the note
+  // carries both halves — the strip cannot express two chips on one version, and DB3's
+  // decision 3 is the precedent for folding them together.
+  //
+  // The removal ruling gives 5.2 for the two departures directly: 5.1's manual asserts their
+  // existence with an entry each, and no later manual mentions either. **Do not cite 5.2
+  // §8.2 as the evidence** — its *"Functions `setfenv` and `getfenv` were removed"* is about
+  // the basic library's pair, and §8.3's `lua_getfenv`/`lua_setfenv` sentence is about the C
+  // API's. Those two sentences are the only occurrences of the string `fenv` in the 5.2
+  // manual, and 5.3, 5.4 and 5.5 contain none at all. (DB5's report says no manual from 5.2
+  // on contains the string anywhere; that is right for 5.3–5.5 and overstated for 5.2, where
+  // the count is two. The two `debug` entries' datasets were derived from `ldblib.c` rather
+  // than from that sentence, so nothing shipped depends on the overstatement.)
+  //
+  // ### The preamble's five facts, and why none of them is a note
+  //
+  // Read in all five (§5.9 in 5.1, §6.10 in 5.2–5.4, §6.11 in 5.5). Identical in 5.2, 5.3 and
+  // 5.4; 5.1 words it differently; 5.5 adds one sentence.
+  //
+  // 1. **The care warning** — several of these functions violate basic assumptions about Lua
+  //    code (that a function's locals cannot be reached from outside; that userdata metatables
+  //    cannot be changed from Lua; that Lua programs do not crash) and can therefore
+  //    compromise otherwise secure code. 5.1 names the first two and not the crashing, and
+  //    adds *"Please resist the temptation to use them as a usual programming tool."* The
+  //    overview states the warning undated: it is a description of what the library can do,
+  //    true on every line, and the third assumption is breakable on 5.1 too — only 5.1's
+  //    manual is silent about it.
+  // 2. **Speed** — 5.1 *"they can be very slow"*, 5.2+ *"some functions in this library may be
+  //    slow"*. A caution, not a behaviour. DB1's judgement, unchanged.
+  // 3. **Everything is in the table `debug`.** True on all five.
+  // 4. **The optional first `thread` argument.** The preamble says *all* functions that
+  //    operate over a thread take one; that is six of the nineteen (`getinfo`, `traceback`,
+  //    `sethook`, `gethook`, `getlocal`, `setlocal`), and the other thirteen take none.
+  //    `debug.getinfo#looking-at-another-thread` owns the rule; the overview links it.
+  // 5. **5.5 only:** *"It is good practice to always require this library explicitly before
+  //    using it."* Advice about how to write code, not behaviour a program can observe —
+  //    DB1's, DB4's and DB5's ruling on the same sentence, and G11's precedent for dropping a
+  //    claim supported by one manual out of five.
+  //
+  // **No `debug` function is documented as a security risk in its own passage.** Grepped all
+  // five for `secur|risk|insecure|unsafe`: the only hits are `package.loadlib`'s *"This
+  // function is inherently insecure"* (5.4, 5.5) and `os.tmpname`'s *"to avoid security
+  // risks"*. The security statement for this library is the preamble's *"can compromise
+  // otherwise secure code"*, and it is library-wide.
+  'debug.library': debugLibrary,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(
