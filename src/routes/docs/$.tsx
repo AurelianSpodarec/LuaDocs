@@ -11,7 +11,8 @@ import {
   // provides, and the `docs` build of it throws under a notebook `DocsLayout`.
 } from 'fumadocs-ui/layouts/notebook/page';
 import { baseOptions } from '@/lib/layout.shared';
-import { encodeMarkdownUrl } from '@/lib/shared';
+import { encodeMarkdownUrl, siteOrigin } from '@/lib/shared';
+import { isAuthoredPage } from '@/migration/authored';
 import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense, use, useMemo, useState } from 'react';
@@ -42,6 +43,12 @@ export const Route = createFileRoute('/docs/$')({
     await docs.getPage(data.path)?.preload();
     return data;
   },
+  head: ({ loaderData }) => ({
+    links: loaderData ? [{ rel: 'canonical', href: `${siteOrigin}${loaderData.url}` }] : [],
+    // An entry with no body has nothing to rank for, and 110 of them would read as a
+    // thin site. The tag comes off by itself the moment someone writes a description.
+    meta: loaderData?.indexable === false ? [{ name: 'robots', content: 'noindex' }] : [],
+  }),
 });
 
 const loader = createServerFn({
@@ -63,6 +70,11 @@ const loader = createServerFn({
 
     return {
       path: page.path,
+      url: page.url,
+      // Drives both the `noindex` tag and what the body renders. An entry with no
+      // description is a scaffolded stub — see `isAuthoredPage`.
+      indexable: isAuthoredPage(page),
+      title: page.data.title,
       luaCompat: page.data['lua-compat'] ?? null,
       source: page.data.source ?? null,
       reviewed: page.data.reviewed ?? null,
