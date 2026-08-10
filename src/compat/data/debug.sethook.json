@@ -1,0 +1,8 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "The words a hook is told change around tail calls. Earlier versions announce a tail call as an ordinary call, and then, on the way out of the frame that absorbed it, deliver one extra `tail return` event for each — during which nothing useful can be asked about the running function. From here a tail call is announced as it happens, with a word of its own, and the events stop pairing up: one return event arrives for the shared frame rather than one for each function that occupied it.",
+    "5.3": "A `count` carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value.",
+    "5.4": "What a function is about to hand back becomes reachable from a return hook. `debug.getinfo()` gains the `r` option, whose `ftransfer` and `ntransfer` say where the values being returned begin and how many there are, and `debug.getlocal()` reads them off that level at those positions. Earlier versions offer no supported way to reach them at all."
+  }
+}

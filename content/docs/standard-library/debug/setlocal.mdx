@@ -1,8 +1,136 @@
 ---
 title: debug.setlocal()
-description: ""
+description: Write a value into a local variable belonging to a call that is currently running.
+lua-compat: debug.setlocal
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.setlocal
 ---
 
-{/* Not yet written. */}
+Assigns a value to one of the local variables of a call that is in progress, addressed by
+position exactly as [`debug.getlocal()`](/docs/standard-library/debug/getlocal) reads one. The
+name of the variable written to comes back, which is how a caller checks it hit what it meant
+to hit.
+
+<RunnableExample code={`local function correct_the_total()\n  local invoice_total = 100\n  local written = debug.setlocal(1, 1, 250)\n  return written, invoice_total\nend\n\nlocal written, corrected = correct_the_total()\nprint(written)\nprint(corrected)\n-- Expected output:\n-- invoice_total\n-- 250`} />
+
+## Syntax
+
+```lua
+debug.setlocal([thread,] level, local, value)
+```
+
+<Parameters>
+  <Param name="thread">The thread whose call stack the level counts in. Left out, it is the thread the call is made from; naming one moves the whole question, and [what the numbering then means](/docs/standard-library/debug/getinfo#looking-at-another-thread) moves with it.</Param>
+  <Param name="level">Which call to write into, counting outwards from here. With no `thread` named, level `1` is the function that asked and level `2` its caller. A function value is not accepted here, only a number.</Param>
+  <Param name="local">Which variable, by position, [addressed exactly as it is for reading](/docs/standard-library/debug/getlocal#how-a-local-is-addressed) — including the negative numbers that reach a variadic call's extra arguments.</Param>
+  <Param name="value">What to put there. Any value at all, including `nil`; the variable is not declared with a type and nothing checks what it held before.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The name the variable was declared under, once the value is in place. A name beginning with `(` means the position held something Lua was keeping there rather than a variable from your program.</Return>
+  <Return type="nil">When the index names no variable at that level. Nothing was written in that case — the value is simply dropped.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `level` names a call past the outermost one on the stack. As with reading, an index naming nothing is answered rather than refused; it is the level that raises.
+- Raises when `level` is neither a number nor a string that reads as one — a function value included.
+- Raises when `local` is left out, or is neither a number nor a string that reads as one.
+- Raises when `value` is left out. There is no shorthand for *clear this variable* — a `nil` meant for the variable has to be written out.
+- <Since v="5.3" /> Raises when `level` or `local` carries a fraction rather than an exact whole-number value.
+
+</Errors>
+
+## Description
+
+This is the writing half of a pair, and everything about *which* variable is being addressed
+belongs to [`debug.getlocal()`](/docs/standard-library/debug/getlocal#how-a-local-is-addressed)
+— positions counted in declaration order, only what is active in the current scope, stand-in
+names beginning with `(` for what Lua is holding, negative numbers for a variadic call's extra
+arguments. Read that once and this call needs no rules of its own.
+
+What it adds is a real assignment into a frame that is still running. The function whose local
+this is has no idea; its next mention of the variable reads what was written here, and there is
+nothing at the site of that read to explain where the value came from. That is what makes this
+a debugger's tool rather than a programming one: it is how a stepping debugger implements *set
+this variable and continue*, and it is a way to make a program behave in a manner none of its
+source explains.
+
+One asymmetry with the reading side is worth knowing about. `debug.getlocal()` accepts a
+function value in place of a level and answers with the names of its parameters; this call does
+not, and there is nothing sensible for it to mean — a function that is not running has no
+storage to write into. Only a level is accepted here, and a function raises.
+
+The name coming back is not decoration. It is what confirms the position addressed was the
+variable intended, and comparing it against an expected name is what turns a fragile index into
+something safe to act on.
+
+## Examples
+
+### Writing into the caller's frame
+
+<RunnableExample code={`local function force_retry(attempts)\n  local written = debug.setlocal(2, 1, attempts)\n  return written\nend\n\nlocal function download_report()\n  local attempts_left = 0\n  local written = force_retry(3)\n  return written, attempts_left\nend\n\nlocal written, attempts_left = download_report()\nprint(written)\nprint(attempts_left)\n-- Expected output:\n-- attempts_left\n-- 3`} />
+
+`download_report` never assigns to `attempts_left` after setting it to `0`, and reads `3` from
+it anyway. Note that the call is written to a local first rather than returned directly: a tail
+call would have thrown away `force_retry`'s own frame and made level `2` mean something else.
+
+### An index that names nothing
+
+<RunnableExample code={`local function nothing_there()\n  local only_local = "kept"\n  local written = debug.setlocal(1, 30, "discarded")\n  local how_many = select("#", debug.setlocal(1, 30, "discarded"))\n  return written, how_many, only_local\nend\n\nlocal written, how_many, only_local = nothing_there()\nprint(written)\nprint(how_many)\nprint(only_local)\n-- Expected output:\n-- nil\n-- 1\n-- kept`} />
+
+Position `30` holds nothing, so `nil` comes back and the value goes nowhere. Nothing is
+disturbed — the one local the function does have is untouched — and the write is reported by
+the absence of a name and by nothing else.
+
+<Only since="5.2">
+
+### Replacing an extra argument
+
+<RunnableExample code={`local function normalise_tags(...)\n  local written = debug.setlocal(1, -1, "billing")\n  local first_tag = ...\n  return written, first_tag\nend\n\nlocal written, first_tag = normalise_tags("BILLING", "urgent")\nprint(written:sub(1, 1))\nprint(first_tag)\n-- Expected output:\n-- (\n-- billing`} />
+
+A negative index writes into the extra arguments the call received, so the first of them is
+replaced before the function ever looks at it. The name that comes back is a stand-in beginning
+with `(`, because the argument had no name to be declared under.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="A write that hits nothing looks exactly like a write that worked">
+The value is accepted, the call returns, nothing raises — and what separates a successful write
+from one that went nowhere is whether a name came back or `nil` did. Nothing else reports it. An
+index that drifts by one quietly stops having any effect, and a tool that does not read the
+returned name will not notice.
+</Gotcha>
+
+<Gotcha title="It takes a level, not a function">
+[`debug.getlocal()`](/docs/standard-library/debug/getlocal) reads either a level or a function
+value, so code written against the pair reaches for the same shape here and gets a raised error
+rather than a `nil`. There is only one form: a number.
+
+<RunnableExample code={`local function apply_late_fee(balance, days_overdue) return balance end\n\nlocal accepted_function = pcall(debug.setlocal, apply_late_fee, 1, 5)\nlocal accepted_level = pcall(debug.setlocal, 500, 1, 5)\nprint(accepted_function)\nprint(accepted_level)\n-- Expected output:\n-- false\n-- false`} />
+</Gotcha>
+
+<Gotcha title="The position is only good where you found it">
+Positions count what is active where execution has reached, so an index read at one point in a
+function does not name the same variable a few lines later, once a block has opened or closed.
+Reading the name back immediately before writing — or checking the name this call returns
+afterwards — is what keeps a write aimed at what it was aimed at.
+</Gotcha>
+
+<Gotcha title="Nothing the function does will explain the value">
+The frame written into carries no record of the write. A variable that was never assigned to
+after its declaration now holds something else, and nothing in the ordinary reading of that
+function will account for it — a stack trace included, since the stack says where the program is
+and not what has been done to it. Left in shipped code this is among the hardest classes of bug
+to find from the outside, and it is worth keeping such writes to a debugger, a test, or a repair
+that is loudly commented.
+</Gotcha>
+
+## See also
+
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal) — the reading half, and where the addressing rules live
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — writing into what a function closed over rather than what a call is holding
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — checking a level exists before writing into it
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — being handed a call at the moment it starts or finishes, with its frame still standing

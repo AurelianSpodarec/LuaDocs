@@ -163,6 +163,10 @@ import packageSeeall from './data/package.seeall.json';
 import packageLibrary from './data/package.library.json';
 import debugGetinfo from './data/debug.getinfo.json';
 import debugTraceback from './data/debug.traceback.json';
+import debugSethook from './data/debug.sethook.json';
+import debugGethook from './data/debug.gethook.json';
+import debugGetlocal from './data/debug.getlocal.json';
+import debugSetlocal from './data/debug.setlocal.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1907,6 +1911,141 @@ const raw: Record<string, unknown> = {
   // `io.close` arrived at for `cannot close standard file`.
   'debug.getinfo': debugGetinfo,
   'debug.traceback': debugTraceback,
+
+  // ## `debug` — batch DB2: the hooks and the locals
+  //
+  // Same reading discipline as DB1. Manuals on disk for all five; `ldblib.c`, `ldebug.c`,
+  // `lapi.c` and `lstate.c` diffed **whole** at every tag (`v5.1`, `v5.1.1`, `v5.2.0`–
+  // `v5.2.3`, `v5.3.0`–`v5.3.6`, `v5.4.0`–`v5.4.8`, `v5.5.0`, `v5.5.1`) plus the two
+  // shipped finals with no tag, 5.1.5 and 5.2.4, from `www.lua.org/source/5.1/…` and
+  // `/5.2/…`. Two of the four boundaries below sit in `db_gethook` and `findvararg` and
+  // would have been missed by extrapolating from the ends. Every claim that could be run
+  // was run on **two** runtimes — a stock `lua` 5.3.6 binary and the harness's own wasmoon
+  // 5.4 — and the two agree on everything shipped.
+  //
+  // ### The hook mask and the events, per version
+  //
+  // `makemask` and `unmakemask` in `ldblib.c` are **byte-identical from `v5.1` to
+  // `v5.5.1`**, and so is `lua_sethook`'s `if (func == NULL || mask == 0) { mask = 0;
+  // func = NULL; }`. So all of this holds on every version:
+  //
+  // - only `c`, `r` and `l` are recognised; any other letter is passed over in silence;
+  // - the count is **not** in the mask string — `count > 0` sets `LUA_MASKCOUNT`, and
+  //   `unmakemask` never emits a letter for it, so a hook installed with a count and no
+  //   letters reads back with an empty mask and a non-zero count;
+  // - `gethook`'s mask is rebuilt in the settled order `c`, `r`, `l`, so `"lc"` reads
+  //   back as `"cl"` (probed on 5.3.6 and 5.4);
+  // - a mask naming no event **and** no count installs nothing at all — the request is
+  //   turned into a removal before it lands.
+  //
+  // The **events** are the one thing that moved:
+  //
+  // | Word | 5.1 | 5.2 | 5.3 | 5.4 | 5.5 |
+  // |---|---|---|---|---|---|
+  // | `"call"` | yes | yes | yes | yes | yes |
+  // | `"return"` | yes | yes | yes | yes | yes |
+  // | `"line"` | yes | yes | yes | yes | yes |
+  // | `"count"` | yes | yes | yes | yes | yes |
+  // | `"tail return"` | **yes** | — | — | — | — |
+  // | `"tail call"` | — | **yes** | yes | yes | yes |
+  //
+  // `hooknames[]` in `ldblib.c` ends `"tail return"` at 5.1 and `"tail call"` from
+  // `v5.2.0`. 5.1.5's `ldo.c` `callrethooks` fires one `LUA_HOOKTAILRET` per tail call the
+  // returning frame absorbed; 5.2.4's `ldo.c` `callhook` instead reports `LUA_HOOKTAILCALL`
+  // when the caller's opcode was `OP_TAILCALL`, and no return event follows. **This is the
+  // only one of the four functions named in any Incompatibilities chapter** — 5.2 §8.1,
+  // *"The event `tail return` in debug hooks was removed"*. Nothing in 5.3, 5.4 or 5.5's
+  // §8, nor 5.1's §7, names any of the four.
+  //
+  // ### What a Lua hook is handed — invariant, and the brief's premise was half wrong
+  //
+  // `hookf` pushes the event word, then `currentline` if `>= 0` and `nil` otherwise, then
+  // `lua_call(L, 2, 0)`. Byte-identical in substance at all five. So a hook is called with
+  // **exactly two arguments on every version**, and a *return* hook receives nothing the
+  // others do not. What a return hook can reach that the others cannot is the values being
+  // handed back, and that arrives at **5.4** with `getinfo`'s `r` option, not as an extra
+  // argument: `ftransfer`/`ntransfer` name the window and `debug.getlocal(2, ftransfer)`
+  // reads it. Probed: a return hook on a two-argument `add_two` reports `ftransfer` `1` and
+  // `ntransfer` `2` on the call event and `3` and `1` on the return event, and reading the
+  // return window off level `2` yields the value the function was handing back. A call
+  // event's `ftransfer` is `1` on every call, as the 5.4 and 5.5 `lua_Debug` passages both
+  // state. 5.1's `lua_sethook` passage says *"You have
+  // no access to the values to be returned"*, 5.2's and 5.3's say *"There is no standard
+  // way"*, and **5.4 deletes the sentence** — both sides manual-established.
+  //
+  // ### Yielding from a hook — no Lua-level version story at all
+  //
+  // The C API gained one at 5.2 (*"Only count and line events can yield"* in `lua_Hook`),
+  // and it does **not** reach a hook installed from Lua. `ldblib`'s `hookf` calls the Lua
+  // function through `lua_call`, which is `luaD_callnoyield` from 5.2 (`nny++` / the
+  // non-yieldable half of `nCcalls`), and 5.1 raises through `lua_yield`'s
+  // `L->nCcalls > L->baseCcalls`. So `coroutine.yield()` from a Lua hook raises on **every**
+  // version, for line and count events as much as for call and return. Probed on 5.3.6 and
+  // 5.4 for both a line hook and a call hook; the resume answers `false`. `sethook`'s
+  // Description says this undated, and nothing here contradicts `coroutine/yield.mdx` or
+  // `coroutine/isyieldable.mdx`, which frame the same rule as a C function that makes no
+  // provision for being picked up again.
+  //
+  // ### `debug.gethook`'s shape — the 5.4 note, and the case it must not over-claim
+  //
+  // `db_gethook` returns three values on 5.1, 5.2 and 5.3 whatever the state. `v5.3.0`
+  // adds `if (hook == NULL) lua_pushnil(L);`, which changes nothing observable — the 5.1
+  // and 5.2 path reaches the same `nil` through an empty hook table. `v5.4.0` turns it into
+  // `if (hook == NULL) { luaL_pushfail(L); return 1; }`, and **that** is the delta:
+  // `select("#", debug.gethook())` is `3` before 5.4 and `1` from it. Confirmed on both
+  // runtimes.
+  //
+  // The note is careful to say *no hook installed at all*, because a `nil` first value does
+  // **not** imply that. `lua_newthread` copies `hook`, `hookmask` and `basehookcount` onto a
+  // new thread on all five versions (`lstate.c`, identical), while the Lua function lives in
+  // a registry table keyed by thread — so a coroutine created under a hook inherits the mask
+  // and the count and *not* the function, and `debug.gethook(that_coroutine)` answers
+  // `nil, "l", 40` with three values on 5.4 as well. Probed on both runtimes. `gethook.mdx`
+  // owns that case under `#when-there-is-no-hook-to-report`.
+  //
+  // **Deliberately not recorded:** on 5.1 and 5.2 only, `debug.sethook(f, "")` stores `f` in
+  // the hook table *before* `lua_sethook` normalises the empty mask to no hook, so
+  // `debug.gethook()` afterwards reports a function that is not installed. `v5.3.0`'s
+  // `hook == NULL` test closes it. No entry claims the first value is `nil` exactly when
+  // nothing is installed, so nothing on either page depends on it.
+  //
+  // ### `debug.getlocal` / `debug.setlocal` — where the addressing rules moved
+  //
+  // 5.1's `findlocal` has no `n < 0` branch and `db_getlocal` runs `luaL_checkint` on its
+  // first argument, so **both** the function form and negative indices arrive at `v5.2.0`.
+  // `findvararg` is rewritten twice more (`v5.3.0` moves the sign inside, `v5.4.0` moves the
+  // extra arguments below `func` and tests `p->is_vararg`) with **no** change in which
+  // indices answer: `-1` is the first extra argument and `-nextra` the last, on 5.2 through
+  // 5.5. Worked through slot by slot against `adjust_varargs` rather than assumed.
+  //
+  // `db_setlocal` never accepts a function on any version — `luaL_checkint`/
+  // `luaL_checkinteger` on the level, and 5.5's `lua_setlocal` passage finally says so
+  // outright (*"`ar` cannot be NULL"*). That asymmetry therefore begins at 5.2, which is
+  // why `debug.setlocal`'s 5.2 note carries it: the page states the asymmetry, and a
+  // borrowed fact needs a dated surface on the page that borrows it.
+  //
+  // The 5.3 note on all three of `sethook`, `getlocal` and `setlocal` is the standing
+  // `luaL_checkint` → `luaL_checkinteger` boundary — the same one `globals.error`,
+  // `globals.collectgarbage`, `io.file-seek`, `debug.getinfo` and `debug.traceback` record.
+  //
+  // 5.4's note is `<const>`: probed, a `local tax_rate <const> = 0.2` is **absent** from the
+  // positions while a `<close>` local is present. 5.5's note is the vararg table —
+  // `findvararg` tests `PF_VAHID`, which `lparser.c` sets for every variadic function and
+  // clears through `needvatab` when a *named* vararg table has to be materialised. An
+  // anonymous `...` always keeps it, so the only spelling that exists before 5.5 keeps
+  // working; the note exists because the base prose has to be true on 5.5.
+  //
+  // ### The generic names are version-unstable and are never printed by a card
+  //
+  // `(*temporary)` / `(*vararg)` at 5.1–5.3; `(temporary)` / `(C temporary)` / `(vararg)`
+  // from `v5.4.0`; a `for` loop's internals are `(for index)`, `(for limit)`, `(for step)`
+  // at 5.1–5.3 and three `(for state)` from 5.4. The manual promises only the leading `(`,
+  // and that is all either entry asserts — every card that meets one prints
+  // `name:sub(1, 1)` or filters on it.
+  'debug.sethook': debugSethook,
+  'debug.gethook': debugGethook,
+  'debug.getlocal': debugGetlocal,
+  'debug.setlocal': debugSetlocal,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

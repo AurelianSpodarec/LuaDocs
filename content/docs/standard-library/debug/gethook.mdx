@@ -1,8 +1,125 @@
 ---
 title: debug.gethook()
-description: ""
+description: Read back the hook function, the mask and the count currently in force on a thread.
+lua-compat: debug.gethook
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.gethook
 ---
 
-{/* Not yet written. */}
+Reports what [`debug.sethook()`](/docs/standard-library/debug/sethook) left in place on a
+thread — the function, the mask and the count — in the order that call takes them, so what
+comes out here can be written straight back in. Reading the settings before installing a hook
+of your own, and writing them back afterwards, is how one tool hands the thread on to another
+in the state it found it.
+
+<RunnableExample code={`local function trace_lines() end\n\ndebug.sethook(trace_lines, "lc", 500)\nlocal hook_function, mask, count = debug.gethook()\ndebug.sethook()\n\nprint(hook_function == trace_lines)\nprint(mask)\nprint(count)\n-- Expected output:\n-- true\n-- cl\n-- 500`} />
+
+## Syntax
+
+```lua
+debug.gethook([thread])
+```
+
+<Parameters>
+  <Param name="thread">The thread to ask about. Left out, it is the thread the call is made from — each carries its own hook, and the [same optional first argument](/docs/standard-library/debug/getinfo#looking-at-another-thread) turns up across this library.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="function, string or nil">The hook function in force, exactly the value that was handed over. It is `nil` when the thread has none to report, and the text `external hook` when the hook in place was installed by the host program through the C interface and so has no Lua value to give back.</Return>
+  <Return type="string">Which events the hook is asked for, as some arrangement of `c`, `r` and `l`, and the empty string when it is asked for none of them. A count is not spelled here.</Return>
+  <Return type="integer">The count the hook was installed with, and `0` when it was installed without one. This and the mask before it describe what the thread is trapping on, and where nothing is trapping neither of them arrives.</Return>
+</Returns>
+
+<Errors>
+
+- Nothing here raises. A first argument that is not a thread is not refused — it is simply not read as one, and the answer describes the calling thread instead.
+
+</Errors>
+
+## Description
+
+The three values line up with the three that
+[`debug.sethook()`](/docs/standard-library/debug/sethook) accepts, deliberately: what comes out
+here can be written straight back in, and that round trip is the reason this call exists.
+Without it a library that wants a hook has to either refuse to run when one is already
+installed or quietly destroy whatever was there, because installing replaces rather than adds.
+
+The mask string is rebuilt from what Lua is actually doing rather than copied from what was
+asked for, so it is normalised on the way out. The letters arrive in the settled order `c`,
+`r`, `l` whatever order they were written in, and letters that named no event are gone —
+which is where a misspelled mask becomes visible, since nothing complained about it when it
+went in.
+
+What the mask string does *not* carry is the count. A hook installed with a count and no
+letters reads back as the empty string with a number after it, so a caller deciding whether
+any hook work is being done has to look at both.
+
+## When there is no hook to report
+
+The first value is `nil` when there is no hook function to name, and that covers two states
+which look alike at the call site and are not alike underneath.
+
+The plain one is that nothing is installed. A thread doing no hook work has no events and no
+count to describe, and the answer stops at that first `nil`.
+
+The other is that the thread is carrying a mask with no function behind it. That is what a
+coroutine created while a hook was in force ends up with: Lua copies the mask and the count
+onto a new thread, and the function, which is held per thread, does not travel with them. The
+thread then goes on trapping at whatever that mask named, and does nothing with the
+interruption. Here the `nil` *is* followed by a mask and a count, and they are what says the
+trapping is happening — so a caller reading past the first value is a caller that can tell the
+two states apart. Clearing it means naming that thread, `debug.sethook(that_thread)`, because a
+removal on the thread that created it does not reach across.
+
+<RunnableExample code={`local function watch() end\n\ndebug.sethook(watch, "l", 40)\nlocal born_under_a_hook = coroutine.create(function() return 1 end)\ndebug.sethook()\n\nlocal inherited_function, inherited_mask, inherited_count = debug.gethook(born_under_a_hook)\ndebug.sethook(born_under_a_hook)\n\nprint(inherited_function)\nprint(inherited_mask)\nprint(inherited_count)\n-- Expected output:\n-- nil\n-- l\n-- 40`} />
+
+## Examples
+
+### Putting back what was there
+
+<RunnableExample code={`local function first_hook() end\nlocal function second_hook() end\n\ndebug.sethook(first_hook, "l")\nlocal previous, previous_mask, previous_count = debug.gethook()\n\ndebug.sethook(second_hook, "c")\ndebug.sethook(previous, previous_mask, previous_count)\n\nlocal restored = debug.gethook()\ndebug.sethook()\n\nprint(restored == first_hook)\nprint(previous_mask)\nprint(previous_count)\n-- Expected output:\n-- true\n-- l\n-- 0`} />
+
+The three values go back in the order they came out, which is the whole trick. A thread that
+had no hook reads back with `nil` in the first position, and writing *that* back is a removal,
+so the round trip restores an absence as faithfully as it restores a hook — a library does not
+have to test which case it is in before putting things right.
+
+### Asking about another thread
+
+<RunnableExample code={`local function watch() end\nlocal reporter = coroutine.create(function() coroutine.yield() end)\n\ndebug.sethook(reporter, watch, "l", 25)\nlocal on_reporter, reporter_mask, reporter_count = debug.gethook(reporter)\nlocal here = debug.gethook()\ndebug.sethook(reporter)\n\nprint(on_reporter == watch)\nprint(reporter_mask)\nprint(reporter_count)\nprint(here)\n-- Expected output:\n-- true\n-- l\n-- 25\n-- nil`} />
+
+Installing on one thread and asking on another shows how completely separate the two are. The
+coroutine has a line hook with a count of `25`; the thread that installed it has nothing.
+
+## Gotchas
+
+<Gotcha title="The mask string is not what you wrote">
+It is rebuilt, so comparing it against the string handed to
+[`debug.sethook()`](/docs/standard-library/debug/sethook) fails on any mask whose letters were
+in another order, and on any mask carrying a letter that names no event. Test for a letter
+with [`string.find()`](/docs/standard-library/string/find) rather than comparing the whole
+string.
+</Gotcha>
+
+<Gotcha title="An empty mask does not mean no hook is running">
+The count lives outside the mask string, so a hook asked for nothing but a count reads back
+with an empty string in the mask position and a number after it. Code deciding whether a thread
+is being watched by looking at the mask alone concludes that it is not, on exactly the hooks a
+profiler is most likely to have installed.
+</Gotcha>
+
+<Gotcha title="The first value is not always a function">
+A host program can install a hook of its own without going through this library, and there is
+no Lua value to hand back for one. What arrives instead is a string, which fails
+`type(hook) == "function"` and quietly succeeds at anything that only tested for a value being
+there. Code that means to put a hook back should check what it was given before handing it to
+[`debug.sethook()`](/docs/standard-library/debug/sethook), which refuses anything that is not a
+function.
+</Gotcha>
+
+## See also
+
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — the call these settings came from and go back into
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — what a hook asks about the call it was triggered by
+- [`coroutine.create()`](/docs/standard-library/coroutine/create) — where a thread that carries a mask it never asked for comes from
+- [`string.find()`](/docs/standard-library/string/find) — testing the mask for a letter rather than comparing it whole

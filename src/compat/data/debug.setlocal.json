@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Negative indices begin naming the extra arguments a variadic call received, so one of them can be replaced before the function reads it; earlier versions name nothing there and are answered with `nil`. This is also where the two halves of the pair stop matching: `debug.getlocal()` begins accepting a function value in place of a level from here, and this call never has.",
+    "5.3": "A level or an index carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value."
+  }
+}

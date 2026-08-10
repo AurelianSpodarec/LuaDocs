@@ -1,8 +1,228 @@
 ---
 title: debug.sethook()
-description: ""
+description: Have Lua call a function of yours as the program runs — on every call, every return, every new line, or every so many instructions.
+lua-compat: debug.sethook
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.sethook
 ---
 
-{/* Not yet written. */}
+Installs a function for Lua to call while your program runs. The mask says which moments to
+call it at — entering a call, leaving one, reaching a new line — and a count asks for it every
+so many instructions besides. Called with nothing after the optional thread, it takes the hook
+away again.
+
+<RunnableExample code={`local last_event, last_line, argument_count\n\nlocal function watch(...)\n  argument_count = select("#", ...)\n  last_event, last_line = ...\nend\n\nlocal function total_of(prices)\n  local running = 0\n  for index = 1, #prices do running = running + prices[index] end\n  return running\nend\n\ndebug.sethook(watch, "l")\nlocal total = total_of({ 3, 4, 5 })\ndebug.sethook()\n\nprint(total)\nprint(last_event)\nprint(type(last_line))\nprint(argument_count)\n-- Expected output:\n-- 12\n-- line\n-- number\n-- 2`} />
+
+## Syntax
+
+```lua
+debug.sethook([thread,] hook, mask [, count])
+debug.sethook([thread])
+```
+
+<Parameters>
+  <Param name="thread">The thread the hook belongs to. Left out, it is the thread the call is made from. Each thread carries its own, and the [same optional first argument](/docs/standard-library/debug/getinfo#looking-at-another-thread) turns up across this library.</Param>
+  <Param name="hook">The function to call. It has to be a function value; a table with a `__call` metavalue is refused.</Param>
+  <Param name="mask">Which events to call it at, written as a string of letters. Letters naming no event are passed over.</Param>
+  <Param name="count">How many instructions to let pass between calls. Left out, or `0`, and no counting is done.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing. The hook that was in place is not handed back on the way out — [`debug.gethook()`](/docs/standard-library/debug/gethook) is what reads it, and reading it first is how one gets put back afterwards.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `hook` is present and is not a function.
+- Raises when `mask` is absent, or is a value no string can be made of, such as a table or a boolean. A number is read as its digits and accepted, naming no events at all.
+- Raises when `count` is present and is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `count` carries a fraction rather than an exact whole-number value.
+- Leaving out everything after the thread does not raise. That is how a hook is taken away, and `mask` is not looked at in that case — so a `hook` of `nil` removes whatever was there whatever else is written beside it.
+
+</Errors>
+
+## Description
+
+A hook is how a program watches itself run without being rewritten to do it, and the tools
+built on that idea — a line profiler, a step debugger, an instruction budget that cuts a
+runaway script off — start here. Lua calls the function you hand over at the moments the mask
+names, passes it a word saying which moment this is, and carries on where it left off when the
+function returns. The rest of this library answers questions about a program; this is the call
+that decides *when* to ask them.
+
+Installing replaces whatever was there rather than adding to it: a thread has one hook, not a
+list of them. Nothing anywhere records what the previous one was, so a library that installs a
+hook and means to be polite reads the settings back first and restores them when it is done.
+
+The hook belongs to a thread, not to the program. Setting one from a coroutine leaves the code
+that resumed it untouched, and a coroutine going about its own work is unaffected by a hook set
+outside it — with one exception, which is that a coroutine *created* while a hook is in force
+starts life with the mask and count copied across. See
+[`debug.gethook()`](/docs/standard-library/debug/gethook#when-there-is-no-hook-to-report)
+for what that inheritance actually amounts to.
+
+## The mask and the count
+
+Three letters name events, and any combination of them may be written in any order:
+
+| Letter | When the hook is called |
+|---|---|
+| `c` | Lua is entering a call, just after the new function is on the stack |
+| `r` | Lua is leaving a call, just before the function goes |
+| `l` | Lua is starting a new line of code, or jumping backwards in it — which is what makes a loop report its condition line over and over |
+
+A letter naming none of those is passed over in silence, so a misspelled mask does not
+complain; it simply asks for less than was meant, or for nothing.
+
+The count is a separate switch, and it does not live in the mask string. Give a whole number
+greater than zero and the hook is called every that-many instructions of Lua code as well,
+whatever letters were written. The two are independent: a mask of `"l"` with a count of `100`
+asks for both, and a mask of `""` with a count of `100` asks for the count alone.
+
+An instruction here is one step of Lua's own virtual machine rather than one line, one
+statement or one function call, so the number is a rough dial rather than a measurement of
+anything a reader can point at in the source. Line and count events also arrive only while Lua
+code is running: a call into a function written in C is a single step however long it takes, so
+no line or count event reaches you while it works. Calls and returns are reported for it in the
+ordinary way.
+
+The pairing has one edge that looks like nothing and does something. A mask asking for no
+events, with no count beside it, installs no hook — the request is turned into a removal
+before it takes effect, and nothing is left behind to find.
+
+<RunnableExample code={`local fired = false\n\nlocal function note_event()\n  fired = true\nend\n\ndebug.sethook(note_event, "")\nlocal computed = 2 + 2\ndebug.sethook()\n\nprint(computed)\nprint(fired)\n-- Expected output:\n-- 4\n-- false`} />
+
+## What a hook is called with
+
+The hook is always called with two arguments, however it was triggered. The first is a word
+saying what happened; the second is the line reached, and it is `nil` for every event that is
+not about a line.
+
+| Word | What triggered it |
+|---|---|
+| `"call"` | a function is being entered |
+| `"tail call"` | a function is being entered by a tail call — `return helper(value)`, with nothing left to do afterwards |
+| `"return"` | a function is being left |
+| `"line"` | a new line is starting |
+| `"count"` | the instruction count ran out |
+
+A tail call is worth reading twice, because it breaks the pairing a hook is otherwise built on.
+It is announced with a word of its own precisely because it does not stack a new frame — it
+takes over its caller's — and when that shared frame finally goes, one return event arrives for
+it rather than one for each function that occupied it. So the events stop pairing up, and code
+counting calls against returns to measure depth drifts by one for every tail call unless it
+leaves this word out of the count.
+
+The hook is a call like any other, so it stands on the stack while it runs, and the levels
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo) counts are shifted accordingly:
+level `1` is the hook function itself and level `2` is the function whose event this is.
+Everything a call can be asked about is reachable from there — where it was defined, what name
+it was called under, which line it is on.
+
+A return hook can reach further than the others. The pair of fields the `r` option fills in
+names where the values being handed back start and how many there are, and
+[`debug.getlocal()`](/docs/standard-library/debug/getlocal) reads them off level `2` at those
+indices. Short of wrapping the function and reading what the wrapper receives, that is the way
+to see what a call is handing back without changing the call, and it is the answer to what
+[`ftransfer` and `ntransfer`](/docs/standard-library/debug/getinfo#what-each-field-says) are
+for: outside a call or return hook they mean nothing.
+
+## What a hook may not do
+
+While a hook runs, hooks are switched off. Nothing the hook itself calls reports anything, which
+is what stops a line hook triggering on its own lines forever — and it also means a hook cannot
+watch the work another hook is doing.
+
+A hook cannot suspend. [`coroutine.yield()`](/docs/standard-library/coroutine/yield#where-a-coroutine-may-not-suspend)
+raises from inside one exactly as it does from inside a comparison handed to
+[`table.sort()`](/docs/standard-library/table/sort), because the hook was reached through
+machinery written in C that makes no provision for being picked up again. A hook that means to
+stop a runaway coroutine raises instead; the failure travels out to whatever resumed it and
+arrives there as a status rather than as a crash.
+
+Raising from a hook is otherwise ordinary. The error surfaces at whatever the program was doing
+when the event fired, which is a line the author of that code did not write and cannot see, so
+the message wants to say plainly that it came from a hook.
+
+## Examples
+
+### Which events a mask asks for
+
+<RunnableExample code={`local events_seen = {}\n\nlocal function note_event(event)\n  events_seen[event] = true\nend\n\nlocal function settle_invoice(amount)\n  return amount * 2\nend\n\ndebug.sethook(note_event, "cr")\nlocal settled = settle_invoice(21)\ndebug.sethook()\n\nprint(settled)\nprint(events_seen.call)\nprint(events_seen["return"])\nprint(events_seen.line)\n-- Expected output:\n-- 42\n-- true\n-- true\n-- nil`} />
+
+Calls and returns were reported and lines were not, because `l` was not in the mask. The two
+that did arrive are not only `settle_invoice`'s: the call that removed the hook and the return
+from the call that installed it are events too, and a hook that reports on the code around it
+sees the code doing the reporting.
+
+### Counting instructions rather than lines
+
+<RunnableExample code={`local count_events = 0\n\nlocal function tick()\n  count_events = count_events + 1\nend\n\nlocal function accumulate()\n  local running = 0\n  for index = 1, 200 do running = running + index end\n  return running\nend\n\ndebug.sethook(tick, "", 50)\nlocal running = accumulate()\ndebug.sethook()\n\nprint(running)\nprint(count_events > 0)\n-- Expected output:\n-- 20100\n-- true`} />
+
+The mask is empty and the count carries the whole request. How many times the hook ran is not
+something to write down — it depends on how the loop above was compiled — which is the shape of
+every honest use of a count: a budget, a watchdog, a sampling profiler, never an assertion about
+a number.
+
+<Only since="5.4">
+
+### Reading what a function is about to return
+
+<RunnableExample code={`local returned_value\n\nlocal function watch_returns(event)\n  if event ~= "return" then return end\n  local frame = debug.getinfo(2, "nr")\n  if frame.name == "compute_change" and frame.ntransfer == 1 then\n    local slot_name, value = debug.getlocal(2, frame.ftransfer)\n    returned_value = value\n  end\nend\n\nlocal function compute_change(paid, price)\n  return paid - price\nend\n\ndebug.sethook(watch_returns, "r")\nlocal change = compute_change(20, 13)\ndebug.sethook()\n\nprint(change)\nprint(returned_value)\n-- Expected output:\n-- 7\n-- 7`} />
+
+`ftransfer` is where the values being handed back begin and `ntransfer` is how many there are,
+so reading level `2` at that index is reading the first of them. The guard on the name matters:
+the hook is called for every return in reach, including returns out of the machinery around it.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="A hook left in place stays in place">
+Nothing takes a hook down for you — not the end of a function, not the end of the chunk that set
+it, not an error travelling past. A line hook costs something on every line the thread
+afterwards runs, forever, and the cost is invisible in a profile of the code that is now slow
+because the code that installed it is nowhere near. Anything that sets one temporarily wants to
+remove it on the way out of both paths, the ordinary one and the failing one.
+</Gotcha>
+
+<Gotcha title="A mask asking for nothing installs nothing">
+`debug.sethook(watcher, "")` reads like *install this and ask it about nothing yet*, and it is
+not that: with no count beside it, the request is turned into a removal and the function is
+never held on to. The same goes for a mask whose letters are all misspelled, since letters
+naming no event are passed over — `"L"` asks for nothing at all, `"line"` asks only for line
+events, and neither says so.
+</Gotcha>
+
+<Gotcha title="A coroutine made under a hook is born carrying it">
+Creating a coroutine while a hook is in force copies the mask and the count onto the new thread,
+so it goes on trapping at whatever that mask named for the rest of its life — including after
+the hook that caused this has been taken off the thread that set it. What it does *not* inherit
+is the function, so the trapping does nothing except cost time.
+[`debug.gethook()`](/docs/standard-library/debug/gethook#when-there-is-no-hook-to-report)
+is what shows the state this leaves behind, and removing it means naming that thread.
+</Gotcha>
+
+<Gotcha title="A hook cannot pause the thread it is watching">
+Suspending from inside a hook raises rather than yielding, so the hook cannot be used as a way
+to interrupt a coroutine and let something else run. What it can do is raise, which stops the
+coroutine and hands the reason to whoever resumed it — the mechanism behind an instruction
+budget that cuts a runaway script off.
+</Gotcha>
+
+<Gotcha title="A line event is not one line of source">
+The `l` mask reports a line each time execution *starts* one, and jumping backwards counts as
+starting one even when it lands on the line it left — so a loop reports its own line on every
+pass, and a line carrying nothing but a comment is not reported, having no code to start. It is
+a report of what the virtual machine is doing, not a walk through the file, and code that pairs
+line events with source lines one for one drifts on the first loop it meets.
+</Gotcha>
+
+## See also
+
+- [`debug.gethook()`](/docs/standard-library/debug/gethook) — reading back the function, the mask and the count that are in force
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — what a hook asks about the call it was triggered by, counting from level `2`
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal) — reading the values a watched call is holding, or the ones it is handing back
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — the whole stack as one string, from inside a hook or anywhere else
+- [`coroutine.yield()`](/docs/standard-library/coroutine/yield) — the suspension a hook is not allowed to make
+- [`os.clock()`](/docs/standard-library/os/clock) — the other half of a profiler, once the hook says where to measure

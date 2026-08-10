@@ -1,0 +1,9 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A function value may be written where a level goes, answering with the name of one of the parameters it declares and no value; earlier versions accept a level and nothing else, and raise when handed a function. Negative indices also begin naming the extra arguments a variadic call received, `-1` being the first of them, where earlier they name nothing and are answered with `nil`.",
+    "5.3": "A level or an index carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value.",
+    "5.4": "A local declared as a compile-time constant may be missing from the positions altogether, the compiler having written its value into the places that use it rather than keeping a variable for it to live in.",
+    "5.5": "Negative indices reach a variadic call's extra arguments only where those arguments were kept on the stack. Where they were gathered into a table instead, nothing is found at a negative index and that table is what holds them."
+  }
+}

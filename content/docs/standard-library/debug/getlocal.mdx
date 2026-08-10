@@ -1,8 +1,189 @@
 ---
 title: debug.getlocal()
-description: ""
+description: Read the name and the value of a local variable belonging to a call that is currently running.
+lua-compat: debug.getlocal
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getlocal
 ---
 
-{/* Not yet written. */}
+Reaches inside a call that is in progress and hands back one of its local variables — the name
+it was declared under, and the value it is holding right now. Locals are addressed by position
+rather than by name, counted in the order they were declared, and the same call names a
+function's parameters without running it.
+
+<RunnableExample code={`local function post_payment(amount, reference)\n  local receipt_number = 1041\n  local first_name, first_value = debug.getlocal(1, 1)\n  local third_name, third_value = debug.getlocal(1, 3)\n  return first_name, first_value, third_name, third_value\nend\n\nlocal first_name, first_value, third_name, third_value = post_payment(75, "INV-8812")\nprint(first_name)\nprint(first_value)\nprint(third_name)\nprint(third_value)\n-- Expected output:\n-- amount\n-- 75\n-- receipt_number\n-- 1041`} />
+
+## Syntax
+
+```lua
+debug.getlocal([thread,] f, local)
+```
+
+<Parameters>
+  <Param name="thread">The thread whose call stack a level counts in. Left out, it is the thread the call is made from; naming one moves the whole question, and [what the numbering then means](/docs/standard-library/debug/getinfo#looking-at-another-thread) moves with it.</Param>
+  <Param name="f">Which call to look inside, as a number counting outwards from here. With no `thread` named, level `1` is the function that asked and level `2` its caller. A function value may be written here instead, which asks about the parameters it declares rather than about any call.</Param>
+  <Param name="local">Which variable, by position. `1` is the first, and a negative number counts through the extra arguments a variadic call received instead.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The name the variable was declared under. A name beginning with `(` is not a name from your program — it is a stand-in for a position Lua has no name for, and the rest of it describes what is there in Lua's own terms.</Return>
+  <Return type="any">The value the variable is holding, taken at the moment of the call. This second value arrives for a level; asked about a function value there is no call in progress and nothing to read, so the name arrives on its own.</Return>
+  <Return type="nil">In place of both, when the index names no variable at that level — which is how a walk along the positions knows it has run out.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is a number naming a level past the outermost call on the stack. It is the level that refuses this way and not the index: reach past the end of the *positions* and `nil` comes back instead. [`debug.getinfo()`](/docs/standard-library/debug/getinfo) is how a level is checked before it is used.
+- Raises when `f` is neither a function nor a number nor a string that reads as one, and when it is left out.
+- Raises when `local` is left out, or is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `f` or `local` carries a fraction rather than an exact whole-number value. `debug.getlocal(1.0, 1)` is accepted; `debug.getlocal(1.5, 1)` is not.
+- An index of `0` does not raise. Positions start at `1`, so `0` names nothing and answers `nil` like any other index that names nothing.
+
+</Errors>
+
+## Description
+
+Everything a running call is holding sits in numbered slots, and this is the door to them. That
+is a genuinely unusual power: short of a closure written into the same source, nothing in
+ordinary Lua can see a local from outside the function that declared it, and this call can. It
+is one of the reasons the library warns about itself — code written on the assumption that its
+locals are private is code this goes behind.
+
+What it is actually for is a debugger, a crash reporter, or a test that wants to prove what a
+function was holding when it went wrong. A stack trace says which functions were running;
+walking their locals says what they were running *with*, which is usually the part that explains
+the failure.
+
+Everything here is a reading taken at the moment of the call. What comes back is the value the
+variable was holding, not a handle on the variable itself: assigning to whatever you put it in
+changes nothing at the other end, though a table that came back is still that table and writing
+into it is felt everywhere the table is held.
+[`debug.setlocal()`](/docs/standard-library/debug/setlocal) is the call that writes a variable
+rather than a copy of its value.
+
+## How a local is addressed
+
+Positions follow the order the variables were declared in, starting at `1`. Parameters are
+declared first, so they occupy the opening positions in the order the signature writes them,
+and the body's locals follow in the order their `local` statements appear.
+
+Only variables *active in the current scope* are counted. A local declared further down the
+function is not there yet — including, exactly, while its own initialiser is being evaluated —
+and one whose block has closed is gone again. So the same index means different variables at
+different points in the same function, and the numbering is a property of where execution has
+reached rather than of the source text.
+
+Past the last variable the answer is `nil`, which is what lets a walk stop. In between there
+may be positions Lua has no name for: values it is holding on the stack while it works, the
+machinery driving a `for` loop, and — in a chunk loaded without its debug information —
+variables whose names were not kept. These arrive with a stand-in name beginning with `(`, and
+testing that first character is the way to leave them out of a listing.
+
+A negative index counts through the extra arguments a variadic call received rather than
+through its locals: `-1` is the first argument that did not fit a parameter, `-2` the second,
+and so on until they run out. A call to a function that takes no `...` finds nothing there, and
+neither does a variadic function whose extra arguments were gathered into a table rather than
+kept on the stack — where they are gathered, the table itself is what holds them.
+
+Written a function value in place of a level, this answers a different question: what the
+function *declares*, rather than what some call to it is holding. Only the parameters are
+visible, because nothing is running and there is no way to know which of the body's locals
+would be in scope, and only their names come back, because there are no values yet. It is a way
+to ask a function how it wants to be called.
+
+## Examples
+
+### Listing what a call is holding
+
+<RunnableExample code={`local function visible_names()\n  local names = {}\n  local slot = 1\n  while true do\n    local name = debug.getlocal(2, slot)\n    if not name then break end\n    if name:sub(1, 1) ~= "(" then names[#names + 1] = name end\n    slot = slot + 1\n  end\n  return table.concat(names, ", ")\nend\n\nlocal function ship_order(order_id, courier)\n  local weight_kilos = 4\n  local listing = visible_names()\n  return listing\nend\n\nlocal listing = ship_order(17, "postal")\nprint(listing)\n-- Expected output:\n-- order_id, courier, weight_kilos`} />
+
+Level `2` from inside the helper is `ship_order`, because level `1` is the helper itself. The
+two parameters come first in signature order and the body's local follows; `listing` is absent
+because the `local` statement holding the call has not finished yet. Positions carrying a
+stand-in name are skipped rather than stopping the walk, which is what the test on the first
+character is doing — the walk stops on `nil` and on nothing else.
+
+<Only since="5.2">
+
+### Asking a function how it wants to be called
+
+<RunnableExample code={`local function apply_late_fee(balance, days_overdue, fee_rate)\n  return balance + days_overdue * fee_rate\nend\n\nprint(debug.getlocal(apply_late_fee, 1))\nprint(debug.getlocal(apply_late_fee, 2))\nprint(debug.getlocal(apply_late_fee, 4))\nprint(select("#", debug.getlocal(apply_late_fee, 1)))\n-- Expected output:\n-- balance\n-- days_overdue\n-- nil\n-- 1`} />
+
+The function was never called, so there are no values and exactly one thing comes back each
+time. Counting past the last parameter answers `nil`, which is how the number of declared
+parameters can be found — though
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says)'s `nparams`
+answers that in one call.
+
+### The arguments that did not fit a parameter
+
+<RunnableExample code={`local function record_metrics(source, ...)\n  local first_name, first_extra = debug.getlocal(1, -1)\n  local second_name, second_extra = debug.getlocal(1, -2)\n  return first_name, first_extra, second_extra\nend\n\nlocal first_name, first_extra, second_extra = record_metrics("nightly", "cpu", "memory")\nprint(first_name:sub(1, 1))\nprint(first_extra)\nprint(second_extra)\n-- Expected output:\n-- (\n-- cpu\n-- memory`} />
+
+`source` took the first argument, so `-1` is `"cpu"` — the first one left over — and `-2` is
+the one after it. They have no names to give, so what comes back in the name position is a
+stand-in beginning with `(`, and the value is the whole of what was asked for.
+
+</Only>
+
+### Reading another thread's locals
+
+<RunnableExample code={`local stocktake = coroutine.create(function()\n  local pending_items = 340\n  coroutine.yield()\n  return pending_items\nend)\ncoroutine.resume(stocktake)\n\nlocal name, value = debug.getlocal(stocktake, 1, 1)\nprint(name)\nprint(value)\n-- Expected output:\n-- pending_items\n-- 340`} />
+
+The coroutine is stopped part-way through and its frames are still standing, so its locals can
+be read from outside while it waits. Naming a thread also shifts what the level numbers mean —
+this call is not on that stack at all — which
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo#looking-at-another-thread) sets out
+once for every call in this library that takes the argument.
+
+## Gotchas
+
+<Gotcha title="A bad level raises and a bad index does not">
+The two numbers fail in opposite ways, and code that guards one is often guarding the wrong
+one. Ask about a level that is not on the stack and the call raises; ask about a position that
+holds nothing and it hands back `nil`. So a loop walking positions needs no protection and a
+loop walking levels does.
+
+<RunnableExample code={`local function look_around()\n  local kept_value = 1\n  local past_the_end = debug.getlocal(1, 30)\n  local how_many = select("#", debug.getlocal(1, 30))\n  return past_the_end, how_many\nend\n\nlocal past_the_end, how_many = look_around()\nprint(past_the_end)\nprint(how_many)\nlocal reachable = pcall(debug.getlocal, 500, 1)\nprint(reachable)\n-- Expected output:\n-- nil\n-- 1\n-- false`} />
+</Gotcha>
+
+<Gotcha title="A local is not there while it is being declared">
+The initialiser of a `local` statement runs before the variable it is initialising exists, so a
+call made inside that expression cannot see it. This reads as an off-by-one in the numbering and
+is not one — it is the scope rule, and it means the same index can answer differently on two
+consecutive lines.
+
+<RunnableExample code={`local function close_the_month(ledger_name)\n  local before_declaring = debug.getlocal(1, 2)\n  local closing_balance = 0\n  local after_declaring = debug.getlocal(1, 2)\n  return before_declaring, after_declaring\nend\n\nlocal before_declaring, after_declaring = close_the_month("august")\nprint(before_declaring)\nprint(after_declaring)\n-- Expected output:\n-- nil\n-- before_declaring`} />
+
+Position `2` was empty on the first reading and holds `before_declaring` on the second — the
+very local the first line was busy creating.
+</Gotcha>
+
+<Gotcha title="Positions are not names, and they move">
+There is no way to ask for a local by name; a tool that wants one has to walk the positions and
+compare. And because the numbering counts what is active where execution has reached, a position
+recorded at one point in a function is not a reliable handle on the same variable a few lines
+later. Read the name back and check it rather than trusting a remembered index.
+</Gotcha>
+
+<Gotcha title="A tail call has already replaced the frame you meant">
+`return read_locals(2)` is a tail call: the enclosing function's frame is gone before the helper
+starts, so the level the helper counts to lands one caller further out than the code reads as
+though it should. Write `local found = read_locals(2)` and return `found` on the next line. The
+same miscount catches out [`debug.getinfo()`](/docs/standard-library/debug/getinfo) and
+[`error()`](/docs/standard-library/globals/error#where-the-blame-lands).
+</Gotcha>
+
+<Gotcha title="A stand-in name is not a name to test against">
+Positions with nothing declared behind them arrive with a name Lua made up, and the only part of
+it worth relying on is the leading `(` — the rest describes what Lua is holding there in its own
+terms, and it is not a promise. Test the first character, not the whole string.
+</Gotcha>
+
+## See also
+
+- [`debug.setlocal()`](/docs/standard-library/debug/setlocal) — writing a value into one of these positions instead of reading it
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — which call a level is, and whether the level exists before you ask about it
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) — the other half of what a function can see: the variables it closed over
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — being handed a call to inspect at the moment it starts or finishes
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — the levels themselves, written out as one string
+- [`select()`](/docs/standard-library/globals/select) — reading the extra arguments from inside the function that received them, without this library

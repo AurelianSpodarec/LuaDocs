@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "A thread with no hook installed at all is answered with a single `nil` and nothing after it, where earlier versions follow that `nil` with an empty mask string and a count of `0`. A thread carrying a mask with no hook function behind it — the state a coroutine created under a hook is born in — is still answered with all three values on every version."
+  }
+}
