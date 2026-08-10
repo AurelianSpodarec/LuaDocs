@@ -32,9 +32,21 @@ and the document says so in its own words:
 Both of that document's *"this line is superseded"* amendments arrived the same way. Not one
 refinement in it came from re-reading the spec.
 
-`prototype/` was then deleted. So the capability that produced findings #1–#3 was built,
-used, and thrown away — and on 2026-08-10 it was reinvented as `/demo` to answer the same
-class of question again.
+> **Correction, 2026-08-10.** This section originally claimed `prototype/` had been deleted.
+> It has not: `docs/research/prototype/` holds all five entries — `length-operator.md`,
+> `math.pi.md`, `string.format.md`, `table.md`, `table.sort.md`. The claim came from checking
+> for `prototype/` at the repository root, finding nothing, and concluding it was gone.
+
+The accurate version is a better argument. Those five files are **markdown, hand-written** —
+prose describing what an entry would contain, never rendered by the components that would
+render it. The list above says so: findings #4–#8 came from entries *"built against the real
+components **rather than by hand**"*, and it is those findings that superseded the spec in
+four places, not the hand-written ones before them.
+
+So nothing was thrown away. The gap was that a *rendered* artefact never had a home — the
+prototypes were prose about pixels, and the four `string` entries that were real pixels lived
+in `content/docs` as shipped pages, where they could not be set beside an alternative. `/demo`
+is the first place an artefact and its alternative can sit side by side.
 
 ### Because the third time was measured
 
@@ -78,10 +90,11 @@ One rendered page cost under an hour.
 
 ### Why the surface is permanent
 
-Rule 1 needs somewhere to put the artefact. Without a standing home, each decision builds a
-throwaway, and a throwaway is deleted the moment its decision ships — which is precisely
-what happened to `prototype/`, taking with it the ability to answer the next question
-cheaply.
+Rule 1 needs somewhere to put the artefact, and the two places this project has used instead
+both fail differently. `docs/research/prototype/` is markdown, so it can describe a rendering
+but never be one. A shipped entry under `content/docs` is real pixels, but it is the *current*
+answer by definition — there is nowhere beside it to put the alternative, which is what a
+comparison needs.
 
 `/demo` therefore keeps pages after their decision has landed. A page that recorded why a
 rule is conditional is the cheapest available answer to someone proposing to make it

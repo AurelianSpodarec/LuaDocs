@@ -72,4 +72,4 @@ A decision about rendered output cannot be validated in prose. Write the rules, 
 
 LuaDocs wrote a six-rule ADR on entry anatomy, then rendered one function under it before touching content. **Three of the six rules were wrong** — each stated unconditionally where it was only conditionally right. One would have required inventing 85 labels to fix an ambiguity that existed on none of those 85 pages. Caught in one page instead of at file 200 of 292.
 
-The same project had already learned this twice — every refinement in its page-structure spec came from building rather than deciding — and had deleted the surface that produced them both times.
+The same project had already learned it twice: every refinement in its page-structure spec came from building rather than deciding, and the two amendments that superseded that spec both came from entries built against real components rather than described in prose. What it lacked was anywhere to put a rendering *beside its alternative* — hand-written prototypes cannot be one, and a shipped page is the current answer by definition.
