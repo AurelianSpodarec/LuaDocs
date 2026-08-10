@@ -1,8 +1,202 @@
 ---
 title: debug.getuservalue()
-description: ""
+description: Read one of the Lua values a full userdata is carrying alongside its block of memory.
+lua-compat: debug.getuservalue
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getuservalue
 ---
 
-{/* Not yet written. */}
+Reads one of the Lua values attached to a full userdata. A userdata is a block of memory the
+host manages on Lua's behalf, and beside that memory the host may attach ordinary Lua values —
+a table of settings, a callback, the object that owns it. Those attached values are the *user
+values*, and this is how a Lua program reads one.
+
+<RunnableExample code={`local report_handle = io.stdout\n\nprint(type(report_handle))\nlocal stored = debug.getuservalue(report_handle)\nprint(stored)\nprint(select("#", debug.getuservalue(report_handle)))\n\nlocal from_a_table = debug.getuservalue({ courier = "north" })\nprint(from_a_table)\n-- Expected output:\n-- userdata\n-- nil\n-- 1\n-- nil`} />
+
+<Note>
+Userdata cannot be created from Lua, so what a userdata is carrying is settled before a Lua
+program ever sees it. The only userdata these examples can get hold of are the ones the standard
+library hands out, and those are carrying nothing at the position asked about — so the cards here
+work on the shape of the answer, on what is refused, and on what is quietly answered instead of
+refused. A reading that finds something is shown as a listing rather than run.
+</Note>
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+debug.getuservalue(u)
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+debug.getuservalue(u, n)
+```
+
+</Only>
+
+<Parameters>
+  <Only before="5.4">
+    <Param name="u">The userdata to read. A value that is not a full userdata is answered with `nil` rather than refused.</Param>
+  </Only>
+  <Only since="5.4">
+    <Param name="u">The userdata to read. A value that is not a full userdata is answered with `nil` rather than refused.</Param>
+    <Param name="n">Which user value, by position. `1` is the first, and is what the call uses when this argument is left out. [How many there are](#what-a-user-value-is) was decided when the userdata was made.</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Only before="5.4">
+    <Return type="any">The value attached to `u`, whatever kind of value it is. `nil` comes back both when the attached value is `nil` and when `u` is not a full userdata at all, and one value is what this call answers in every case.</Return>
+  </Only>
+  <Only since="5.4">
+    <Return type="any">The value stored at position `n`. `nil` comes back when nothing is stored there, when the userdata has no such position, and when `u` is not a full userdata at all.</Return>
+    <Return type="boolean">`true`, and only ever `true` — it is present when the userdata really has a value at that position, and where it does not, [nothing follows the first value](#telling-a-stored-nil-from-nothing-stored) rather than a `false`.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Nothing about `u` raises. A table, a string, a number, a light userdata and no argument at all are all answered with `nil`, so a mistake here reads as an empty result rather than as a complaint.
+- <Since v="5.4" /> Raises when `n` is neither a number nor a string that reads as one.
+- <Since v="5.4" /> Raises when `n` carries a fraction rather than an exact whole-number value. `debug.getuservalue(u, 1.0)` is accepted; `debug.getuservalue(u, 1.5)` is not.
+- <Only since="5.4">A position the userdata does not have — including `0` and a negative one — is answered rather than refused.</Only>
+
+</Errors>
+
+## Description
+
+This and [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) are the pair that
+reaches the Lua values a userdata is carrying. The block of memory behind a userdata is the
+host's, and the language has no operation that looks into it — what a userdata can do from Lua
+is whatever the metatable the host gave it defines, and no more. What the host attached *beside*
+that memory is Lua's own kind of value, though, and this call hands it over as it stands.
+
+Reading disturbs nothing. What comes back is the value itself rather than a copy of it, in the
+same sense that reading a field of a table hands over what is in the field — a table that comes
+back is the table the userdata is holding, and writing into it is felt wherever else that table
+is held. Replacing what the userdata carries is a different call.
+
+The value is read at the moment of the call, and nothing about the result tracks it afterwards.
+A program that wants to know what a userdata is holding now asks again.
+
+## What a user value is
+
+A full userdata is two things at once. One is a block of raw memory that the host allocated and
+manages; Lua stores it, keeps it alive and eventually frees it, and never looks inside. The
+other is a set of ordinary Lua values attached to it — the user values. Those are Lua's own
+kind of value, traced by the collector like any other reference, and they are what a C library
+uses to hang a Lua-side object off a C-side one: the table a handle's methods read, the callback
+a connection should invoke, the parent that must not be collected before the child.
+
+They are addressed by position, counting from `1`. How many positions a userdata has is fixed
+when it is created, and creating one is something only C can do — a userdata may have several,
+one, or none at all. No call reports how many there are outright: a position either answers with
+a value or answers that there is nothing there, and counting upwards until the answers run out is
+what tells a program where the end is.
+
+Which position holds what is the host library's arrangement. Nothing names a position, nothing
+orders them, and no rule outside a library's own source says which of its values sits where — so
+reading a particular position is worth doing against a library whose source you have, and not
+otherwise. This is a debugger's window on someone else's bookkeeping, not an interface.
+
+## Telling a stored nil from nothing stored
+
+Three quite different situations answer with `nil`: the position holds `nil`, the userdata has
+no such position, and the value asked about was not a full userdata. The second value is what
+separates them.
+
+It is present, as `true`, when the userdata genuinely has a value at that position — including
+when the value stored there is `nil`. Where it does not, the call answers with one value and
+stops. So a program that writes `local stored, present = debug.getuservalue(handle, 2)` finds
+`present` holding `true` or holding `nil`, and the ordinary truth test reads correctly; a
+program that tests `present == false` is testing for something that never arrives.
+
+Counting says the same thing more plainly.
+[`select("#", ...)`](/docs/standard-library/globals/select) answers `2` for a position that
+exists and `1` for one that does not, which is the test to reach for when the stored value
+might legitimately be `nil`.
+
+## Examples
+
+### Being handed the wrong thing is not an error
+
+<RunnableExample code={`local asked_about_a_string = debug.getuservalue("north")\nprint(asked_about_a_string)\nlocal asked_about_nothing = pcall(debug.getuservalue)\nprint(asked_about_nothing)\nprint(select("#", debug.getuservalue(io.stdout)))\n-- Expected output:\n-- nil\n-- true\n-- 1`} />
+
+A string, and no argument at all, are answered rather than refused — with the same `nil` a real
+userdata with nothing to hand over gives. That makes this a safe call to make speculatively, and
+it makes a mistake in what is being asked about indistinguishable from an empty answer.
+
+### A light userdata is a userdata, and not one of these
+
+<RunnableExample code={`local pending_total = 0\nlocal function add_charge(amount)\n  pending_total = pending_total + amount\nend\n\nlocal variable_identity = debug.upvalueid(add_charge, 1)\nprint(type(variable_identity))\nlocal stored = debug.getuservalue(variable_identity)\nprint(stored)\nlocal wrote = pcall(debug.setuservalue, variable_identity, { note = "seen" })\nprint(wrote)\n-- Expected output:\n-- userdata\n-- nil\n-- false`} />
+
+[`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) hands back a *light* userdata, and
+[`type()`](/docs/standard-library/globals/type#the-eight-names) calls that `"userdata"` too. A
+light userdata is a bare pointer with nothing attached, so this call answers nothing for one —
+while [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) refuses it outright.
+Testing `type(value) == "userdata"` before reading is therefore not the guard it looks like.
+
+<Only since="5.4">
+
+### A position that is refused, and one that is merely empty
+
+<RunnableExample code={`local archive_path = "debug-getuservalue-archive.txt"\nlocal archive = assert(io.open(archive_path, "w"))\n\nlocal at_zero = pcall(debug.getuservalue, archive, 0)\nlocal far_past_the_end = pcall(debug.getuservalue, archive, 500)\nlocal fractional = pcall(debug.getuservalue, archive, 1.5)\nprint(at_zero)\nprint(far_past_the_end)\nprint(fractional)\nprint(select("#", debug.getuservalue(archive, 500)))\n\narchive:close()\nos.remove(archive_path)\n-- Expected output:\n-- true\n-- true\n-- false\n-- 1`} />
+
+A position of `0` and one far past the end are ordinary empty answers rather than complaints, so
+counting upwards until the second value stops arriving is how a program finds out how many
+positions there are. A fraction is different: it is a mistake the call will not guess at, and it
+raises.
+
+</Only>
+
+### Reading a userdata that is carrying something
+
+```lua
+-- A connection handed over by a C library that attached its settings table.
+local settings = debug.getuservalue(connection, 1)
+
+if settings then
+  print(settings.timeout_seconds)
+end
+```
+
+Written against a library whose source says what it puts where. This listing is shown rather than
+run: it reads a userdata that a C library made and filled in, and the sandbox these examples run
+in has no such library to ask.
+
+## Gotchas
+
+<Gotcha title="A wrong argument answers nil instead of complaining">
+Hand this call a table, a string, a number or nothing at all and it answers `nil` — the same
+answer a userdata with nothing at that position gives. So a bug in what is being asked about
+looks exactly like an empty result, and the mistake survives until something downstream notices
+the missing value. Where it matters, check the value yourself before asking.
+</Gotcha>
+
+<Gotcha title="A position is the library's arrangement, not an interface">
+Nothing names a position and nothing orders them, so which value a library keeps where is
+readable only out of its source. Code that reads position `1` of a userdata from a library it
+does not control is reading a detail that library never promised, and a release of that library
+that attaches one more thing can move it. This is a call for looking at a program, not for
+building one on.
+</Gotcha>
+
+<Gotcha title="A table that comes back is the table itself">
+What arrives is the value, not a copy, so a table read out of a userdata is the same table the
+userdata is holding. Writing into it changes what the host will read next time — quietly, with
+no call to this library's writing half and no sign that anything unusual happened. Copy it first
+where the intention is to look rather than to change.
+</Gotcha>
+
+## See also
+
+- [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) — writing one of these positions instead of reading it
+- [`debug.getregistry()`](/docs/standard-library/debug/getregistry) — the other place C code keeps Lua values where a Lua program can reach them
+- [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) — where a Lua program can come by a light userdata, which this call answers nothing for
+- [`type()`](/docs/standard-library/globals/type#the-eight-names) — the one name both kinds of userdata answer to
+- [`io.type()`](/docs/standard-library/io/type#what-a-file-handle-is) — the full userdata a Lua program is most likely to be holding

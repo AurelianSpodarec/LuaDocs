@@ -1,8 +1,189 @@
 ---
 title: debug.setuservalue()
-description: ""
+description: Replace one of the Lua values a full userdata is carrying alongside its block of memory.
+lua-compat: debug.setuservalue
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.setuservalue
 ---
 
-{/* Not yet written. */}
+Writes one of the Lua values attached to a full userdata, replacing whatever was there. It is
+the writing half of the pair [`debug.getuservalue()`](/docs/standard-library/debug/getuservalue)
+opens: the same positions, the same values, and the same absence of any promise about what a host
+library keeps where.
+
+<RunnableExample code={`local delivery_notes = { courier = "north" }\n\nlocal wrote_to_a_table = pcall(debug.setuservalue, delivery_notes, "signed")\nprint(wrote_to_a_table)\n\nlocal wrote_to_a_string = pcall(debug.setuservalue, "north", "signed")\nprint(wrote_to_a_string)\n\nlocal wrote_to_nothing = pcall(debug.setuservalue, nil, "signed")\nprint(wrote_to_nothing)\n-- Expected output:\n-- false\n-- false\n-- false`} />
+
+<Note>
+Userdata cannot be created from Lua, so nothing on this page can build one to write into, and
+the ones the standard library hands out belong to that library rather than to the example. The
+cards below therefore work on what this call refuses and on what it answers; a write meant to be
+kept is shown as a listing rather than run.
+</Note>
+
+## Syntax
+
+<Only before="5.4">
+
+```lua
+debug.setuservalue(udata, value)
+```
+
+</Only>
+
+<Only since="5.4">
+
+```lua
+debug.setuservalue(udata, value, n)
+```
+
+</Only>
+
+<Parameters>
+  <Only before="5.3">
+    <Param name="udata">The userdata to write into. It has to be a full userdata; anything else, light userdata included, is refused.</Param>
+    <Param name="value">The value to attach. It has to be a table, or `nil` to detach whatever was there — and leaving it out counts as `nil`.</Param>
+  </Only>
+  <Only since="5.3" before="5.4">
+    <Param name="udata">The userdata to write into. It has to be a full userdata; anything else, light userdata included, is refused.</Param>
+    <Param name="value">The value to attach — any Lua value at all, `nil` included, and it cannot be left out.</Param>
+  </Only>
+  <Only since="5.4">
+    <Param name="udata">The userdata to write into. It has to be a full userdata; anything else, light userdata included, is refused.</Param>
+    <Param name="value">The value to attach — any Lua value at all, `nil` included, and it cannot be left out.</Param>
+    <Param name="n">Which user value, by position. `1` is the first, and is what the call uses when this argument is left out. [How many there are](/docs/standard-library/debug/getuservalue#what-a-user-value-is) was decided when the userdata was made, and a position outside that range is where this call reports a failure rather than raising.</Param>
+  </Only>
+</Parameters>
+
+<Returns>
+  <Only before="5.4">
+    <Return type="userdata">`udata` itself, so the call can be written inline around the thing it wrote into. There is no other answer: once the arguments are accepted the write has landed.</Return>
+  </Only>
+  <Only since="5.4">
+    <Return type="userdata or nil">`udata` itself when the write landed, so the call can be written inline around the thing it wrote into — and `nil` in its place when the userdata has no value at position `n`, in which case nothing was written.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when `udata` is not a full userdata. A table, a string, a number, a light userdata and no argument at all are all refused, which is the opposite of what the reading half does with them.
+- <Only before="5.3">Raises when `value` is anything other than a table or `nil`.</Only>
+- <Since v="5.3" /> Raises when `value` is left out. Before that a missing value counts as `nil`, and detaches whatever was there.
+- <Since v="5.4" /> Raises when `n` is neither a number nor a string that reads as one, and when it carries a fraction rather than an exact whole-number value.
+- <Only since="5.4">A position the userdata does not have — including `0` and a negative one — is reported in the answer rather than raised.</Only>
+
+</Errors>
+
+## Description
+
+A full userdata carries a block of memory that only the host can touch and, beside it, some
+number of ordinary Lua values. Those attached values are the *user values*, described under
+[what a user value is](/docs/standard-library/debug/getuservalue#what-a-user-value-is), and this
+call replaces one of them.
+
+What is replaced is the slot, not the value that was in it. Whatever the userdata was carrying
+there is simply no longer referenced from it, and if nothing else holds that value it becomes
+collectable like anything else. Nothing warns the host library that its bookkeeping changed
+underneath it, and nothing records that the change happened.
+
+That is the whole difficulty with this call, and it is worth being plain about. The reading half
+looks at an arrangement a C library made; this one edits it. A library that attached a settings
+table, a parent object or a callback did so because its own C code will read it back, and code
+that overwrites the slot has changed what that C code will find on its next call. Where the
+library expected a table and finds a string, the failure surfaces inside C, which is where Lua's
+usual protections stop.
+
+A host that means a program to change these values normally provides a method for doing it, and
+the absence of one is a fair sign that the arrangement was not meant to be edited from Lua. This
+call does not consult the host about that, which is what puts it in a debugging library rather
+than in the language.
+
+## When a write has nowhere to go
+
+Positions run from `1` up to however many the userdata was created with, and a userdata may have
+been created with none. Writing outside that range is not treated as a mistake in the program:
+the call reports it in what it hands back, answering `nil` where it would otherwise answer the
+userdata, and nothing is written.
+
+So the check worth making is on the answer, not around the call. The call either gives back the
+userdata, meaning the value is now there, or gives back `nil`, meaning this userdata has no such
+position and never had one. Wrapping the call in
+[`assert()`](/docs/standard-library/globals/assert) turns that distinction into a complaint at
+the point of the write, which is where a program can still do something about it.
+
+The failing answer is the same `nil` that
+[`debug.getuservalue()`](/docs/standard-library/debug/getuservalue#telling-a-stored-nil-from-nothing-stored)
+gives for a position that is not there, and for the same reason. It is not a report about the
+value being written, which may itself be `nil` quite legitimately.
+
+## Examples
+
+<Only since="5.3">
+
+### The value cannot be left out
+
+<RunnableExample code={`local receipts_path = "debug-setuservalue-receipts.txt"\nlocal receipts = assert(io.open(receipts_path, "w"))\n\nlocal with_a_value = pcall(debug.setuservalue, receipts, false)\nlocal with_no_value = pcall(debug.setuservalue, receipts)\nprint(with_a_value)\nprint(with_no_value)\n\nreceipts:close()\nos.remove(receipts_path)\n-- Expected output:\n-- true\n-- false`} />
+
+Any Lua value is accepted here, `false` and `nil` among them, which is why the argument is
+required rather than optional: there is no value left over that the call could read as *nothing
+given*. Detaching what is there is written as an explicit `nil`.
+
+</Only>
+
+<Only since="5.4">
+
+### A write with nowhere to land
+
+<RunnableExample code={`local manifest_path = "debug-setuservalue-manifest.txt"\nlocal manifest = assert(io.open(manifest_path, "w"))\n\nlocal answer = debug.setuservalue(manifest, { checked = true }, 1)\nprint(answer == manifest)\nprint(answer)\nprint(select("#", debug.setuservalue(manifest, { checked = true }, 1)))\nlocal read_back = debug.getuservalue(manifest, 1)\nprint(read_back)\n\nmanifest:close()\nos.remove(manifest_path)\n-- Expected output:\n-- false\n-- nil\n-- 1\n-- nil`} />
+
+A file handle is a full userdata, so the call is accepted — and it answers `nil` rather than the
+handle, because this userdata has no position `1` to write into. Reading it back afterwards
+confirms that nothing landed. One value comes back either way, so it is what that value *is*
+that carries the report.
+
+</Only>
+
+### Attaching a value to a userdata that has room for one
+
+```lua
+-- A connection handed over by a C library that reads its settings out of position 1.
+local settings = debug.getuservalue(connection, 1)
+settings.timeout_seconds = 30
+
+assert(debug.setuservalue(connection, settings, 1))
+```
+
+Read, change, write back — and let `assert()` object if the position turned out not to exist.
+This listing is shown rather than run: producing a userdata with a position to write into is
+something Lua has no way to do.
+
+## Gotchas
+
+<Gotcha title="This edits a C library's bookkeeping, not your own">
+Whatever a userdata is carrying was put there by the code that created the userdata, and that
+code will read it back expecting to find what it left. Replacing it is not a private change to a
+value you own — it is a change to another library's state, made without telling it, and the
+consequences arrive inside C where a wrong type is not a Lua error. If a host wanted this
+changed from Lua it would have offered a way.
+</Gotcha>
+
+<Gotcha title="A refusal and a failure look nothing alike">
+Handing this call something that is not a full userdata raises; asking it to write a position
+that does not exist does not, and reports itself only in the value handed back. So a program
+that wraps the call in `pcall()` catches the first and sails straight past the second. The
+answer is what tells you the write landed.
+</Gotcha>
+
+<Gotcha title="The value that was there is dropped, not merged">
+This replaces the slot outright. A table that was attached is not updated and not combined with
+the new value — it is simply no longer referenced from the userdata, and unless something else
+is holding it, it becomes collectable. Where the intention is to change a setting rather than
+the whole arrangement, read the value out, change it in place, and write nothing back at all.
+</Gotcha>
+
+## See also
+
+- [`debug.getuservalue()`](/docs/standard-library/debug/getuservalue) — reading one of these positions, and what a user value is
+- [`debug.getregistry()`](/docs/standard-library/debug/getregistry) — the other place C code keeps Lua values where a Lua program can reach them
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — the same kind of reach into a closure rather than a userdata
+- [`type()`](/docs/standard-library/globals/type#the-eight-names) — the one name both kinds of userdata answer to, which is why the guard here is not `type()`
+- [`io.type()`](/docs/standard-library/io/type#what-a-file-handle-is) — the full userdata a Lua program is most likely to be holding

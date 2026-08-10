@@ -1,8 +1,160 @@
 ---
 title: debug.getregistry()
-description: ""
+description: Hand back the registry — the table C code uses to keep Lua values where a Lua program cannot normally see them.
+lua-compat: debug.getregistry
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getregistry
 ---
 
-{/* Not yet written. */}
+Hands back the registry: an ordinary table that C code uses to keep Lua values alive across
+calls, in a place no Lua program is otherwise given. Every C library sharing one Lua state
+shares this table, and this call is what opens it to Lua.
+
+<RunnableExample code={`local registry = debug.getregistry()\n\nprint(type(registry))\nprint(registry == debug.getregistry())\nprint(registry._LOADED == package.loaded)\n-- Expected output:\n-- table\n-- true\n-- true`} />
+
+## Syntax
+
+```lua
+debug.getregistry()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="table">The registry itself, not a copy of it. Every call answers the same table, from any thread, and writing into it is felt everywhere.</Return>
+</Returns>
+
+<Errors>
+
+- Nothing here fails. There is always a registry, it is always a table, and any arguments handed to this call are ignored.
+
+</Errors>
+
+## Description
+
+A C function that needs to keep a Lua value between calls has nowhere obvious to put it. It
+cannot leave the value on the stack, which is emptied when it returns, and a Lua variable is the
+Lua program's to reassign. The registry is the place the C API provides instead: one table per
+Lua state, reachable from C without going through any Lua variable at all, holding whatever the
+libraries loaded into that state need to hold.
+
+Almost everything in it is therefore somebody's private bookkeeping. Metatables that libraries
+share between the objects they hand out, the record of which modules have been loaded, values a
+host handed the state before running a line of Lua — they are here because C wanted them
+somewhere, not because they were meant to be read.
+
+That makes this call unusual among the ones on this site. It is a real tool for looking at what a
+state is carrying, and almost nothing it hands back is something a program should then be built
+on — the manual's own advice about the registry is about which keys C code may take, and it
+reads very differently once the reader holding the table is a Lua program rather than a C
+library.
+
+## What is in the registry
+
+The manual is specific about two kinds of key and says nothing at all about the rest.
+
+*Integer keys are spoken for.* Some of them hold values Lua itself put there when the state was
+made — the global environment, and the main thread, the one created along with the state — and
+the rest belong to the
+mechanism the C API offers for holding a value under a number it hands back. A Lua program has
+no access to the names C code uses for the reserved ones, and the numbers behind those names are
+not part of what the manual documents. Reading the global environment out of the registry is
+therefore the wrong way round: [`_G`](/docs/standard-library/globals/_g) is the supported way,
+and it is the same table.
+
+*String keys beginning with an underscore and a capital letter are reserved for Lua.* Those are
+the ones the standard libraries use, and the one a program is likeliest to recognise holds the
+record [`require()`](/docs/standard-library/globals/require) keeps —
+[`package.loaded`](/docs/standard-library/package/loaded) is that same table under a name in
+here.
+
+Everything else is whatever the C libraries in this state chose, and the manual's advice to a C
+library is to pick keys the others will not: a string naming the library, a pointer to something
+in its own C code, or an object it made itself and nothing else can construct. So there is no
+list of what a registry contains, and what a program finds there depends on which libraries the
+host loaded as much as on which Lua it is running.
+
+## Writing into it
+
+Nothing stops a Lua program writing here, and there are three separate reasons not to.
+
+The first is that two kinds of key are already committed. Writing an integer key can hand a
+value to the reference mechanism, or overwrite something Lua put there when the state was made,
+and either failure surfaces later, in C, somewhere unrelated. Writing a name beginning with an
+underscore and a capital letter is writing into the space reserved for Lua's own use.
+
+The second is that the registry is reachable for as long as the state lives, so anything left
+here is [never collected](/docs/standard-library/globals/collectgarbage#what-a-collection-promises).
+A cache built in the registry is a cache that grows until the program ends.
+
+The third is that this table is shared with code that does not know the program exists. A C
+library reading its own key back and finding something else does not raise a Lua error; it
+behaves as C behaves when its assumptions turn out to be wrong.
+
+A program that needs a table of its own can simply make one, and hold it in an upvalue or a
+field where nothing else will find it. The registry offers nothing that a table of your own does
+not, except the risk of collision.
+
+## Examples
+
+### What a program can recognise in there
+
+<RunnableExample code={`local registry = debug.getregistry()\n\nlocal named_entries = 0\nfor key in pairs(registry) do\n  if type(key) == "string" then named_entries = named_entries + 1 end\nend\nprint(named_entries > 0)\nprint(type(registry._LOADED))\nprint(registry["shipping rates cache"])\n-- Expected output:\n-- true\n-- table\n-- nil`} />
+
+There are string keys in there, one of them is the loaded-module record, and a key nothing put
+there reads as `nil` like any absent field. The card counts rather than listing, because what is
+in a registry is the host's business — a different interpreter, or the same one with another
+library loaded, answers with a different set.
+
+### One table for the whole state
+
+<RunnableExample code={`local registry = debug.getregistry()\n\nlocal seen_inside = nil\nlocal worker = coroutine.create(function()\n  seen_inside = debug.getregistry()\nend)\ncoroutine.resume(worker)\n\nprint(rawequal(seen_inside, registry))\nprint(seen_inside == debug.getregistry())\n-- Expected output:\n-- true\n-- true`} />
+
+Several calls in this library take a thread to ask about, and this one does not, because there
+is nothing per-thread about a registry. A coroutine sees the same table the code that created it
+sees, which is also why a write made anywhere is a write everyone lives with.
+
+### Looking at what a state has loaded
+
+```lua
+-- Which of the standard libraries got loaded into this state.
+for name in pairs(debug.getregistry()._LOADED) do
+  print(name)
+end
+```
+
+Written as an inspection rather than as part of a program: the same question is answered by
+`package.loaded`, and the reason to come through the registry is to see the shape of what is
+kept in there rather than to get the answer.
+
+## Gotchas
+
+<Gotcha title="This is the live table, not a snapshot">
+What comes back is the registry itself. A stray assignment through the variable holding it is an
+assignment into the state's shared bookkeeping, felt by every library and every coroutine at
+once, and it cannot be undone by dropping the variable. Treat the value as read-only and it is a
+harmless tool; treat it as a scratch table and it is about as far-reaching as a write from Lua
+gets.
+</Gotcha>
+
+<Gotcha title="What you find here is nobody's interface">
+The keys in a registry belong to the libraries that made them and can change with any release of
+those libraries, including with a rebuild of the host. Code that reads a key it did not put
+there is reading something that was never promised — fine while looking at a running program,
+and a fault waiting to happen if it is left in.
+</Gotcha>
+
+<Gotcha title="Anything left here is never collected">
+The registry is reachable for the whole life of the state, so a value stored here is a value the
+collector will never take. That is exactly why C code uses it, and exactly why a Lua program
+should not: a table dropped in here as a quick cache is a leak with no way to notice it, since
+the memory figure grows for a reason nothing else in the program can point at.
+</Gotcha>
+
+## See also
+
+- [`debug.getuservalue()`](/docs/standard-library/debug/getuservalue) — reading the Lua values a full userdata is carrying
+- [`_G`](/docs/standard-library/globals/_g) — the supported way to reach the global environment, which the registry also holds
+- [`package.loaded`](/docs/standard-library/package/loaded) — the loaded-module record, which is one of the entries in here
+- [`collectgarbage()`](/docs/standard-library/globals/collectgarbage#what-a-collection-promises) — why anything reachable from the registry is never collected
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — the call to reach for when the question is what a program is doing rather than what it is holding

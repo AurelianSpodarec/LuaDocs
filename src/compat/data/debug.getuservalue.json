@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.2" } },
+  "changed_in": {
+    "5.4": "A second argument names which of the userdata's values to read, counting from `1` and defaulting to the first, and a second value of `true` comes back when the userdata really has a value at that position — so a position holding `nil` can be told from one that is not there. Earlier a full userdata carries exactly one value, anything written after the userdata is ignored, and one value is all this call ever answers with."
+  }
+}

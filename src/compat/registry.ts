@@ -171,6 +171,9 @@ import debugGetupvalue from './data/debug.getupvalue.json';
 import debugSetupvalue from './data/debug.setupvalue.json';
 import debugUpvalueid from './data/debug.upvalueid.json';
 import debugUpvaluejoin from './data/debug.upvaluejoin.json';
+import debugGetuservalue from './data/debug.getuservalue.json';
+import debugSetuservalue from './data/debug.setuservalue.json';
+import debugGetregistry from './data/debug.getregistry.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -2119,6 +2122,92 @@ const raw: Record<string, unknown> = {
   'debug.setupvalue': debugSetupvalue,
   'debug.upvalueid': debugUpvalueid,
   'debug.upvaluejoin': debugUpvaluejoin,
+
+  // ## `debug` — batch DB4: the user values and the registry
+  //
+  // Same reading discipline as DB1–DB3. All five manuals on disk, read at
+  // `pdf-debug.getuservalue`, `pdf-debug.setuservalue` and `pdf-debug.getregistry`, at the
+  // C-API entries they defer to (`lua_getuservalue`/`lua_setuservalue` at 5.2 and 5.3,
+  // `lua_getiuservalue`/`lua_setiuservalue`/`lua_newuserdatauv` at 5.4 and 5.5), at the
+  // Registry section (**§3.5 in 5.1, §4.5 in 5.2 and 5.3, §4.3 in 5.4 and 5.5**), at §2.1's
+  // userdata paragraph, at the Debug Library preamble in each, and at every Incompatibilities
+  // chapter end to end. `ldblib.c`, `lapi.c`, `lstate.c`, `lauxlib.c`, `lauxlib.h`, `lua.h`,
+  // `liolib.c` and `loadlib.c` diffed whole at every tag of every line — `v5.1`, `v5.1.1`,
+  // `v5.2.0`–`v5.2.3`, `v5.3.0`–`v5.3.6`, `v5.4.0`–`v5.4.8`, `v5.5.0`, `v5.5.1` — plus the
+  // shipped 5.1.5 and 5.2.4 from `lua.org/source/5.1` and `/5.2`. Everything runnable was run
+  // on the harness's wasmoon 5.4 and on a stock `lua` 5.3.6 binary.
+  //
+  // **None of the three is named in any Incompatibilities chapter** (5.1 §7, 5.2–5.5 §8).
+  // What *is* named is the C API on both sides of each move: 5.2 §8.1 introduces
+  // `lua_getuservalue`/`lua_setuservalue` for what used to be a userdata's *environment*, and
+  // 5.4 §8.3 replaces them with `lua_getiuservalue`/`lua_setiuservalue`/`lua_newuserdatauv`.
+  // 5.4 §8.3's *"the old names still work as macros assuming one single user value"* is about
+  // C source compatibility and says nothing about the Lua-level calls, which really did change
+  // shape.
+  //
+  // ### The user-value pair, per version
+  //
+  // | | 5.1 | 5.2 | 5.3 | 5.4 | 5.5 |
+  // |---|---|---|---|---|---|
+  // | values per full userdata | *(no such call)* | exactly one, a table or absent | exactly one, any value | however many it was created with, possibly none | same as 5.4 |
+  // | `getuservalue` signature | — | `(u)` | `(u)` | `(u, n)`, `n` defaults to `1` | same |
+  // | `getuservalue` returns | — | one value | one value | value, `true` — or one value alone | same |
+  // | `getuservalue` on a non-userdata | — | `nil` | `nil` | `nil` | `nil` |
+  // | `setuservalue` signature | — | `(udata, value)` | `(udata, value)` | `(udata, value, n)` | same |
+  // | `setuservalue` value | — | table or `nil`, optional | any, required | any, required | same |
+  // | `setuservalue` returns | — | `udata` | `udata` | `udata`, or `nil` for a missing position | same |
+  //
+  // `db_getuservalue` and `db_setuservalue` in `ldblib.c` are byte-stable across each line —
+  // one edit each, at `v5.4.0`, plus `setuservalue`'s `v5.3.0` `luaL_checkany`. **No
+  // patch-level residual anywhere in these three.**
+  //
+  // **The manual is wrong about the second value.** 5.4 and 5.5 say `debug.getuservalue`
+  // returns the value *"plus a boolean, false if the userdata does not have that value"*.
+  // `db_getuservalue` pushes `true` and returns `2` when `lua_getiuservalue` answers anything
+  // but `LUA_TNONE`, and otherwise returns `1` — so the absent case answers with **one value**
+  // and no boolean at all. `select("#", …)` is `2` and `1`; probed on the 5.4 runtime. Both
+  // entries state the implication in the safe direction and neither mentions a `false`.
+  //
+  // **A file handle is the full userdata a Lua program can reach, and it is the wrong shape
+  // to demonstrate a write on.** `newprefile` in `liolib.c` calls `lua_newuserdata` at 5.2 and
+  // 5.3 — one user value, holding `nil` — and `lua_newuserdatauv(L, sizeof(LStream), 0)` from
+  // `v5.4.0`, which is **zero**. So the same card that reads `nil` on every version reads it
+  // for two different reasons, and a *successful* write cannot be carded at all on the 5.4
+  // runtime. Every card here works on the shape of the answer; the successful path is a
+  // fenced listing on both pages, per `package.loadlib`'s precedent.
+  //
+  // ### `debug.getregistry` — the function never changed, the table did
+  //
+  // `db_getregistry` is `lua_pushvalue(L, LUA_REGISTRYINDEX); return 1;`, byte-identical at
+  // all 28 artefacts. Both notes are about what `init_registry` in `lstate.c` puts in the
+  // table, which is where the change hid — in `lua.h` macros rather than in any function:
+  //
+  // | | 5.1 | 5.2 | 5.3 | 5.4 | 5.5 |
+  // |---|---|---|---|---|---|
+  // | `LUA_RIDX_GLOBALS` | *(none)* | `2` | `2` | `2` | `2` |
+  // | `LUA_RIDX_MAINTHREAD` | *(none)* | `1` | `1` | `1` | **`3`** |
+  // | `LUA_RIDX_LAST` | — | `2` | `2` | `2` | **`3`** |
+  // | key `1` of a fresh registry | absent | main thread | main thread | main thread | **`false`** |
+  // | `luaL_ref`'s free-list head | key `0` | key `0` | key `0` | key `0`, then key `3` from `v5.4.3` | key `1` |
+  //
+  // 5.1's `f_luaopen` creates an **empty** registry and keeps the global environment in
+  // `gt(L)`, reachable from C through the `LUA_GLOBALSINDEX` pseudo-index that 5.2 §8.3
+  // removed. So `debug.getregistry()[2] == _G` is false on 5.1 and true on 5.2 through 5.5,
+  // which is the 5.2 note. `luaL_ref`'s `freelist` moving to `LUA_RIDX_LAST + 1` at **v5.4.3**
+  // is a patch-level residual the site cannot express and no entry depends on.
+  //
+  // `registry["_LOADED"]` is `package.loaded` at every artefact — `luaL_findtable` at 5.1,
+  // `luaL_getsubtable` from `v5.2.0`, `LUA_LOADED_TABLE` from `v5.3.4` — and it is the one
+  // named entry the page's cards use. `_PRELOAD` is deliberately **not** used: 5.1's
+  // `luaopen_package` makes `package.preload` a fresh table that is not in the registry.
+  //
+  // Neither the reservation of `_UPPERCASE` string keys (5.2's wording; 5.1 says only "choose
+  // keys different from those used by other libraries") nor 5.5's "good practice to require
+  // this library" gets a note: both are advice about how to write code, not behaviour a
+  // program can observe.
+  'debug.getuservalue': debugGetuservalue,
+  'debug.setuservalue': debugSetuservalue,
+  'debug.getregistry': debugGetregistry,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

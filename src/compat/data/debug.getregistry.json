@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "The registry a fresh state starts with already holds two entries under integer keys — the global environment and the main thread. Earlier it starts out empty, and the global environment is not in it at all but kept in a place of its own.",
+    "5.5": "The main thread is held at integer key `3`. On the versions that keep it in the registry at all it was at key `1`, and key `1` now carries a starting value for the mechanism that hands out numeric references instead."
+  }
+}

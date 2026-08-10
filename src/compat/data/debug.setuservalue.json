@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.2" } },
+  "changed_in": {
+    "5.3": "Any Lua value may be attached; earlier only a table or `nil` is accepted and anything else is refused. The value also stops being optional: leaving it out now raises, where before it counted as `nil` and detached whatever was there.",
+    "5.4": "A third argument names which of the userdata's values to write, counting from `1` and defaulting to the first, and `nil` comes back in place of the userdata when there is no value at that position to write — so a write that went nowhere can be told from one that landed. Earlier a full userdata carries exactly one value, anything written after the value is ignored, and a call whose arguments are accepted has always written something."
+  }
+}
