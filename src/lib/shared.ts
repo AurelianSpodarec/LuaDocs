@@ -3,6 +3,13 @@ export const docsRoute = '/docs';
 export const blogRoute = '/blog';
 export const docsImageRoute = '/og/docs';
 
+/**
+ * The canonical origin. `www`, because that is the host the old site has been indexed
+ * under since 2022 — moving to the apex would put a second hop on every redirect in the
+ * migration. See ADR 0012.
+ */
+export const siteOrigin = 'https://www.luadocs.com';
+
 export const gitConfig = {
   user: 'AurelianSpodarec',
   repo: 'LuaDocs',

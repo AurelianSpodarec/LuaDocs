@@ -29,6 +29,10 @@ export default defineConfig({
         { path: '/api/search' },
         { path: 'llms-full.txt' },
         { path: 'llms.txt' },
+        // Not reachable by `crawlLinks` — nothing on the site links to either, and a
+        // sitemap that never prerendered is a sitemap Search Console reports as missing.
+        { path: 'sitemap.xml' },
+        { path: 'robots.txt' },
         ...contentTreeUrls(CONTENT_TREE).map((path) => ({ path })),
       ],
     }),
