@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "luadocs-built",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", ".output/public", "--config", "../../serve.json", "-l", "4173"],
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }
