@@ -9,9 +9,11 @@
     them, which is why README.md says so directly and why the wordmark beside the mark is
     LuaDocs' own rather than a variation on theirs.
 
-    The white plate is not decoration. Lua's navy (#000080) on a near-black field is close to
-    invisible, and the alternatives were recolouring the logo — worse, it is not ours to
-    restyle — or lightening the whole banner. A light plate keeps the mark's colours exact.
+    Lua's navy is #000080, which against a near-black field is a dark blob with no readable
+    edge. A white plate behind it fixed the contrast and looked like a sticker, so the sphere
+    is instead lifted to #1e25a8 with a thin lighter rim — the ordinary dark-mode adaptation,
+    and far less intrusive than boxing the mark. The white "Lua" and the highlight need no
+    change; they already read against the navy, and the ring is mid-grey.
 
     Presentation attributes rather than a <style> block, because GitHub's SVG sanitiser strips
     embedded stylesheets.
@@ -37,20 +39,21 @@
   </g>
 
   <g id="lua-mark">
-    <!-- Light plate, so the navy reads against the dark field. -->
-    <circle cx="450" cy="210" r="152" fill="#ffffff"/>
+    <!-- Centred at x=478 rather than 450: dropping the plate narrowed the mark, which left an
+         88px gap to the wordmark and read as two objects instead of one lockup. -->
     <!-- Dashed orbital ring -->
-    <circle cx="450" cy="210" r="112" fill="none" stroke="#8a8a8a" stroke-width="3" stroke-dasharray="11 9"/>
-    <!-- Sphere -->
-    <circle cx="450" cy="210" r="88" fill="#000080"/>
+    <circle cx="478" cy="210" r="122" fill="none" stroke="#7e8494" stroke-width="3" stroke-dasharray="12 10"/>
+    <!-- Sphere. Rim is one step lighter than the fill, enough to define the edge without
+         reading as an outline. -->
+    <circle cx="478" cy="210" r="96" fill="#1e25a8" stroke="#3742d6" stroke-width="2"/>
     <!-- Terminator highlight, upper right inside the sphere -->
-    <circle cx="488" cy="172" r="25" fill="#ffffff"/>
-    <!-- Satellite, upper right, sitting across the ring -->
-    <circle cx="529" cy="131" r="26" fill="#000080"/>
-    <!-- Wordmark inside the sphere -->
-    <text x="440" y="243"
+    <circle cx="520" cy="168" r="27" fill="#ffffff"/>
+    <!-- Satellite, sitting on the ring at roughly one o'clock -->
+    <circle cx="564" cy="124" r="28" fill="#1e25a8" stroke="#3742d6" stroke-width="2"/>
+    <!-- Wordmark inside the sphere, set slightly left of centre as in the original -->
+    <text x="466" y="248"
           font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"
-          font-size="62" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
+          font-size="68" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
   </g>
 
   <!-- LuaDocs' own wordmark -->
