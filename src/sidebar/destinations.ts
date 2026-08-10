@@ -29,6 +29,12 @@ export type Destination = {
   /** Tree folders this destination owns, by URL. Absent when the link leaves the site. */
   areas?: string[];
   external?: boolean;
+  /**
+   * Open in a new tab. Implied by `external`, and set on its own for the destinations
+   * that stay on the site but are *tools* rather than reading — you go to them with an
+   * entry half-read and want it still there when you come back.
+   */
+  newTab?: boolean;
 };
 
 export const destinations: Destination[] = [
@@ -42,7 +48,10 @@ export const destinations: Destination[] = [
   { name: 'Guides', url: '/docs/guides', icon: FileText, areas: ['/docs/guides'] },
   // Not a docs area — it is the standalone editor — and it sits here anyway, exactly
   // as Tailwind's own Playground does. The route arrives in slice 5.
-  { name: 'Playground', url: '/playground', icon: SquareTerminal },
+  // A new tab, though it never leaves the site: the reason to open the playground from
+  // inside an entry is to try what the entry just described, and a same-tab jump costs
+  // you the entry — and the editor its contents on the way back.
+  { name: 'Playground', url: '/playground', icon: SquareTerminal, newTab: true },
   {
     name: 'Community',
     url: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,

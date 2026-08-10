@@ -38,7 +38,9 @@ function DestinationRow({
     </>
   );
 
-  if (destination.external) {
+  // `noopener` on a same-origin tab too: the opener reference buys the new tab nothing
+  // here, and the rule is easier to keep than the exception.
+  if (destination.external || destination.newTab) {
     return (
       <a href={destination.url} target="_blank" rel="noreferrer noopener" className={className}>
         {label}

@@ -145,3 +145,46 @@ describe('a Section as a disclosure', () => {
     expect(screen.queryByText('string.format()')).toBeNull();
   });
 });
+
+/**
+ * A folder's `meta.json` can ask for it to start open. Standard Library does, because
+ * it is the whole Reference tree: shut, the sidebar was one row of small caps over
+ * nothing, and the reader had to guess there was a chevron worth clicking.
+ */
+describe('a Section marked defaultOpen', () => {
+  const area: PageTree.Folder = {
+    type: 'folder',
+    name: 'Standard Library',
+    defaultOpen: true,
+    index: { type: 'page', name: 'Standard Library', url: '/docs/standard-library' },
+    children: [],
+  };
+
+  async function renderArea(pathname: string) {
+    const rootRoute = createRootRoute({
+      component: () => (
+        <SidebarFolderNode item={area}>{entry('string')}</SidebarFolderNode>
+      ),
+    });
+    const router = createRouter({
+      routeTree: rootRoute,
+      history: createMemoryHistory({ initialEntries: [pathname] }),
+    });
+    render(<RouterProvider router={router} />);
+    await screen.findByRole('link', { name: 'Standard Library' });
+  }
+
+  it('stands open somewhere else on the site, not only once you are inside it', async () => {
+    await renderArea('/docs/guides/metatables');
+
+    expect(screen.getByText('string')).toBeInTheDocument();
+    expect(chevron(/collapse standard library/i)).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('is a starting position, not a pin — the chevron still shuts it', async () => {
+    await renderArea('/docs/guides/metatables');
+    fireEvent.click(chevron(/collapse standard library/i));
+
+    expect(screen.queryByText('string')).toBeNull();
+  });
+});

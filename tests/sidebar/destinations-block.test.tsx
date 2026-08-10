@@ -37,12 +37,19 @@ describe('the destinations block', () => {
     expect(screen.getByRole('link', { name: 'Reference' })).not.toHaveAttribute('data-active');
   });
 
-  it('sends Community off-site in a new tab, and nothing else', async () => {
+  it('opens the tools in a new tab, and leaves the reading destinations in place', async () => {
     await renderAt('/docs');
 
-    const community = screen.getByRole('link', { name: 'Community' });
-    expect(community).toHaveAttribute('target', '_blank');
-    expect(community).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
-    expect(screen.getByRole('link', { name: 'Reference' })).not.toHaveAttribute('target');
+    // Community leaves the site; the Playground does not, and still earns a tab —
+    // you go to it from a half-read entry and want the entry still there after.
+    for (const name of ['Playground', 'Community']) {
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    }
+
+    for (const name of ['Reference', 'Learn', 'Guides']) {
+      expect(screen.getByRole('link', { name })).not.toHaveAttribute('target');
+    }
   });
 });

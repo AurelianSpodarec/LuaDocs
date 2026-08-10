@@ -243,7 +243,13 @@ function SidebarSection({
   }
   // A filter only shows what matched, so everything left is worth seeing. Collapse
   // state is suspended, not discarded — emptying the box restores it.
-  const open = filtering || (override ?? inside);
+  //
+  // `defaultOpen` (from the folder's `meta.json`) is what a folder that should be
+  // standing open on arrival sets — Standard Library, which is the entire Reference
+  // tree today, and shut it showed a reader one row of small caps and nothing else.
+  // It is a starting position, not a pin: the chevron still overrides it, and being
+  // inside still opens it.
+  const open = filtering || (override ?? (inside || item.defaultOpen === true));
 
   const isArea = index.url.split('/').filter(Boolean).length === 2;
   const name = textOf(item.name);
