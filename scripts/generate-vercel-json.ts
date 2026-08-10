@@ -13,6 +13,20 @@ import { LEGACY_REDIRECTS } from '../src/migration/legacyRedirects';
 export function renderVercelJson(): string {
   const config = {
     $schema: 'https://openapi.vercel.sh/vercel.json',
+    // Without this Vercel runs framework auto-detection, decides this is Next.js, and
+    // fails the build with "No Next.js version detected". It is a TanStack Start app
+    // built by Vite, which auto-detection has no preset for — `null` is Vercel's name
+    // for "Other", and it is the setting that makes the two fields below authoritative.
+    framework: null,
+    buildCommand: 'npm run build',
+    // Nitro writes the prerendered site here. `.output/server` beside it is not deployed:
+    // every route on this site is prerendered, so there is nothing for a server to do
+    // (ADR 0004).
+    outputDirectory: '.output/public',
+    // Canonicals, the sitemap and the redirect map all write paths without a trailing
+    // slash (ADR 0012). Left to default, Vercel would answer both spellings and the
+    // canonical would disagree with the URL that served it.
+    trailingSlash: false,
     redirects: LEGACY_REDIRECTS.map(({ from, to }) => ({
       source: from,
       destination: to,
