@@ -1,8 +1,149 @@
 ---
 title: debug.upvaluejoin()
-description: ""
+description: Make one closure read the same captured variable as another, so the two share it from then on.
+lua-compat: debug.upvaluejoin
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.upvaluejoin
 ---
 
-{/* Not yet written. */}
+Points one of a closure's captured variables at one of another closure's, so that from then on
+the two functions are reading and writing a single variable. Nothing comes back. It is the only
+call in this library that changes *which* variable a function reads rather than what that
+variable holds, and there is no undoing it.
+
+<RunnableExample code={`local left_total = 1\nlocal function read_left() return left_total end\n\nlocal right_total = 2\nlocal function read_right() return right_total end\n\nprint(read_left())\n\ndebug.upvaluejoin(read_left, 1, read_right, 1)\nprint(read_left())\n\nright_total = 40\nprint(read_left())\nprint(left_total)\n-- Expected output:\n-- 1\n-- 2\n-- 40\n-- 1`} />
+
+## Syntax
+
+```lua
+debug.upvaluejoin(f1, n1, f2, n2)
+```
+
+<Parameters>
+  <Param name="f1">The closure being changed. It has to be a function written in Lua.</Param>
+  <Param name="n1">Which of its upvalues to redirect, by position, [addressed exactly as it is for reading](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed).</Param>
+  <Param name="f2">The closure holding the variable to share. It too has to be a function written in Lua.</Param>
+  <Param name="n2">Which of `f2`'s upvalues the first one is to become, by position.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="none">Nothing at all comes back. Whether the join happened is reported by nothing — a call that did not raise did it, and [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) is how it is confirmed afterwards.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f1` or `f2` is not a function, and when either is left out.
+- Raises when `f1` or `f2` is a function written in C. Only a closure written in Lua can have one of its captured variables redirected, in either position.
+- Raises when `n1` names no upvalue of `f1`, or `n2` none of `f2`. Unlike [reading](/docs/standard-library/debug/getupvalue), a position naming nothing is refused here rather than answered.
+- Raises when `n1` or `n2` is left out, or is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `n1` or `n2` carries a fraction rather than an exact whole-number value.
+
+</Errors>
+
+## Description
+
+The neighbouring calls all change a value.
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) puts something else in a
+variable; this replaces the variable. Afterwards `f1` is not holding a copy of what `f2` holds —
+the two are reading one piece of storage, so an assignment made by either function, or by the
+block that declared the variable, is what the other reads next.
+
+Comparing values afterwards proves nothing about that, because two separate variables holding
+equal values look exactly the same.
+[`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) is what tells the two apart, and
+its identifier for the two positions is equal from the moment the join returns.
+
+The honest description of what this is for is *rewriting a closure that already exists*. A hot
+patch that has to make a shipped function read the new configuration table, a test harness
+redirecting a module's private cache at one it can inspect, a sandbox forcing several loaded
+chunks onto one environment — these are the cases, and each of them is a repair. Nothing about
+ordinary program design wants this call: two functions that should share state are written in
+one block, where they capture the same variable because the source says so.
+
+The caution the debug library gives about itself applies here about as sharply as it can: this
+rewrites a function some other part of the program is holding, from outside, permanently, and
+leaves nothing at the site of that function to say it happened.
+
+## What the join leaves behind
+
+The variable `f1` used to read is not destroyed and not emptied. It is simply no longer what
+`f1` reads. Anything else still holding it — the block that declared it, another closure made
+alongside `f1`, a coroutine parked inside that block — goes on reading and writing it exactly as
+before, and stops being able to reach `f1` through it. Where `f1` was the last thing keeping it
+alive, it becomes collectable like any other value nothing refers to.
+
+There is no call that undoes a join. What restores the old arrangement is another join, and only
+if something still holds a closure over the original variable to join back from. Taking that
+handle *before* the join is the difference between a reversible edit and a permanent one.
+
+A join is per position, not per function. Redirecting position `1` says nothing about the
+others, so a closure over three variables can be made to share one of them and keep the other
+two to itself.
+
+## Examples
+
+### Two counters becoming one
+
+<RunnableExample code={`local function make_counter()\n  local hits = 0\n  return function()\n    hits = hits + 1\n    return hits\n  end\nend\n\nlocal page_hits = make_counter()\nlocal api_hits = make_counter()\n\npage_hits()\npage_hits()\nprint(page_hits())\nprint(api_hits())\n\ndebug.upvaluejoin(api_hits, 1, page_hits, 1)\nprint(api_hits())\nprint(page_hits())\nprint(select("#", debug.upvaluejoin(api_hits, 1, page_hits, 1)))\n-- Expected output:\n-- 3\n-- 1\n-- 4\n-- 5\n-- 0`} />
+
+The two counters were made by separate calls, so they began with a variable each. After the join
+they are one running total: `api_hits` picks up where `page_hits` left off, and the next call to
+`page_hits` continues from there. The last line joins the same pair a second time, which is
+harmless, and counts what came back: nothing.
+
+### Confirming the join rather than assuming it
+
+<RunnableExample code={`local left_hits = 0\nlocal function bump_left()\n  left_hits = left_hits + 1\n  return left_hits\nend\n\nlocal right_hits = 0\nlocal function bump_right()\n  right_hits = right_hits + 1\n  return right_hits\nend\n\nprint(debug.upvalueid(bump_left, 1) == debug.upvalueid(bump_right, 1))\ndebug.upvaluejoin(bump_left, 1, bump_right, 1)\nprint(debug.upvalueid(bump_left, 1) == debug.upvalueid(bump_right, 1))\nprint(bump_left())\nprint(bump_right())\n-- Expected output:\n-- false\n-- true\n-- 1\n-- 2`} />
+
+Since the call reports nothing,
+[`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) is what turns *it did not raise*
+into *they are sharing now*. The counts afterwards agree with that: one variable, incremented
+twice.
+
+### What is refused
+
+<RunnableExample code={`local box = 1\nlocal function read_box() return box end\nlocal wrapper = coroutine.wrap(function() coroutine.yield() end)\n\nlocal joined_c = pcall(debug.upvaluejoin, read_box, 1, wrapper, 1)\nprint(joined_c)\n\nlocal joined_missing = pcall(debug.upvaluejoin, read_box, 2, read_box, 1)\nprint(joined_missing)\n\nprint(read_box())\n-- Expected output:\n-- false\n-- false\n-- 1`} />
+
+A function written in C is refused however many upvalues it is
+[carrying](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries), and so is a
+position that names nothing. Neither refusal changes anything: `read_box` reads what it always
+did.
+
+## Gotchas
+
+<Gotcha title="It is permanent, and nothing records that it happened">
+There is no undo and no log. The function that was rewritten reads the same as it always did,
+its source is unchanged, and a stack trace taken inside it says nothing about the join. Code that
+does this in anger should take a handle on the original arrangement first — a closure still
+reading the old variable — because that handle is the only route back.
+</Gotcha>
+
+<Gotcha title="A position that names nothing raises here and not next door">
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) answers a bad position with
+nothing and [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) drops the write, so
+code written against those two reaches for the same shape here and gets a raised error instead.
+Check the positions first, or wrap the call.
+</Gotcha>
+
+<Gotcha title="Sharing is not copying, and it works both ways">
+It is easy to read this as *give `f1` the value `f2` has*. It gives `f1` the *variable*, so a
+later assignment by either side is read by both, and `f1` can now write something the author of
+`f2` never expected to see. Where one-way handover is what was wanted,
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) with the value read out of `f2`
+is the call that does that and leaves the two variables separate.
+</Gotcha>
+
+<Gotcha title="Both sides have to be written in Lua">
+A function written in C carries captured values too, and none of them can be redirected — the
+call refuses whichever side such a function appears on. Reading and writing those values is still
+available through [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) and
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue), which is as far as a program can
+reach into one.
+</Gotcha>
+
+## See also
+
+- [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) — checking whether two closures already share, and confirming a join that reported nothing
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) — what a closure is reading, and where the addressing rules live
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — changing what the variable holds rather than which variable is read
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says) — how many positions each side has, before choosing two

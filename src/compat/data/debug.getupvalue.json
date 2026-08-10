@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A function written in C is looked inside rather than passed over: the values it was created holding can be read, each under an empty name. Earlier versions answer nothing for any function written in C, whatever it is carrying. A Lua function that mentions a global also begins carrying the table it reads global names out of as a captured variable called `_ENV`, so a function's globals become reachable this way; earlier versions keep that table elsewhere and it is not among a function's upvalues.",
+    "5.3": "An index carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value."
+  }
+}

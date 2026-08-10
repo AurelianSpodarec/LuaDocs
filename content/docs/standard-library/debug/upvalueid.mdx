@@ -1,8 +1,147 @@
 ---
 title: debug.upvalueid()
-description: ""
+description: Get a value that identifies one of a function's captured variables, so two closures can be tested for sharing it.
+lua-compat: debug.upvalueid
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.upvalueid
 ---
 
-{/* Not yet written. */}
+Hands back a value standing for one particular captured variable. It is a value to compare, not
+a value to read. Two closures reading the same variable answer with identifiers that are equal,
+and two closures holding separate variables answer with identifiers that are not — however alike
+the values in them happen to be.
+
+<RunnableExample code={`local function make_ledger()\n  local balance = 0\n  local deposit = function(amount) balance = balance + amount end\n  local read_balance = function() return balance end\n  return deposit, read_balance\nend\n\nlocal deposit, read_balance = make_ledger()\nlocal other_deposit = make_ledger()\n\nprint(debug.upvalueid(deposit, 1) == debug.upvalueid(read_balance, 1))\nprint(debug.upvalueid(deposit, 1) == debug.upvalueid(other_deposit, 1))\nprint(type(debug.upvalueid(deposit, 1)))\n-- Expected output:\n-- true\n-- false\n-- userdata`} />
+
+## Syntax
+
+```lua
+debug.upvalueid(f, n)
+```
+
+<Parameters>
+  <Param name="f">The function whose captured variable is being identified. Any function value, including one written in C.</Param>
+  <Param name="n">Which upvalue, by position, [addressed exactly as it is for reading](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed).</Param>
+</Parameters>
+
+<Returns>
+  <Return type="light userdata">A value standing for that one variable, equal to the one any other closure over the same variable answers with. [`type()`](/docs/standard-library/globals/type#the-eight-names) calls it `userdata`. It carries no fields and no methods; comparing it is what it is for.</Return>
+  <Only since="5.4">
+    <Return type="nil">When `n` names no upvalue of `f` — including every position of a function that captured nothing at all.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is not a function, and when it is left out.
+- Raises when `n` is left out, or is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `n` carries a fraction rather than an exact whole-number value.
+- <Only before="5.4">Raises when `n` names no upvalue of `f`, so asking about a function that captured nothing needs a protected call.</Only>
+
+</Errors>
+
+## Description
+
+Reading two closures' upvalues with
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) and finding equal values proves
+nothing: two variables can hold the same number, and the same variable can be read twice a
+moment apart and give two different ones. The other way of finding out — writing a marker
+through one closure and looking for it through the other — changes the program to ask its
+question and has to put back what it disturbed. This asks it directly instead, and disturbs
+nothing.
+
+The identifier stands for the variable and not for the closure. A getter and a setter built in
+the same block are two functions and one captured variable, so the two identifiers are equal
+even though the functions are not. Run the same factory a second time and the variables are new,
+so the identifiers differ even though the functions were made from identical source.
+
+It is also stable. The same variable answers with the same identifier every time it is asked,
+including after the block that declared it has ended and the closure is all that is keeping it
+alive.
+
+What it is for, in practice, is telling apart the two things a factory can produce: closures
+that share state, and closures that merely look alike. A test that means to assert *these two
+handles talk to one counter* can say so directly, and a debugger listing what a function
+captured can mark which entries are shared with something else.
+
+Functions written in C are identified position by position in the same way, so a wrapper and
+whatever else was handed the same value can be compared. What such a function keeps, and in what
+order, is [the implementation's business](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries)
+rather than a documented interface.
+
+## What the identifier is not
+
+It is not a name, a number, or anything to be read. Printing one shows an address, and an address
+means nothing outside the run that produced it — so it belongs in no log, no file and no test's
+expected output. Ordering identifiers, or reading anything at all out of the text, is reading
+meaning into a value that carries none. Using one as a table key *within* a run is fine, and is
+the usual way to collect closures by which variable they share; storing that key anywhere it
+outlives the run is not.
+
+It is also not a reference. Holding an identifier does not keep the variable it names alive, and
+it gives no way to read or write that variable — [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue)
+and [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) still need the closure and
+the position. So compare identifiers taken from closures the program is still holding, and take
+them fresh rather than keeping them.
+
+## Examples
+
+### Equal values are not one variable
+
+<RunnableExample code={`local first_limit = 100\nlocal second_limit = 100\n\nlocal function under_first(value)\n  return value < first_limit\nend\n\nlocal function under_second(value)\n  return value < second_limit\nend\n\nprint(first_limit == second_limit)\nprint(debug.upvalueid(under_first, 1) == debug.upvalueid(under_second, 1))\n-- Expected output:\n-- true\n-- false`} />
+
+The two variables hold the same number and are still two variables: assigning to one leaves the
+other alone, and the identifiers say so where the values cannot.
+
+### The same variable, after the block has ended
+
+<RunnableExample code={`local read_stock\ndo\n  local stock_level = 12\n  read_stock = function() return stock_level end\nend\n\nlocal first_look = debug.upvalueid(read_stock, 1)\ncollectgarbage()\nprint(first_look == debug.upvalueid(read_stock, 1))\nprint(type(first_look))\n-- Expected output:\n-- true\n-- userdata`} />
+
+The block that declared `stock_level` has finished and the closure is the only thing keeping the
+variable alive, which changes nothing here: it is the same variable, so it answers with the same
+identifier.
+
+<Only since="5.4">
+
+### A function that captured nothing
+
+<RunnableExample code={`local budget = 12\nlocal function under_budget(amount)\n  return amount < budget\nend\n\nprint(select("#", debug.upvalueid(under_budget, 1)))\nprint(debug.upvalueid(under_budget, 2))\nprint(debug.upvalueid(string.rep, 1))\n-- Expected output:\n-- 1\n-- nil\n-- nil`} />
+
+A position that names no captured variable is answered rather than refused, so a listing can ask
+about any function it was handed without wrapping the call.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="It identifies the variable, not the value in it">
+Two closures whose identifiers differ can be holding values that are equal, and will go on
+holding equal values for as long as nothing writes to either. Equality of identifiers is a
+statement about storage — *there is one variable here* — and says nothing at all about what is in
+it. The implication runs one way only: equal identifiers do mean equal values, there being one
+variable to read, while equal values — which is what
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) compares — mean nothing at all
+about identifiers.
+</Gotcha>
+
+<Gotcha title="Do not print it, log it, or expect it to keep">
+What it prints is an address. Nothing about that text is stable enough to write down: it is
+meaningless in a file, useless in an expected output, and no basis for anything that outlives the
+process. Compare it against another identifier taken in the same run, and discard both.
+</Gotcha>
+
+<Gotcha title="Position 1 of one closure is not position 1 of another">
+The positions belong to each function separately and the compiler decides them, so comparing
+position `1` against position `1` compares whichever variables happen to have landed there.
+Where the two functions are not obviously siblings, find each variable by name with
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) and compare the positions you
+found.
+</Gotcha>
+
+## See also
+
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) — reading the variable this identifies, and where the addressing rules live
+- [`debug.upvaluejoin()`](/docs/standard-library/debug/upvaluejoin) — making two closures answer with the same identifier
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — writing the variable, and so writing what every closure over it reads
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says) — how many positions a function has to ask about
+- [`type()`](/docs/standard-library/globals/type#the-eight-names) — the name Lua gives what comes back here

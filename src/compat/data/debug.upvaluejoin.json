@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.2" } },
+  "changed_in": {
+    "5.3": "An index carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value."
+  }
+}

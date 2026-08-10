@@ -1,8 +1,174 @@
 ---
 title: debug.getupvalue()
-description: ""
+description: Read the name and the value of one of the variables a function closed over.
+lua-compat: debug.getupvalue
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getupvalue
 ---
 
-{/* Not yet written. */}
+Hands back one of the variables a function closed over — the name it was declared under, and
+what it is holding right now. Upvalues are addressed by position, and the positions are not
+decided by the order the source declares them in, so anything looking for a particular variable
+reads the names back rather than counting.
+
+<RunnableExample code={`local orders_taken = 0\nlocal function record_order()\n  orders_taken = orders_taken + 1\n  return orders_taken\nend\n\nrecord_order()\nrecord_order()\n\nlocal name, value = debug.getupvalue(record_order, 1)\nprint(name)\nprint(value)\n-- Expected output:\n-- orders_taken\n-- 2`} />
+
+## Syntax
+
+```lua
+debug.getupvalue(f, up)
+```
+
+<Parameters>
+  <Param name="f">The function to look inside. Any function value will do; it does not have to be running, and asking disturbs nothing.</Param>
+  <Param name="up">Which upvalue, by position. `1` is the first, and [what the positions mean](#how-an-upvalue-is-addressed) is not decided by the order the variables appear in the source.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The name the variable was declared under. An empty name is still an answer rather than a refusal: [every upvalue of a function written in C](#upvalues-a-c-function-carries) comes back under one.</Return>
+  <Return type="any">The value the upvalue is holding, read at the moment of the call.</Return>
+  <Return type="none">When `up` names no upvalue of `f`, nothing at all comes back — not a `nil` but no values. Read as one value the call answers `nil`, which is how a walk along the positions knows it has run out; counted with `select("#", ...)` it answers zero.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is not a function, and when it is left out. There is no form of this call that asks about a running call rather than a function value — [`debug.getlocal()`](/docs/standard-library/debug/getlocal) is that one.
+- Raises when `up` is left out, or is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `up` carries a fraction rather than an exact whole-number value. `debug.getupvalue(f, 1.0)` is accepted; `debug.getupvalue(f, 1.5)` is not.
+- An index of `0`, a negative index, and one past the last upvalue all fail to name anything, and none of them raises. Nothing comes back instead.
+
+</Errors>
+
+## Description
+
+A closure is a function plus the variables it took with it, and this is the door to those
+variables. It is the counterpart of [`debug.getlocal()`](/docs/standard-library/debug/getlocal):
+that one reaches into a call that is running, this one reaches into a function whether or not it
+is running at all. A function value is enough, which is what makes this the more reachable of
+the two — a closure sitting in a table can be asked about at any time.
+
+What comes back is the value the variable is holding, not a handle on the variable itself.
+Assigning to whatever you put it in changes nothing at the other end, though a table that came
+back is still that table and writing into it is felt wherever the table is held.
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) is the call that writes the
+variable rather than a copy of its value.
+
+This is a debugger's tool, and it goes behind an assumption a program is entitled to make: that
+what a closure captured is its own business. A counter that hands out only the function that
+increments it is still a counter whose state can be read from outside, and read without the
+counter noticing.
+
+## How an upvalue is addressed
+
+An upvalue is a local variable declared outside a function and used inside it. The
+function keeps it alive after the block that declared it has ended, and every closure made over
+that same variable is reading the one variable rather than a copy each —
+[`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) is how that is checked.
+
+Positions run from `1` up to however many upvalues the function has, and
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says)'s `nups` says how
+many that is without walking them. Past the last one nothing comes back, which is what lets a
+walk stop.
+
+The order is the compiler's, not the source's. A variable declared first is not therefore
+position `1`, and adding a mention of another variable somewhere in the body can move
+everything. Nothing promises an order at all, so code that wants a particular upvalue walks the
+positions and compares the names, and code that remembers an index across an edit of the
+function it came from is code that will one day read the wrong variable.
+
+Two kinds of position answer with a name that came from nowhere in the source. Every upvalue of
+a function written in C answers with an empty name, described [below](#upvalues-a-c-function-carries).
+And where a chunk was loaded without its debug information the declared names were not kept with
+it, so nothing a position answers with there is a name from the program; matching on names is
+not a way to find an upvalue in such a chunk.
+
+One name that *is* from the language rather than from the program is `_ENV`, the variable
+holding the table a function reads its global names out of. A function that mentions a global
+carries it like any other captured variable, which is what puts a function's globals within
+reach of this call — a table like any other, read and written like any other.
+
+## Upvalues a C function carries
+
+A function written in C can close over values too. They are given to it when it is created,
+and they are its upvalues in exactly the sense above: this call reads them, and
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) writes them.
+
+Two differences are worth knowing. Every one of them answers with an *empty* name, so the name
+distinguishes nothing and the position is the only handle there is. And a function written in C
+that was created holding nothing answers nothing at any position, which is the ordinary case
+for the library functions a program calls by name.
+
+What a particular C function keeps, and in what order, is the implementation's business rather
+than a documented interface. Reading it is a genuine rescue — the coroutine behind a wrapper,
+the file behind an iterator — and it is a rescue rather than something to build a program on.
+
+## Examples
+
+### Finding an upvalue by name
+
+<RunnableExample code={`local tax_pennies = 20\nlocal delivery_pennies = 5\n\nlocal function total_for(base_pennies)\n  return base_pennies + tax_pennies + delivery_pennies\nend\n\nlocal function upvalue_named(closure, wanted)\n  local index = 1\n  while true do\n    local name, value = debug.getupvalue(closure, index)\n    if name == nil then return nil end\n    if name == wanted then return value end\n    index = index + 1\n  end\nend\n\nprint(upvalue_named(total_for, "tax_pennies"))\nprint(upvalue_named(total_for, "delivery_pennies"))\nprint(upvalue_named(total_for, "postage_pennies"))\n-- Expected output:\n-- 20\n-- 5\n-- nil`} />
+
+The walk stops when a position hands back nothing, and until then it compares rather than
+counts. Written this way the example says nothing about which position either variable is in —
+which is the point, because neither does the language.
+
+<Only since="5.2">
+
+### What a function written in C is holding
+
+<RunnableExample code={`local ticker = coroutine.wrap(function()\n  coroutine.yield("first")\n  coroutine.yield("second")\nend)\n\nprint(ticker())\n\nlocal name, value = debug.getupvalue(ticker, 1)\nprint(name == "")\nprint(type(value))\nprint(select("#", debug.getupvalue(string.rep, 1)))\n-- Expected output:\n-- first\n-- true\n-- thread\n-- 0`} />
+
+[`coroutine.wrap()`](/docs/standard-library/coroutine/wrap) hands out a plain function and keeps
+the coroutine behind it, and the coroutine is what that function closed over — so it can be
+recovered here, under the empty name every such upvalue has.
+[`string.rep()`](/docs/standard-library/string/rep) closed over nothing, so it answers nothing.
+
+</Only>
+
+### An index that names nothing
+
+<RunnableExample code={`local rate_pennies = 7\nlocal function apply_rate(amount)\n  return amount * rate_pennies\nend\n\nprint(select("#", debug.getupvalue(apply_rate, 1)))\nprint(select("#", debug.getupvalue(apply_rate, 2)))\n\nlocal missing = debug.getupvalue(apply_rate, 2)\nprint(missing)\n-- Expected output:\n-- 2\n-- 0\n-- nil`} />
+
+Position `1` answers with two values and position `2` with none. Assigned to a single variable
+the second call reads as `nil`, which is why a walk can test the name it got; counted, it is the
+difference between an upvalue holding `nil` and no upvalue at all.
+
+## Gotchas
+
+<Gotcha title="Position 1 is not the first variable you declared">
+The compiler decides the order, and it has no obligation to follow the source. Reading position
+`1` and assuming it is the variable at the top of the enclosing block is the mistake this call
+invites, and it survives testing for exactly as long as nobody edits the function. Walk the
+positions and compare the names, every time.
+</Gotcha>
+
+<Gotcha title="Nothing comes back, rather than nil">
+An index that names no upvalue produces *no values at all*. In most places that reads as `nil`
+and behaves the way you want, but [`select()`](/docs/standard-library/globals/select) counts
+zero, and a call written as the last argument to another function contributes nothing rather
+than a `nil`. It is also how this differs from
+[`debug.getlocal()`](/docs/standard-library/debug/getlocal), which is otherwise its twin.
+</Gotcha>
+
+<Gotcha title="An empty name is an answer, not a failure">
+Every upvalue of a function written in C comes back under an empty name. Code that treats the
+name as a truth test survives this — `""` is a true value in Lua — and code that tests
+`name ~= ""` to decide whether it got anything does not. The test that means *there was nothing
+here* is `name == nil`.
+</Gotcha>
+
+<Gotcha title="What comes back is a reading, not the variable">
+The value arrives as of the moment of the call and has no connection to the variable afterwards.
+Storing it and assigning to your copy changes nothing the closure will see; the closure goes on
+reading its own variable. Writing into the variable is a different call —
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — and a table that came back is
+the exception that proves it, since writing into *that* is felt everywhere the table is held.
+</Gotcha>
+
+## See also
+
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — writing into one of these positions instead of reading it
+- [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) — whether two closures are reading one variable or two that happen to be equal
+- [`debug.upvaluejoin()`](/docs/standard-library/debug/upvaluejoin) — making two closures read one variable
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal) — the other half of what a function can see: what a call in progress is holding
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says) — how many upvalues there are to walk, in one call

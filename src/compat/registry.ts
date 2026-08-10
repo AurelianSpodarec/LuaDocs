@@ -167,6 +167,10 @@ import debugSethook from './data/debug.sethook.json';
 import debugGethook from './data/debug.gethook.json';
 import debugGetlocal from './data/debug.getlocal.json';
 import debugSetlocal from './data/debug.setlocal.json';
+import debugGetupvalue from './data/debug.getupvalue.json';
+import debugSetupvalue from './data/debug.setupvalue.json';
+import debugUpvalueid from './data/debug.upvalueid.json';
+import debugUpvaluejoin from './data/debug.upvaluejoin.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -2046,6 +2050,75 @@ const raw: Record<string, unknown> = {
   'debug.gethook': debugGethook,
   'debug.getlocal': debugGetlocal,
   'debug.setlocal': debugSetlocal,
+
+  // ## `debug` — batch DB3: the upvalues
+  //
+  // Same reading discipline as DB1 and DB2. All five manuals on disk, read at
+  // `pdf-debug.getupvalue`, `pdf-debug.setupvalue`, `pdf-debug.upvalueid`,
+  // `pdf-debug.upvaluejoin` **and** at the C-API entries several of them defer to
+  // (`lua_getupvalue`, `lua_setupvalue`, `lua_upvalueid`, `lua_upvaluejoin`), which is where
+  // most of what these four do is actually written down. `lapi.c` and `ldblib.c` diffed whole
+  // at every tag of every line — `v5.1`, `v5.1.1`, `v5.2.0`–`v5.2.3`, `v5.3.0`–`v5.3.6`,
+  // `v5.4.0`–`v5.4.8`, `v5.5.0`, `v5.5.1` — plus the shipped 5.1.5 and 5.2.4 from
+  // `lua.org/source/5.1` and `/5.2`. Everything runnable was run on the harness's wasmoon 5.4
+  // and on a stock `lua` 5.3.6 binary; the two agreed on every card.
+  //
+  // **None of the four is named in any Incompatibilities chapter** (5.1 §7, 5.2–5.5 §8).
+  // `debug.upvalueid` and `debug.upvaluejoin` are absent from the 5.1 manual altogether and
+  // absent from 5.1's `ldblib.c`; both arrive together at `v5.2.0`, along with
+  // `lua_upvalueid`, `lua_upvaluejoin` and the `getupvalref` helper they share.
+  //
+  // ### The 5.2 note on `getupvalue`/`setupvalue` — two functions with confusingly close names
+  //
+  // 5.1's **`ldblib.c`** has `auxupvalue` open with
+  // `if (lua_iscfunction(L, 1)) return 0;  /* cannot touch C upvalues from Lua */`, and
+  // `v5.2.0` deletes that line. 5.1's **`lapi.c`** has `aux_upvalue` (different function, one
+  // underscore apart) handling `f->c.isC` and returning `""` the whole time — so the C API
+  // could always do this and `debug.getupvalue` could not. Reading only `lapi.c` gives the
+  // wrong answer here, and it is the answer this batch was briefed with.
+  //
+  // The second half of the same note is `_ENV`: from `v5.2.0` a Lua function that mentions a
+  // global carries the environment table as a captured variable, and a chunk compiled from
+  // source has it as upvalue `1`. On 5.1 the environment is a per-function property and a main
+  // chunk has zero upvalues — the fact `globals/load.mdx` and `globals/getfenv.mdx` already
+  // carry, restated here because it is observable through these two calls.
+  //
+  // ### The generic names, and why no entry quotes one
+  //
+  // What `aux_upvalue` returns for a Lua upvalue whose name was not kept:
+  //
+  // | | 5.1 | 5.2 | 5.3 | 5.4 | 5.5 |
+  // |---|---|---|---|---|---|
+  // | nameless Lua upvalue | *unreachable* | `""` | `(*no name)` | `(no name)` | `(no name)` |
+  // | any upvalue of a C function | *unreachable* | `""` | `""` | `""` | `""` |
+  //
+  // On 5.1 a stripped chunk's `sizeupvalues` is `0`, so every index answers nothing, and
+  // `string.dump` there takes no `strip` argument and refuses a function with upvalues at all.
+  // **The 5.4 and 5.5 manuals say the stand-in is `'?'`. It is not** — `aux_upvalue` returns
+  // `"(no name)"` at every 5.4 and 5.5 tag, and a probe on the 5.4 runtime prints exactly that.
+  // No entry quotes any of these, and no entry says an empty name implies a C function, because
+  // at 5.2 a nameless Lua upvalue answers with the empty string too.
+  //
+  // ### `debug.upvalueid` — the 5.4 note
+  //
+  // `db_upvalueid` answered a bad index by raising through `checkupval` at 5.2 and 5.3;
+  // `v5.4.2` rewrites `checkupval` to return `lua_upvalueid`'s result and `db_upvalueid` to
+  // push `luaL_pushfail` when it is `NULL`, and `lua_upvalueid` gains the `LUA_VLCF` fallthrough
+  // that answers `NULL` for a light C function instead of tripping `api_check`. Credited to 5.4
+  // per the standing rule that a line is credited with what its final release has; `v5.4.0` and
+  // `v5.4.1` still raise. `debug.upvaluejoin` keeps the raise on every version, which is why the
+  // two entries differ on this one point.
+  //
+  // ### The 5.3 note on all four
+  //
+  // The standing `luaL_checkint` → `luaL_checkinteger` boundary — `auxupvalue` for the first
+  // two, `checkupval` for the other two — the same one `globals.error`,
+  // `globals.collectgarbage`, `io.file-seek`, `debug.getinfo`, `debug.traceback`,
+  // `debug.sethook`, `debug.getlocal` and `debug.setlocal` record.
+  'debug.getupvalue': debugGetupvalue,
+  'debug.setupvalue': debugSetupvalue,
+  'debug.upvalueid': debugUpvalueid,
+  'debug.upvaluejoin': debugUpvaluejoin,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

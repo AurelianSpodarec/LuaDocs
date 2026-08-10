@@ -1,8 +1,141 @@
 ---
 title: debug.setupvalue()
-description: ""
+description: Write a value into one of the variables a function closed over.
+lua-compat: debug.setupvalue
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.setupvalue
 ---
 
-{/* Not yet written. */}
+Assigns a value to one of the variables a function closed over, addressed by position exactly as
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) reads one. The name of the
+variable written to comes back, which is how a caller checks it hit what it meant to hit.
+
+<RunnableExample code={`local retries_left = 3\n\nlocal function attempt()\n  retries_left = retries_left - 1\n  return retries_left\nend\n\nprint(attempt())\n\nlocal written = debug.setupvalue(attempt, 1, 10)\nprint(written)\nprint(attempt())\n-- Expected output:\n-- 2\n-- retries_left\n-- 9`} />
+
+## Syntax
+
+```lua
+debug.setupvalue(f, up, value)
+```
+
+<Parameters>
+  <Param name="f">The function whose captured variable is being written. Any function value; it does not have to be running.</Param>
+  <Param name="up">Which upvalue, by position, [addressed exactly as it is for reading](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed) — including the fact that the positions are not decided by the order the source declares them in.</Param>
+  <Param name="value">What to put there. Any value at all, including `nil`; the variable is not declared with a type and nothing checks what it held before.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The name the variable was declared under, once the value is in place. [Every upvalue of a function written in C](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries) answers under an empty name, which is still a name coming back rather than a write that went nowhere.</Return>
+  <Return type="none">When `up` names no upvalue of `f`, nothing at all comes back and nothing was written — the value is simply dropped. Read as one value the call answers `nil`; counted with `select("#", ...)` it answers zero.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is not a function, and when it is left out.
+- Raises when `up` is left out, or is neither a number nor a string that reads as one.
+- Raises when `value` is left out. There is no shorthand for *clear this variable* — a `nil` meant for the variable has to be written out.
+- <Since v="5.3" /> Raises when `up` carries a fraction rather than an exact whole-number value.
+- An index of `0`, a negative index, and one past the last upvalue all fail to name anything, and none of them raises. Nothing comes back and nothing is written.
+
+</Errors>
+
+## Description
+
+This is the writing half of a pair, and everything about *which* variable is being addressed
+belongs to
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed) —
+positions decided by the compiler rather than by the source, an empty name on anything written
+in C, no declared names at all in a chunk loaded without its debug information, and `_ENV` for
+the table a function reads its globals from. Read that once and this call needs no rules of its
+own.
+
+What it adds is a real assignment into a closure from outside it. The function has no idea; its
+next mention of the variable reads what was written here, and there is nothing at the site of
+that read to explain where the value came from. That is what makes this a debugger's tool rather
+than a programming one, and it is a sharper one than
+[`debug.setlocal()`](/docs/standard-library/debug/setlocal): a local belongs to a call that will
+finish, while a captured variable outlives every call and can be reached whenever the closure
+can be.
+
+A write reaches the *variable*, not the function. Where several closures were made over one
+variable — the usual shape of a getter and a setter built in the same block — writing through
+any of them is what all of them read afterwards.
+[`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) is how that sharing is confirmed
+before relying on it.
+
+The name coming back is not decoration. It is what confirms the position addressed was the
+variable intended, and comparing it against an expected name is what turns a fragile index into
+something safe to act on.
+
+## Examples
+
+### An index that names nothing
+
+<RunnableExample code={`local threshold = 5\nlocal function above(value)\n  return value > threshold\nend\n\nlocal written = debug.setupvalue(above, 9, 100)\nprint(written)\nprint(select("#", debug.setupvalue(above, 9, 100)))\nprint(above(6))\nprint(threshold)\n-- Expected output:\n-- nil\n-- 0\n-- true\n-- 5`} />
+
+Position `9` names nothing, so the value goes nowhere and the one variable the closure does have
+is untouched. Nothing raises, and the write is reported by the absence of a name and by nothing
+else.
+
+### Writing through one closure and reading through another
+
+<RunnableExample code={`local function make_gauge()\n  local reading = 0\n  local set_reading = function(value) reading = value end\n  local get_reading = function() return reading end\n  return set_reading, get_reading\nend\n\nlocal set_reading, get_reading = make_gauge()\nprint(get_reading())\n\ndebug.setupvalue(get_reading, 1, 88)\nprint(get_reading())\n\nprint(select("#", debug.setupvalue(set_reading, 1, 5)))\nprint(get_reading())\n-- Expected output:\n-- 0\n-- 88\n-- 1\n-- 5`} />
+
+Both closures were made in the same call and captured the same variable, so writing through
+either is read by both. The write through `set_reading` is felt by `get_reading` without
+`set_reading` ever being called.
+
+<Only since="5.2">
+
+### Giving a chunk a different set of globals
+
+<RunnableExample code={`local sandbox = { result = 0 }\nlocal chunk = load("result = 21 * 2")\n\nprint(debug.setupvalue(chunk, 1, sandbox))\nchunk()\n\nprint(sandbox.result)\nprint(result)\n-- Expected output:\n-- _ENV\n-- 42\n-- nil`} />
+
+A chunk compiled from source keeps the table it reads and writes global names through as its
+first captured variable, so replacing that variable is replacing its globals. The assignment the
+chunk makes lands in `sandbox` and the real global of that name is never touched.
+[`load()`](/docs/standard-library/globals/load#choosing-the-environment) does the same thing at
+the moment the chunk is made, which is where it belongs in a program that is not repairing
+something.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="A write that hits nothing looks exactly like a write that worked">
+The value is accepted, the call returns, nothing raises — and what separates a successful write
+from one that went nowhere is whether a name came back. Nothing else reports it. An index that
+drifts by one quietly stops having any effect, and a tool that does not read the returned name
+will not notice.
+</Gotcha>
+
+<Gotcha title="One write, every closure over that variable">
+This does not give one function a private new value. It changes the variable, and a variable
+captured by four closures is one variable — all four read the new value from then on. Where that
+is what you wanted it is the point of the call; where it is not, the closure you meant to leave
+alone has quietly changed behaviour.
+</Gotcha>
+
+<Gotcha title="Nothing the function does will explain the value">
+The closure carries no record of the write. A captured variable that its own code never assigns
+to now holds something else, and nothing in the ordinary reading of that function will account
+for it — a stack trace included, since the stack says where the program is and not what has been
+done to it. Left in shipped code this is among the hardest classes of bug to find from the
+outside, and it is worth keeping such writes to a debugger, a test, or a repair that is loudly
+commented.
+</Gotcha>
+
+<Gotcha title="It is not a way to reset a closure">
+Writing over what a factory-made closure captured looks like a cheap way to start it again, and
+it reaches only the variables that closure actually captured — not the ones its siblings hold,
+and not anything the enclosing call kept to itself. Calling the factory again gives a fresh set
+of variables, which is what *starting again* means, and it needs none of this.
+</Gotcha>
+
+## See also
+
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) — the reading half, and where the addressing rules live
+- [`debug.upvalueid()`](/docs/standard-library/debug/upvalueid) — checking which closures a write here will be read by
+- [`debug.upvaluejoin()`](/docs/standard-library/debug/upvaluejoin) — changing which variable a closure reads, rather than what that variable holds
+- [`debug.setlocal()`](/docs/standard-library/debug/setlocal) — writing into what a call in progress is holding rather than into what a function captured
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says) — how many positions there are before writing into one
