@@ -66,6 +66,38 @@ export function destinationFor(pathname: string): Destination {
 }
 
 /**
+ * The area URLs that still have something behind them, read off the filtered tree.
+ *
+ * `filterUnwritten` drops a top-level folder whose entries are all unwritten, so an area
+ * that survives is one with at least one authored entry. Today that is
+ * `/docs/standard-library` and nothing else.
+ */
+export function liveAreaUrls(tree: PageTree.Root): Set<string> {
+  const live = new Set<string>();
+  for (const child of tree.children) {
+    if (child.type === 'folder' && child.index != null) live.add(child.index.url);
+  }
+  return live;
+}
+
+/**
+ * Destinations worth offering — the same rule as everything else on this site: do not
+ * advertise what is not there (ADR 0012).
+ *
+ * Learn and Guides own one unwritten area each, so listing them hands the reader a link
+ * to an empty tree. A destination with no `areas` at all — Playground, Community — is not
+ * a docs area and is always shown.
+ *
+ * Rows come back the moment the first entry in their area is authored. Nothing here is a
+ * hand-maintained list of what is ready.
+ */
+export function visibleDestinations(live: ReadonlySet<string>): Destination[] {
+  return destinations.filter(
+    (destination) => !destination.areas || destination.areas.some((area) => live.has(area)),
+  );
+}
+
+/**
  * Clicking Learn does not scroll you to a distant part of one enormous tree — it
  * replaces the tree with Learn's (ADR 0007).
  *

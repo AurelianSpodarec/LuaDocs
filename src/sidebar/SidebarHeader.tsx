@@ -53,14 +53,19 @@ function DestinationRow({
   );
 }
 
-/** Inside the scroll viewport, above the tree — so it scrolls away with it. */
-export function DestinationsBlock() {
+/**
+ * Inside the scroll viewport, above the tree — so it scrolls away with it.
+ *
+ * `visible` is derived from the filtered tree rather than from the static list, so a
+ * destination whose area holds nothing written is not offered. See `visibleDestinations`.
+ */
+export function DestinationsBlock({ visible = destinations }: { visible?: typeof destinations }) {
   const { pathname } = useLocation();
   const active = destinationFor(pathname);
 
   return (
     <nav aria-label="Sections of the site" className="flex flex-col gap-0.5">
-      {destinations.map((destination) => (
+      {visible.map((destination) => (
         <DestinationRow
           key={destination.name}
           destination={destination}

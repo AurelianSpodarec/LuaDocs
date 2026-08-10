@@ -30,7 +30,7 @@ import { EntryAvailabilityProvider } from '@/version/EntryAvailability';
 import { buildFullToc, entryTitleClass } from '@/entry/pageToc';
 import { createSidebarItem, FilteringContext, SidebarFolderNode } from '@/sidebar/Sidebar';
 import { groupPageTree } from '@/sidebar/groupPageTree';
-import { scopeToDestination } from '@/sidebar/destinations';
+import { scopeToDestination, liveAreaUrls, visibleDestinations } from '@/sidebar/destinations';
 import { countEntries, filterPageTree } from '@/sidebar/filterPageTree';
 import { filterUnwritten } from '@/sidebar/filterUnwritten';
 import { DestinationsBlock, SidebarFilter } from '@/sidebar/SidebarHeader';
@@ -196,6 +196,9 @@ function Page() {
     () => filterPageTree(groupPageTree(scopeToDestination(pageTree, pathname)), query),
     [pageTree, pathname, query],
   );
+  // Read off the same filtered tree, so a destination whose area holds nothing written is
+  // not offered. Learn and Guides are both in that state today.
+  const visible = useMemo(() => visibleDestinations(liveAreaUrls(pageTree)), [pageTree]);
   const options = baseOptions();
 
   return (
@@ -228,7 +231,7 @@ function Page() {
         // panel it is only occasionally used from. `on: 'menu'` keeps it out of the
         // navbar, and `app.css` unhides the `lg:hidden` wrapper the notebook layout
         // puts around it.
-        links={[{ type: 'custom', on: 'menu', children: <DestinationsBlock /> }]}
+        links={[{ type: 'custom', on: 'menu', children: <DestinationsBlock visible={visible} /> }]}
         // The tree's top level is Areas, not product tabs. Left on, fumadocs would
         // derive a tab dropdown from it and offer a second, competing way to switch.
         tabs={false}
