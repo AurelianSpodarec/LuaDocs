@@ -1,0 +1,41 @@
+name: CI
+
+# The guards this repository already has only guard anything if something runs them.
+# Before this workflow existed, `redirects:check` and the 568-test suite ran when someone
+# remembered — and the redirect map, whose whole job is to survive a rename nobody
+# noticed, was the thing least likely to be checked by hand.
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types
+        run: npm run types:check
+
+      # 739 runnable examples are executed against their expected-output comments here,
+      # so this is content verification as much as it is unit testing.
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Must follow the build: it reads `.output/public`. The dev server answers every
+      # path with the same 200 SPA shell, so these assertions are meaningless against it
+      # and meaningful only against prerendered files.
+      - name: Redirects and links
+        run: npm run redirects:check
