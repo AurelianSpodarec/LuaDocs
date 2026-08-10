@@ -1,6 +1,6 @@
 # Welcome to LuaDocs
 
-![LuaDocs — a reference for Lua 5.1 through 5.5](assets/banner.svg)
+![LuaDocs — a reference for Lua 5.1 through 5.5](assets/banner.svg?v=2)
 
 An MDN-style reference for the Lua language — one page per function, operator and language
 construct, rewritten from the official manual, covering **Lua 5.1 through 5.5**.
