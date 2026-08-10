@@ -55,10 +55,17 @@ puts in front of those values is exactly what this call drops.
 
 The coroutine itself is not handed out. `coroutine.create()` gives you a `thread` you can
 ask about; this gives you a function, and the coroutine behind it is not part of what the
-call returns. Code that needs the handle has to get it from somewhere else — a body can ask
-[`coroutine.running()`](/docs/standard-library/coroutine/running) for its own, and the
-[debug library](/docs/standard-library/debug) can read it back off the wrapper as an upvalue,
-which is a debugging tool rather than a design.
+call returns. Code that needs the handle has to get it from somewhere else, and a body can ask
+[`coroutine.running()`](/docs/standard-library/coroutine/running) for its own.
+
+<Only since="5.2">
+
+The wrapper is a function written in C, and the coroutine is what it is
+[carrying](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries), so the
+[debug library](/docs/standard-library/debug) can read it back off the wrapper — a debugging
+tool rather than a design.
+
+</Only>
 
 Dropping the status is what makes a wrapper usable where a plain function is expected, and
 a [generic `for`](/docs/language/statements/generic-for) loop is the case that comes up
