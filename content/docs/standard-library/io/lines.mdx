@@ -112,14 +112,18 @@ afterwards.
 <Only before="5.4">
 
 A loop left early does not close it. A `break`, a `return` out of the loop, and something
-inside the body raising all leave the file open — and open with nothing anywhere in the
-program that could close it, because this call handed back an iterator and nothing else.
-What closes it then is the collector, at a moment nothing in the program decides.
+inside the body raising all leave the file open, and leave the program with nothing to write
+`:close()` on: what came back was an iterator and nothing else. The file is not beyond reach
+— the iterator is holding it, and
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) will hand it back — but that
+is a rescue rather than a way to write a program. Left alone, what closes the file is the
+collector, at a moment nothing in the program decides.
 
 So a loop that might not reach the end of the file is the case this call does not cover.
 [`io.open()`](/docs/standard-library/io/open) and
 [`file:lines()`](/docs/standard-library/io/file-lines) are the pair to reach for there: one
-more line, and the program keeps the handle, which is what makes closing it possible at all.
+more line, and the program keeps the handle, so closing it is a `close()` rather than an
+excavation.
 
 </Only>
 
@@ -141,8 +145,15 @@ input until something does. It is the same reading, aimed the way
 This form opens nothing, and so it closes nothing. The file was not this call's to open, and
 it is left open, and where the reading stopped, when the loop ends — the same thing
 [`file:lines()`](/docs/standard-library/io/file-lines) does, on whichever handle the default
-input happens to be. It is also the shape of this call that hands back the iterator and
-nothing behind it, since there is no file of its own to hand over.
+input happens to be.
+
+<Only since="5.4">
+
+It is also the shape of this call that hands back the iterator and nothing behind it: the
+values that follow the iterator are there to give a `for` loop a file to close, and this
+form has no file of its own to hand over.
+
+</Only>
 
 Two iterators made this way are two views of one position rather than two readings of one
 file, because the default input file is one file: a step taken through either moves it on for
@@ -225,12 +236,15 @@ value.
 
 <Only since="5.2">
 
-<Gotcha title="The whole-file format turns forever">
-A step reading everything left has no failing answer: at the end of the file it hands back
-the empty string rather than nothing, and the empty string is not what a `for` loop stops
-on. A loop given that format never ends, and the file it opened is never closed either,
-because the step that would have closed it is never reached. Reading a file whole is
-[`file:read()`](/docs/standard-library/io/file-read)'s job, in one call and with no loop
+<Gotcha title="The whole-file format never runs out">
+A step reading everything left never runs out: at the end of the file it hands back the
+empty string rather than nothing, and the empty string is not what a `for` loop stops on. So
+a loop given that format will not stop of its own accord, and the file it opened is not
+given back in the ordinary way either — the step that would have closed it is never reached.
+What does end such a loop is trouble the system reports, which raises; what becomes of the
+file then is what [What happens to the file](#what-happens-to-the-file) says about a loop
+left early. A count of `0` behaves the same way, for the same reason. Reading a file whole
+is [`file:read()`](/docs/standard-library/io/file-read)'s job, in one call and with no loop
 around it.
 </Gotcha>
 

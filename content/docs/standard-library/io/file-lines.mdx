@@ -75,8 +75,8 @@ end-of-file test written into it.
 Nothing here opens or closes anything. The handle comes from somewhere else — usually
 [`io.open()`](/docs/standard-library/io/open) — and giving it back is the program's job, as
 described under [The handle is yours to close](#the-handle-is-yours-to-close).
-[`io.lines()`](/docs/standard-library/io/lines) is the call that does both of those for a
-file named rather than held.
+[`io.lines()`](/docs/standard-library/io/lines) is the call that opens the file itself and
+gives it back at the end of the reading, for a file named rather than held.
 
 ## What one step reads
 
@@ -99,9 +99,11 @@ and the loop turns again with the missing variables `nil`. That is
 [reading more than one format at a time](/docs/standard-library/io/file-read#reading-more-than-one-format-at-a-time)'s
 rule, seen one turn at a time.
 
-The whole-file format is worth thinking twice about here. It has no failing answer: at the
-end of the file it hands back the empty string rather than nothing, which is not what a
-`for` loop stops on. A loop given it turns forever.
+The whole-file format is worth thinking twice about here. It never runs out: at the end of
+the file it hands back the empty string rather than nothing, and the empty string is not
+what a `for` loop stops on. So a loop given it will not stop of its own accord — what ends
+one is trouble the system reports, which raises out of the loop rather than ending it. A
+count of `0` behaves the same way, for the same reason.
 
 </Only>
 
@@ -125,9 +127,12 @@ stopped, and the handle goes on working as it did before:
 
 That holds however the loop ends. A loop that runs out of file, one left by a `break` or a
 `return`, and one whose body raised all leave the same open handle behind. What differs is
-only whether the program gets as far as closing it: the first two do, and a raise carries
-past the close on its way out, which is what a
-[`pcall()`](/docs/standard-library/globals/pcall) around the loop is for.
+whether the program gets as far as closing it. A `break` does: the close written after the
+loop is the next thing to run. A `return` out of the loop does not, and neither does a
+raise — both leave the function with the close still sitting below them, which is the
+ordinary way a handle is leaked. Where a loop can end either of those ways, the close has to
+go somewhere that runs anyway: before the `return`, or after a
+[`pcall()`](/docs/standard-library/globals/pcall) around the loop.
 
 Two iterators made from one handle are two views of one position rather than two readings
 of one file: a step taken through either moves the file on for both. Reading a file twice
@@ -146,9 +151,9 @@ or wants it back afterwards.
 <RunnableExample code={`local diary_path = "io-file-lines-example-diary.txt"\n\nlocal writing = assert(io.open(diary_path, "w"))\nwriting:write("cocoa,2\\nflour,1\\nsugar,3\\n")\nwriting:close()\n\nlocal reading = assert(io.open(diary_path, "r"))\nlocal seen = 0\nfor line in reading:lines() do\n  seen = seen + 1\n  if seen == 2 then\n    break\n  end\nend\nprint(io.type(reading))\nprint(reading:read())\nreading:close()\n\nos.remove(diary_path)\n-- Expected output:\n-- file\n-- sugar,3`} />
 
 The loop stops on the second row, and the handle carries on from exactly there — the read
-after it produces the third. That is the property this call has and
-[`io.lines()`](/docs/standard-library/io/lines) does not: a loop left early leaves something
-the program can still use.
+after it produces the third. That is the difference this call makes over
+[`io.lines()`](/docs/standard-library/io/lines): a loop left early leaves the program still
+holding the file.
 
 ### Two iterators, one position
 
@@ -233,7 +238,7 @@ and the handle is still open when the error arrives, so it can still be closed.
 
 ## See also
 
-- [`io.lines()`](/docs/standard-library/io/lines) — the same loop over a file named rather than held, opened and closed for you
+- [`io.lines()`](/docs/standard-library/io/lines) — the same loop over a file named rather than held, opened by the call and closed once the reading reaches the end
 - [`file:read()`](/docs/standard-library/io/file-read) — the read each step performs, and where the formats are set out
 - [`io.open()`](/docs/standard-library/io/open) — where a readable handle comes from
 - [`file:close()`](/docs/standard-library/io/file-close) — giving the file back when the loop is done
