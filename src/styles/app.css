@@ -73,6 +73,23 @@
   --lua-function: #d2a8ff;
 }
 
+/*
+ * The marketing header sticks below the announcement bar rather than under it.
+ *
+ * Fumadocs pins `#nd-nav` at `top-0` and gives it the same `z-40` as its own `Banner`,
+ * which is fine on a site where the banner is the only sticky thing — but the landing
+ * page, the blog and the playground all wear that header, and at `top: 0` it parks on
+ * top of the bar the moment the page scrolls. The docs shell has no such problem: its
+ * containers already offset every sticky element by `--fd-banner-height`
+ * (`--fd-docs-row-1`), and this is the same sum for the shell that does not.
+ *
+ * The variable is unset once the bar is dismissed, so the fallback is what runs on most
+ * loads and the header goes back to the top by itself.
+ */
+#nd-nav {
+  top: var(--fd-banner-height, 0px);
+}
+
 html {
   scrollbar-gutter: stable;
 }
