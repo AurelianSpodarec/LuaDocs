@@ -29,7 +29,7 @@ Done against a condition nothing would ever meet.
 | 5 | Playground | [2026-08-05-playground.md](2026-08-05-playground.md) | Done |
 | 6 | Per-version Lua runtimes | — | Not started |
 | 7 | Contribution surface | — | Not started |
-| 8 | Deploy | [2026-08-07-url-migration.md](2026-08-07-url-migration.md) — extended 2026-08-10 to the whole slice | Not started |
+| 8 | Deploy | [2026-08-07-url-migration.md](2026-08-07-url-migration.md) — extended 2026-08-10 to the whole slice | Tasks 1–12 done; cutover owed |
 
 ## The slices
 
@@ -271,9 +271,21 @@ are one piece of work and not two.
 
 **Its content gate is discharged (2026-08-10).** All sixty-six distinct redirect targets
 are authored — the four exceptions, the `io`, `os`, `package` and `debug` section
-overviews, were written in slice 2.6.2. One page is still owed and does not gate cutover:
-`standard-library/index.mdx`, the chapter front door, which is not a redirect target but
-would drop out of the sidebar and sitemap under the authored filter.
+overviews, were written in slice 2.6.2. `standard-library/index.mdx`, the chapter front
+door, was written the same day; it was never a redirect target but would have dropped out
+of the sidebar and the sitemap under the authored filter.
+
+**Everything but the cutover is built and verified against build output (2026-08-10).**
+The redirect map, `vercel.json`, `sitemap.xml` (188 URLs), `robots.txt`, canonicals,
+`noindex`, the authored filter across all five consumers, the resolved text exports, the
+link check and the first CI workflow. What is left is Task 13: pointing
+`www.luadocs.com` at the new deployment, which needs a person.
+
+**One decision taken during the work, recorded here because it changes navigation.** Learn
+and Guides each own exactly one area and both are entirely unwritten, so
+`visibleDestinations` drops them from the sidebar's destinations block. Rows return on
+their own when the first entry in their area is authored — nothing maintains a list of
+what is ready.
 
 ## Deliberately unscheduled
 
