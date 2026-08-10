@@ -5,16 +5,39 @@
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Every URL the old luadocs.com serves answers with a permanent redirect to the
-entry that replaces it, and the new site ships the indexing hygiene the old one never had.
+entry that replaces it, the new site ships the indexing hygiene the old one never had, and
+nothing it publishes — page, index, sitemap or export — advertises an entry nobody has
+written or states a version fact it cannot date.
 
-**Architecture:** The sixty-nine pairs live once, as TypeScript data in
-`src/migration/legacyRedirects.ts`. Everything else is derived from that one array —
+**Architecture:** Two data spines, and everything is derived from one of them.
+
+The sixty-nine pairs live once, as TypeScript data in `src/migration/legacyRedirects.ts`.
 `vercel.json` is generated from it and checked against the committed copy, and the tests
-read it directly. Nothing is hand-transcribed twice. Sitemap, `robots.txt` and canonicals
-are TanStack Start routes and route `head` config, following the `llms.txt` route already
-in the repo.
+read it directly. Nothing is hand-transcribed twice.
 
-**Tech Stack:** TanStack Start, Fumadocs, Vitest, `tsx` for scripts, Vercel for hosting.
+The second spine is **one predicate, `isAuthored`, with five consumers** — the sidebar, the
+search index, the sitemap, the `llms.txt` index, and the `noindex` tag on the page itself.
+ADR 0012 commits to "one rule, three consumers"; the two export surfaces make it five. It is
+derived rather than flagged, for the reason the ROADMAP already gives for the version-badge
+debt: *it must be derived; hand-written badges go stale.* Sitemap, `robots.txt` and
+canonicals are TanStack Start routes and route `head` config, following the `llms.txt` route
+already in the repo.
+
+**Tech Stack:** TanStack Start, Fumadocs, Vitest, `tsx` for scripts, Vercel for hosting,
+GitHub Actions for CI.
+
+**Amended 2026-08-10.** Tasks 1–8 were written on 2026-08-07, when the standard library was
+four sections short. Three things changed and this plan changed with them:
+
+- **Task 3's gate is discharged.** `io`, `os`, `package` and `debug` are authored. All 66
+  redirect targets have bodies. The task is kept as a record and its ratchet starts empty.
+- **The counts moved.** 184 pages are authored (182 under `content/docs`, plus two blog
+  posts) and 110 are unwritten, against the 121/171 this plan was written against.
+- **Tasks 9–13 are new.** The original stopped at the sitemap, which is one of the five
+  consumers above. The sidebar and the search index still advertise all 110 stubs, the two
+  export surfaces still serve version claims they cannot date, and there is no CI at all —
+  `.github/workflows` does not exist, so every "CI asserts…" line in Tasks 2 and 7 asserts
+  nothing today.
 
 ## Global Constraints
 
@@ -46,7 +69,13 @@ in the repo.
 | `src/lib/shared.ts` | Gains `siteOrigin`. |
 | `tests/migration/legacy-redirects.test.ts` | Map shape, and targets against the content tree. |
 | `tests/migration/indexing.test.ts` | The authored predicate, sitemap and robots content. |
-| `scripts/check-build-output.ts` | Post-build: every target is a real prerendered file. |
+| `scripts/check-build-output.ts` | Post-build: every target is a real prerendered file, and every internal link resolves. |
+| `src/sidebar/filterUnwritten.ts` | Drops unwritten entries from the page tree (Task 9). |
+| `src/routes/api/search.ts` | Gains the authored filter (Task 9). |
+| `src/content/UnwrittenEntry.tsx` | What an unwritten entry renders instead of nothing (Task 10). |
+| `src/lib/exportText.ts` | Resolves `<Only>` against one version for the text surfaces (Task 11). |
+| `src/routes/llms[.]txt.ts`, `src/routes/llms-full[.]txt.ts`, `src/routes/docs/{$}[.]md.ts` | Gain the filter and the resolved export (Task 11). |
+| `.github/workflows/ci.yml` | The first CI workflow: types, tests, build, post-build checks (Task 13). |
 
 ---
 
@@ -267,16 +296,13 @@ import { LEGACY_REDIRECTS } from '@/migration/legacyRedirects';
 import { entryFileFor, isAuthored } from '@/migration/authored';
 
 /**
- * The four section overviews that are still 8-line stubs. Their old counterparts are
- * live and indexed, so until these are written, four redirects land on an empty page.
- * This list is a ratchet: emptying it is Task 3, and nothing may be added to it.
+ * Empty, and it stays empty. A redirect target without a body turns an indexed 200 on the
+ * old site into a page that says nothing — worse than the 404 it was avoiding.
+ *
+ * This started as a four-item ratchet holding the `io`, `os`, `package` and `debug`
+ * overviews. All four were authored (Task 3), so it starts empty and nothing may be added.
  */
-const KNOWN_STUB_TARGETS = [
-  '/docs/standard-library/debug',
-  '/docs/standard-library/io',
-  '/docs/standard-library/os',
-  '/docs/standard-library/package',
-];
+const KNOWN_STUB_TARGETS: string[] = [];
 
 const targets = [...new Set(LEGACY_REDIRECTS.map((r) => r.to))].sort();
 
@@ -286,7 +312,7 @@ describe('every redirect target', () => {
     expect(missing).toEqual([]);
   });
 
-  it('has a body, except for the four overviews still owed', () => {
+  it('has a body — every one of them', () => {
     const stubs = targets.filter(
       (to) => !isAuthored(readFileSync(`content/docs/${entryFileFor(to)}`, 'utf8')),
     );
@@ -361,9 +387,8 @@ and add `import { existsSync } from 'node:fs';` at the top.
 npx vitest run tests/migration/legacy-redirects.test.ts
 ```
 
-Expected: PASS, 7 tests. The stub test passes by listing exactly the four known
-overviews — if it reports a different set, the map or the tree has moved and the
-discrepancy is the finding.
+Expected: PASS, 7 tests. The stub test passes on an empty list — if it reports anything at
+all, the map or the tree has moved and the discrepancy is the finding.
 
 - [ ] **Step 5: Commit**
 
@@ -374,10 +399,15 @@ git commit -m "test(migration): bind redirect targets to the content tree"
 
 ---
 
-### Task 3: Author the four owed overviews
+### Task 3: Author the four owed overviews — **DONE (2026-08-10)**
 
-This is the cutover gate and the only content work in the plan. Four section overviews
-are 8-line stubs whose old counterparts are live and indexed.
+> **Discharged.** `io`, `os`, `package` and `debug` were authored as part of the remaining-
+> libraries slice, not here. All 66 redirect targets have bodies, and the ratchet in Task 2
+> starts empty. **The steps below are kept as a record — do not re-run them.** The one thing
+> still owed from this task is Step 8, which is new.
+
+This was the cutover gate and the only content work in the plan. Four section overviews
+were 8-line stubs whose old counterparts are live and indexed.
 
 **Files:**
 - Modify: `content/docs/standard-library/io/index.mdx`
@@ -388,7 +418,7 @@ are 8-line stubs whose old counterparts are live and indexed.
 
 **Interfaces:**
 - Consumes: `KNOWN_STUB_TARGETS` from Task 2.
-- Produces: nothing importable. Clears the gate for Task 8.
+- Produces: nothing importable. Clears the gate for Task 13 (cutover).
 
 - [ ] **Step 1: Read the proven pattern**
 
@@ -477,6 +507,25 @@ the likely cause.
 ```bash
 git add content/docs/standard-library tests/migration/legacy-redirects.test.ts
 git commit -m "content(stdlib): author the four owed overviews"
+```
+
+- [ ] **Step 8 (new, still owed): author `standard-library/index.mdx`**
+
+`content/docs/standard-library/index.mdx` is the chapter's own front door and is still an
+8-line stub with an empty `description`. It is **not** a redirect target, so it does not
+block cutover — but it is the page the Standard Library destination lands on, and with the
+authored filter from Task 9 in place an empty description would drop the chapter root out
+of the sidebar, the search index and the sitemap.
+
+It is **not a section overview**: it indexes ten sections rather than nineteen entries, and
+`overview-index.test.ts` does not apply to it. Do not copy the overview fork. What it owes
+is a summary of what the standard library is, and a list of the ten sections with a
+one-line gloss each.
+
+```bash
+npx vitest run tests/content
+git add content/docs/standard-library/index.mdx
+git commit -m "content(stdlib): author the chapter front door"
 ```
 
 ---
@@ -605,8 +654,12 @@ git commit -m "feat(migration): generate vercel.json from the map"
 ### Task 5: `sitemap.xml` and `robots.txt`
 
 The old site has neither, and no canonical tags. This is the cheapest indexing win
-available. The sitemap lists **authored entries only** — submitting 171 near-empty pages
+available. The sitemap lists **authored entries only** — submitting 110 near-empty pages
 is the fastest way to get a young site classified as thin.
+
+**The sitemap is not docs-only.** `source.getPages()` covers `content/docs` and nothing
+else, so the homepage, `/blog` and the two blog posts are absent unless they are added
+explicitly. A sitemap that omits the homepage is a bad first impression to hand a crawler.
 
 **Files:**
 - Modify: `src/lib/shared.ts` (add `siteOrigin`)
@@ -764,8 +817,14 @@ then
 node -e "console.log(require('fs').readFileSync('.output/public/sitemap.xml','utf8').match(/<url>/g).length + ' urls')"
 ```
 
-Expected: **122** — the 121 authored entries plus `/playground`. If it reports ~292, the
-`description` filter is not being applied; if it reports 0, the route did not prerender.
+Expected: **187** — the 182 authored pages under `content/docs`, plus `/`, `/playground`,
+`/blog` and the two blog posts. If it reports ~292, the `description` filter is not being
+applied; if it reports 183, the non-docs routes were not added; if it reports 0, the route
+did not prerender.
+
+These counts are load-bearing and will move as content lands. Assert them in
+`tests/migration/indexing.test.ts` rather than only eyeballing the build, so growth is a
+visible diff rather than a silent one.
 
 - [ ] **Step 7: Commit**
 
@@ -803,7 +862,7 @@ On the `createFileRoute('/docs/$')` call, alongside `component` and `loader`:
 ```ts
 head: ({ loaderData }) => ({
   links: loaderData ? [{ rel: 'canonical', href: `${siteOrigin}${loaderData.url}` }] : [],
-  // An entry with no body has nothing to rank for, and 171 of them would read as a thin
+  // An entry with no body has nothing to rank for, and 110 of them would read as a thin
   // site. The tag comes off by itself the moment someone writes a description.
   meta: loaderData?.indexable === false ? [{ name: 'robots', content: 'noindex' }] : [],
 }),
@@ -828,10 +887,13 @@ Expected: one `rel="canonical" href="https://www.luadocs.com/docs/standard-libra
 An unwritten entry must have both:
 
 ```bash
-grep -o 'rel="canonical"[^>]*\|name="robots"[^>]*' .output/public/docs/standard-library/debug/gethook/index.html
+grep -o 'rel="canonical"[^>]*\|name="robots"[^>]*' .output/public/docs/language/statements/while/index.html
 ```
 
 Expected: a canonical **and** `name="robots" content="noindex"`.
+
+(The original named `debug/gethook` here. That entry is authored now — pick any of the 110
+still-unwritten pages; every page under `content/docs/language/` qualifies.)
 
 - [ ] **Step 4: Commit**
 
@@ -926,12 +988,280 @@ git commit -m "test(migration): check redirects against build output"
 
 ---
 
-### Task 8: Cutover
+### Task 8: The predicate reaches the sidebar and the search index
+
+Tasks 5 and 6 applied `isAuthored` to the sitemap and to `noindex`. ADR 0012 commits it to
+the sidebar and the search index too — *"one rule, three consumers"* — and neither has it.
+Today the sidebar lists all 110 unwritten entries as ordinary rows, and
+`createFromSource(source)` indexes their titles, so searching `while` returns a page with
+no body.
+
+**These are the two consumers a reader meets first.** A sitemap they never see; a sidebar
+row that goes nowhere is the site telling them it has a page it does not have.
+
+**Files:**
+- Create: `src/sidebar/filterUnwritten.ts`
+- Modify: `src/routes/docs/$.tsx` (apply it in the tree pipeline)
+- Modify: `src/routes/api/search.ts`
+- Test: `tests/sidebar/filter-unwritten.test.ts`
+
+**Interfaces:**
+- Consumes: `isAuthored` from Task 2, `PageTree` from Fumadocs.
+- Produces: `filterUnwritten(tree: PageTree.Root): PageTree.Root`.
+
+- [ ] **Step 1: Write the failing test**
+
+Assert three things, the third being the one that bites:
+
+1. A tree containing an unwritten page returns without it.
+2. An authored page survives.
+3. **A folder whose children are all unwritten disappears with them.** Otherwise the
+   Language chapter renders as eleven empty collapse triggers — worse than the rows it
+   replaced, because a chevron promises something is behind it.
+
+Compose with the existing transforms rather than reimplementing: `groupPageTree` folds
+separators into folders and `filterPageTree` handles the text query. This runs **first**,
+before grouping, so a group emptied by it never forms.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+```bash
+npx vitest run tests/sidebar/filter-unwritten.test.ts
+```
+
+- [ ] **Step 3: Write the module and wire it in**
+
+In `src/routes/docs/$.tsx` the pipeline at line ~175 currently reads
+`filterPageTree(groupPageTree(scopeToDestination(pageTree, pathname)), query)`. It becomes
+`filterPageTree(groupPageTree(scopeToDestination(filterUnwritten(pageTree), pathname)), query)`.
+
+For search, filter the pages handed to `createFromSource`. Fumadocs takes the source; if it
+does not accept a page list directly, pass a shallow wrapper whose `getPages()` returns only
+authored pages.
+
+- [ ] **Step 4: Verify in the browser, both destinations**
+
+Start the dev server and check the Standard Library sidebar is unchanged, then that the
+Language destination shows only what is written. Search `while` and confirm the unwritten
+entry no longer appears.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/sidebar/filterUnwritten.ts src/routes/docs/\$.tsx src/routes/api/search.ts tests/sidebar/filter-unwritten.test.ts
+git commit -m "feat(sidebar): hide unwritten entries from tree and search"
+```
+
+---
+
+### Task 9: What an unwritten entry renders
+
+Task 8 removes the ways a reader *discovers* a stub. It does not change what happens when
+they land on one — from a `## See also` link, from an old bookmark, or from a search engine
+that crawled it before the `noindex` landed. Today that is a blank page under a title.
+
+Entries cross-link heavily into not-yet-written targets, so this is not an edge case.
+
+**The alternative considered and refused: 404 them by not prerendering.** Cleaner in the
+abstract, and it turns every existing cross-link into a hard error — Task 11's link check
+would open with a large backlog belonging to future content slices, not to this one. It
+also throws away the one useful thing the stub already has.
+
+**Every stub carries a `source:` frontmatter field pointing at the exact manual anchor.**
+So the page can say what it is and send the reader somewhere that answers them.
+
+**Files:**
+- Create: `src/content/UnwrittenEntry.tsx`
+- Modify: `src/routes/docs/$.tsx` (render it when `indexable === false`)
+- Test: `tests/content/unwritten-entry.test.tsx`
+
+**Interfaces:**
+- Consumes: the loader's `indexable` flag from Task 6, and `page.data.source`.
+- Produces: a component. Nothing else imports it.
+
+- [ ] **Step 1: Write the failing test**
+
+- Renders the entry title.
+- Renders a link to `page.data.source` when present.
+- Renders no broken affordance when `source` is absent — every stub has one today, but the
+  component must not assume it.
+- Says plainly that the entry is not written yet. Do not dress this up; a reader who hit a
+  dead end is owed a straight sentence.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+- [ ] **Step 3: Write the component and branch the route**
+
+Keep the entry chrome — title, sidebar, version switcher — and replace the body. The page
+still carries `noindex` from Task 6, so this changes what a person sees and nothing a
+crawler indexes.
+
+- [ ] **Step 4: Verify in the browser**
+
+Visit `/docs/language/statements/while` and confirm the manual link resolves.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/content/UnwrittenEntry.tsx src/routes/docs/\$.tsx tests/content/unwritten-entry.test.tsx
+git commit -m "feat(content): give unwritten entries an honest page"
+```
+
+---
+
+### Task 10: The text surfaces stop contradicting themselves
+
+Three routes serve entry text: `llms[.]txt.ts`, `llms-full[.]txt.ts` and
+`docs/{$}[.]md.ts`. All three have the same two defects.
+
+**Defect one — they serve stubs.** Every one walks `source.getPages()` unfiltered, so they
+publish 110 "Not yet written" bodies. `isAuthored` fixes it, and for `llms.txt` — which is
+`llms(source).index()`, titles and links only — that is the whole fix.
+
+**Defect two, and the reason this task exists.** `<Only before="…">` and `<Only since="…">`
+both survive into the export, adjacent and unlabelled. `error()`'s markdown states that
+`nil` reaches a catcher as `nil` and then states that it does not, with nothing saying which
+version either sentence belongs to. The ROADMAP is blunt about it: *"a reader or a model
+gets version data that is false."* This is why Fumadocs's page-actions row was deleted from
+the entry page rather than left pointing at it.
+
+**Fix, not defer.** On a site whose premise is being right about versions, the export is
+where a model reads us, and shipping a self-contradictory one is the worst available option.
+
+**The approach:** resolve `<Only>` against a single version at export time rather than
+letting both branches through. `src/version/versionScope.ts` already decides what a given
+version keeps — the export reuses it with `DEFAULT_VERSION`, and the file states which
+version it describes in its header. One version's coherent text beats five versions' worth
+of contradictions.
+
+**What this does not do:** it does not restore the Copy Markdown affordance to the entry
+page. That is the ROADMAP's call for slice 3 and it stays there. This makes the surfaces
+correct; deciding to advertise them again is separate.
+
+**Files:**
+- Create: `src/lib/exportText.ts`
+- Modify: `src/lib/source.ts` (`getLLMText` uses it)
+- Modify: all three routes
+- Test: `tests/content/export-text.test.ts`
+
+**Interfaces:**
+- Consumes: `versionScope`, `DEFAULT_VERSION`, `isAuthored`.
+- Produces: `resolveExportText(page, version): Promise<string>`.
+
+- [ ] **Step 1: Write the failing test, using `error()` as the fixture**
+
+It is the worked example the ROADMAP names. Assert that the resolved export contains the
+`<Only since>` branch and **not** the `<Only before>` branch, and that no `<Only` tag
+survives in the output at all. Add a general assertion across every authored page: the
+export contains no `<Only`, no `{/*`, and no unresolved JSX tag.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+- [ ] **Step 3: Write the resolver and wire up all three routes**
+
+Each export gets a header line naming the version it describes. Filter to authored pages in
+all three.
+
+- [ ] **Step 4: Verify against a real build**
+
+```bash
+npm run build
+```
+
+```bash
+grep -c 'Only' .output/public/llms-full.txt; grep -c 'Not yet written' .output/public/llms-full.txt
+```
+
+Expected: `0` and `0`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/lib/exportText.ts src/lib/source.ts 'src/routes/llms[.]txt.ts' 'src/routes/llms-full[.]txt.ts' 'src/routes/docs/{$}[.]md.ts' tests/content/export-text.test.ts
+git commit -m "fix(export): resolve version scoping in text surfaces"
+```
+
+---
+
+### Task 11: The link check
+
+The ROADMAP has owed this since the page-anatomy slice, and for the reason Task 7 already
+states: the dev server answers every path with the same 200 SPA shell, so a crawl of it can
+never 404 and would pass over a wholly broken set of links. It belongs in
+`scripts/check-build-output.ts` beside the redirect assertion — same job, same reason, one
+script.
+
+Entries cross-link heavily in `## See also` and in prose. `fragment-links.test.ts` already
+covers `#anchor` targets; this covers the page paths.
+
+**Files:**
+- Modify: `scripts/check-build-output.ts`
+
+- [ ] **Step 1: Extend the script**
+
+Walk every `.html` in `.output/public`, collect internal `href`s, and assert each resolves
+to a prerendered file. Ignore external links, `mailto:`, and bare fragments.
+
+- [ ] **Step 2: Run it and read the output before fixing anything**
+
+```bash
+npm run build && npm run redirects:check
+```
+
+**Expect failures on the first run, and triage before fixing.** A link into an unwritten
+entry is *not* a failure — Task 9 makes those real pages. A genuine failure is a typo or a
+renamed path. If the count is large, list the distinct targets first; do not start editing
+content until you know which kind you have.
+
+- [ ] **Step 3: Fix what is genuinely broken, then commit**
+
+```bash
+git add scripts/check-build-output.ts
+git commit -m "test(build): check internal links against build output"
+```
+
+---
+
+### Task 12: CI
+
+There is no CI. `.github/workflows` does not exist, so every "CI asserts…" line in Tasks 2
+and 7 currently asserts nothing, and the redirect map is guarded only by whoever remembers
+to run the script.
+
+**Files:**
+- Create: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Write the workflow**
+
+On push and pull request: checkout, Node from `.nvmrc` or the current LTS, `npm ci`, then
+`npm run types:check`, `npm test`, `npm run build`, `npm run redirects:check`.
+
+Order matters — `redirects:check` reads `.output/public` and must follow the build.
+
+- [ ] **Step 2: Verify it passes on `dev`**
+
+Push and read the run. **If it fails, fix the workflow or the code — do not weaken the
+checks to make it green.**
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add .github/workflows/ci.yml
+git commit -m "ci: add build, test and redirect checks"
+```
+
+---
+
+### Task 13: Cutover
 
 Not code. Do these in order, and stop at the first one that does not behave as described.
 
-**Prerequisite:** Tasks 1–7 committed, and `npm run build && npm run redirects:check &&
-npm run test` all green.
+**Prerequisite:** Tasks 1–12 committed, CI green on `dev`, and `npm run build && npm run
+redirects:check && npm test` all green locally.
+
+**This is the point at which the work becomes public and irreversible-ish** — a 301 is
+permanent by design and search engines will cache it. Do not begin Task 13 without saying
+so explicitly and getting a clear yes.
 
 - [ ] **Step 1: Deploy to a Vercel preview URL** (not the production domain)
 
@@ -988,19 +1318,20 @@ which takes weeks.
 
       Expected: `1`.
 - [ ] **Day 1 — the sitemap is being read.** Search Console → Sitemaps. Expect
-      "Success" and ~122 discovered URLs. A much larger number means the authored-only
+      "Success" and ~187 discovered URLs. A number near 292 means the authored-only
       filter regressed.
 - [ ] **Week 2 — coverage.** Search Console → Pages. Old `/docs/functions/…` URLs should
       be moving to "Page with redirect". New URLs should be entering "Indexed".
 - [ ] **Week 2 — no soft 404s.** A 301 that Google reports as a soft 404 means the
-      *target* is thin, not that the redirect is wrong. If any appear, check whether the
-      target is one of the four overviews from Task 3.
+      *target* is thin, not that the redirect is wrong. All 66 targets are authored, so a
+      soft 404 here means a real page is reading as thin — check that one, do not assume
+      the redirect is at fault.
 - [ ] **Week 4 — rankings.** Search Console → Performance, compare the 28 days after
       cutover against the 28 before. A dip of 10–20% during weeks 1–3 is normal and
       recovers. A dip that is still there at week 6 is not, and the first thing to check
       is whether `noindex` is on a page that should be indexed.
-- [ ] **Week 4 — the four owed overviews are still authored.** `npx vitest run
-      tests/migration` — the ratchet in Task 3 fails if anyone reverted one.
+- [ ] **Week 4 — every redirect target is still authored.** `npx vitest run
+      tests/migration` — the ratchet in Task 2 fails if any target lost its body.
 
 ## What this plan does not do
 
@@ -1009,9 +1340,13 @@ which takes weeks.
 - **No redirect is written for a path that already 404s** — the fifty-seven dead sidebar
   targets and the Tailwind template leftovers (`/quickstart`, `/sdks`, `/webhooks`, …).
   A redirect for a URL that has never returned 200 preserves nothing.
-- **No structured data, no OG image work, no analytics migration.** The old site runs GA4
-  (`G-W6B2W9TT0L`); whether the new one has analytics at all is a separate decision, and
-  ADR 0004's "is this worth a backend?" bar applies to it.
+- **No structured data and no OG image work.**
+- **Analytics is not this plan's, but it is no longer hypothetical.** When this was written,
+  whether the new site had analytics at all was open. There is now an implementation sitting
+  uncommitted in the working tree — `src/analytics/googleAnalytics.ts`, `tests/analytics/`
+  and a `scripts:` line in `src/routes/__root.tsx`. Commit it on its own before starting
+  Task 1 so it is not tangled into the migration diff, and note that shipping it is what
+  makes the ROADMAP's "translations, prioritised by analytics" item actionable.
 - **`gitConfig.repo` is not updated.** The GitHub repo has been renamed to
   `AurelianSpodarec/luadocs`, and `src/lib/shared.ts` still says `LuaDocs`. GitHub's
   redirect covers it today. It is a real defect and it is not this plan's.

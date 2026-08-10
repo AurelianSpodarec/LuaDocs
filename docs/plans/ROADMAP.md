@@ -29,7 +29,7 @@ Done against a condition nothing would ever meet.
 | 5 | Playground | [2026-08-05-playground.md](2026-08-05-playground.md) | Done |
 | 6 | Per-version Lua runtimes | — | Not started |
 | 7 | Contribution surface | — | Not started |
-| 8 | Deploy | [2026-08-07-url-migration.md](2026-08-07-url-migration.md) — the migration half only | Not started |
+| 8 | Deploy | [2026-08-07-url-migration.md](2026-08-07-url-migration.md) — extended 2026-08-10 to the whole slice | Not started |
 
 ## The slices
 
@@ -252,9 +252,13 @@ GitHub Actions build + deploy of the static output. Host is deliberately open
 ([ADR 0004](../adr/0004-self-hosted-on-github-no-third-parties.md)); the output is
 static, so this is a late, cheap decision.
 
-**Blocked on content:** slice 1.5 left 291 entries as empty stubs. Deploy must not
-ship them — either they are authored, or the build filters unwritten entries out of
-the sidebar, search index and `llms.txt` first.
+**Blocked on content — resolved 2026-08-10 by taking the second branch.** Slice 1.5 left
+291 entries as empty stubs; 110 remain. Deploy must not ship them, and authoring the
+language, C-API, guides and standalone chapters is not a precondition for launching the
+standard library. So the build filters unwritten entries out of the sidebar, the search
+index, the sitemap and both export surfaces, and a reader who lands on one directly gets an
+honest page pointing at the manual rather than a blank one. One predicate, five consumers,
+derived from the entry rather than flagged on it. This is Tasks 8–10 of the plan.
 
 **It is also a migration.** Deploy takes over `www.luadocs.com` from the old site
 rather than standing up somewhere new, so it owes the sixty-nine permanent redirects,
@@ -265,10 +269,11 @@ issue real 301s, which rules out bare GitHub Pages — and the sitemap's
 authored-entries-only predicate is the same one the stub filter above needs, so they
 are one piece of work and not two.
 
-**Its own content gate is four pages.** Sixty-two of the sixty-six distinct redirect
-targets are authored today; the exceptions are the `io`, `os`, `package` and `debug`
-section overviews, still 8-line stubs, whose old counterparts are live and indexed.
-Until they are written, four 301s land on an empty page.
+**Its content gate is discharged (2026-08-10).** All sixty-six distinct redirect targets
+are authored — the four exceptions, the `io`, `os`, `package` and `debug` section
+overviews, were written in slice 2.6.2. One page is still owed and does not gate cutover:
+`standard-library/index.mdx`, the chapter front door, which is not a redirect target but
+would drop out of the sidebar and sitemap under the authored filter.
 
 ## Deliberately unscheduled
 
