@@ -23,10 +23,12 @@
     the worker's output buffer, the domain. MDN's lowercase wordmark works because `mdn` is an
     initialism; `Lua` is a proper noun Lua.org always capitalises.
 
-    The lockup centres in the span from the left edge to the leftmost token (`local`, x=1152),
-    not in the full 1600 canvas — 366px clear on each side. Centring on the canvas instead put
-    it visually right of true centre, because the token field carries weight on that side and
-    the eye reads the gap before it as part of the composition rather than as empty margin.
+    The lockup is left-anchored, not centred: its left margin is 216, the same as the vertical
+    padding above and below, so the inset is uniform on three sides. Centred variants were tried
+    at mark-x 640, 560 and 430 (the last giving mathematically equal 366px margins against the
+    token field) and all three read as sitting too far right — the token field is faint enough
+    that the eye does not weigh it as a counterbalance, so the composition wants an anchor rather
+    than a centre.
 
     Presentation attributes rather than a <style> block, because GitHub's SVG sanitiser strips
     embedded stylesheets.
@@ -58,28 +60,28 @@
 
   <g id="lua-mark">
     <!-- Dashed orbital ring -->
-    <circle cx="430" cy="280" r="64" fill="none" stroke="#7e8494" stroke-width="2" stroke-dasharray="7 6"/>
+    <circle cx="280" cy="280" r="64" fill="none" stroke="#7e8494" stroke-width="2" stroke-dasharray="7 6"/>
     <!-- Sphere. Rim one step lighter than the fill, enough to define the edge. -->
-    <circle cx="430" cy="280" r="50" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
+    <circle cx="280" cy="280" r="50" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
     <!-- Terminator highlight, upper right inside the sphere -->
-    <circle cx="448" cy="262" r="14" fill="#ffffff"/>
+    <circle cx="298" cy="262" r="14" fill="#ffffff"/>
     <!-- Satellite, sitting on the ring at roughly one o'clock -->
-    <circle cx="475" cy="235" r="15" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
+    <circle cx="325" cy="235" r="15" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
     <!-- Wordmark inside the sphere, slightly left of centre as in the original -->
-    <text x="424" y="295"
+    <text x="274" y="295"
           font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"
           font-size="36" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
   </g>
 
   <!-- LuaDocs' own wordmark -->
-  <text x="554" y="268"
+  <text x="404" y="268"
         font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
         font-size="62" font-weight="600" letter-spacing="-1"
         fill="#f4f6fa" dominant-baseline="central">LuaDocs</text>
 
   <!-- Version range. `y` is 328 because the wordmark's box reaches 305 and 316 left a 6px
        overlap — invisible, since `LuaDocs` has no descenders, but the spacing read as wrong. -->
-  <text x="557" y="328"
+  <text x="407" y="328"
         font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
         font-size="18" letter-spacing="3"
         fill="#7a8494">LUA 5.1 &#8212; 5.5</text>
