@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Two environment variable names are consulted at start-up where there was one. Lua reads `LUA_PATH_5_2` first, falls back to `LUA_PATH`, and settles for the default compiled into the interpreter only if neither is set; earlier versions read `LUA_PATH` and nothing else. The same version added a way to refuse the environment outright — the stand-alone interpreter's `-E` option builds this string from the compiled-in default and reads neither name — and it does that through a field in the registry, so a program embedding Lua can ask for the same thing.",
+    "5.4": "Where the value came from an environment variable, only the first `;;` in it is replaced by the compiled-in default. Earlier versions replace every `;;`, so a setting carrying two of them ends up holding the whole default path twice."
+  }
+}

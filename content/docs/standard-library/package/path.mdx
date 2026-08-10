@@ -1,8 +1,144 @@
 ---
 title: package.path
-description: ""
+description: The string of templates require() searches when it is asked for a module written in Lua.
+lua-compat: package.path
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.path
 ---
 
-{/* Not yet written. */}
+The list of places [`require()`](/docs/standard-library/globals/require) looks for a module
+written in Lua. It is an ordinary string field holding a run of *templates* — file names,
+nearly all of them carrying a `?` that the name of the module being asked for replaces.
+
+<RunnableExample code={`local templates = {}\nfor template in string.gmatch(package.path, "[^;]+") do\n  templates[#templates + 1] = template\nend\n\nprint(#templates > 0)\nprint(string.find(templates[1], "?", 1, true) ~= nil)\n-- Expected output:\n-- true\n-- true`} />
+
+## Value
+
+A string, and a list in disguise. Two characters in it carry structure and the rest is
+literal text: the character between one template and the next, and the mark inside a
+template where the module name is substituted.
+[`package.config`](/docs/standard-library/package/config) is what reports both — a semicolon
+and a `?` on a stock build.
+
+What the string holds when a program starts is a property of the interpreter running it,
+not of the language. The directories in it are chosen when Lua is compiled and name places
+on the system it was built for; an environment variable can replace the whole thing before
+the program's first line runs; and a host that embeds Lua can set whatever it likes. So a
+program may read this field, add to it and replace it, but writing a particular value into
+a comparison ties the program to one installation. What is fixed is the shape.
+
+## What a template is
+
+A template is a file name, usually with the mark written somewhere inside it. To search for
+a module, the mark is replaced by the module's name and the result is a file name to try:
+through `./?.lua`, a module called `postage` becomes `./postage.lua`.
+
+The name is adjusted once before it is substituted — every dot in it becomes a directory
+separator — so `shop.orders` searched through `./?.lua` looks for `orders.lua` inside a
+`shop` directory rather than for a file with a dot in its name. That is what makes a dotted
+module name mean a subdirectory.
+
+Templates are tried in the order they are written, and the first one whose file can be
+opened for reading is the one used; that file is opened only to see whether it is there and
+closed again before anything is compiled. Nothing else is checked, so a template naming a
+directory that does not exist on this machine costs one failed open and nothing more; it
+turns up again only in the report a search produces once it has run out of templates. That
+is why a path can list places only some installations have.
+
+A template is not obliged to carry the mark. One written without it is tried exactly as it
+stands, which makes it a file that answers to any module name at all — see the example
+below.
+
+## Where the value comes from
+
+Lua fills this field once, as the `package` library loads, and then leaves it alone.
+
+It looks first for an environment variable named `LUA_PATH` with the version of the
+language appended and the dot in that version written as an underscore, then for plain
+`LUA_PATH`, and settles for the default compiled into the interpreter if neither is set.
+Where the value does come from the environment, the first `;;` in it is replaced by that
+compiled-in default, which is how a setting can add to the built-in list rather than throw
+it away.
+
+That splice happens at start-up and only to a value that arrived from the environment. A
+`;;` the program writes into the field itself is left alone, and so is an assignment made
+after start-up: the field is read at the moment a search happens, and whatever is in it then
+is what gets searched.
+
+A host can decline the environment altogether. The stand-alone interpreter does it with
+`-E`, which makes Lua build this string from its compiled-in default and ignore both
+variable names; it works by setting a field in the registry, so a program embedding Lua can
+ask for the same thing.
+
+## Examples
+
+### Teaching require() about somewhere new
+
+<RunnableExample code={`local original_path = package.path\n\nlocal module_file = assert(io.open("vendored-stock_levels.lua", "w"))\nmodule_file:write("return { warehouse = 40, shop = 6 }")\nmodule_file:close()\n\npackage.path = "vendored-?.lua;" .. original_path\n\nlocal stock_levels = require("stock_levels")\nprint(stock_levels.warehouse)\n\npackage.path = original_path\npackage.loaded["stock_levels"] = nil\nos.remove("vendored-stock_levels.lua")\nprint(package.path == original_path)\n-- Expected output:\n-- 40\n-- true`} />
+
+Putting the new template in front of what was already there is the usual shape: the added
+place is tried first and everything the interpreter shipped with is still reachable behind
+it. Keeping the old string and putting it back afterwards matters more than it looks —
+this is one field shared by every piece of code in the program, and a library that
+overwrites it takes the rest of the program's modules away with it.
+
+### The order decides which copy is loaded
+
+<RunnableExample code={`local original_path = package.path\n\nlocal shipped_file = assert(io.open("shipped-postage.lua", "w"))\nshipped_file:write("return { source = 'shipped' }")\nshipped_file:close()\n\nlocal local_file = assert(io.open("local-postage.lua", "w"))\nlocal_file:write("return { source = 'local' }")\nlocal_file:close()\n\npackage.path = "local-?.lua;shipped-?.lua"\nprint(require("postage").source)\n\npackage.loaded["postage"] = nil\npackage.path = "shipped-?.lua;local-?.lua"\nprint(require("postage").source)\n\npackage.path = original_path\npackage.loaded["postage"] = nil\nos.remove("shipped-postage.lua")\nos.remove("local-postage.lua")\n-- Expected output:\n-- local\n-- shipped`} />
+
+Two files can answer to the same module name, and which one is loaded is settled by which
+template comes first. That is what lets a patched copy of a dependency stand in front of the
+shipped one, and what makes loading the wrong one so easy to miss.
+
+### Filling in a template by hand
+
+<RunnableExample usesEntry={false} code={`local template = "vendored-?.lua"\nlocal file_name = (string.gsub(template, "%?", "stock_levels"))\nprint(file_name)\n-- Expected output: vendored-stock_levels.lua`} />
+
+The substitution is plain text replacement, and doing it by hand is how a program can work
+out which file a template would reach without asking for the module. The `package` library
+has a function for this that walks a whole path and reports the first file it can open,
+which is what a searcher uses.
+
+### A template that carries no mark
+
+<RunnableExample code={`local original_path = package.path\n\nlocal catalogue_file = assert(io.open("package-path-example-catalogue.lua", "w"))\ncatalogue_file:write("return { kind = 'catalogue' }")\ncatalogue_file:close()\n\npackage.path = "package-path-example-catalogue.lua"\nprint(require("anything_you_ask_for").kind)\n\npackage.path = original_path\npackage.loaded["anything_you_ask_for"] = nil\nos.remove("package-path-example-catalogue.lua")\n-- Expected output: catalogue`} />
+
+With nothing to substitute, the template is the file name, so the search finds that file
+whatever module was asked for. It is almost never what somebody meant to write — the usual
+cause is a mark lost while a path was being pasted together.
+
+## Gotchas
+
+<Gotcha title="Changing it does not reach a module that is already loaded">
+The record of what has been loaded is consulted before any searching happens, so a module
+the record already counts as loaded comes back from it and this field is never read. Adding
+a template after the fact reaches the next module asked for, not the one already sitting in
+memory. [What gets remembered](/docs/standard-library/globals/require#what-gets-remembered)
+is where that record — and the one value it does *not* count as loaded — is set out.
+</Gotcha>
+
+<Gotcha title="The separator is a semicolon, not the system's own path separator">
+A semicolon is what a stock build separates templates with wherever it runs, which is not
+what every system uses for its own lists of directories: a value copied from one that
+separates with colons arrives here as a single template with colons inside it. The
+character actually used is the one
+[`package.config`](/docs/standard-library/package/config) reports on its second line, and a
+program that means to be careful should split on that rather than on a semicolon written
+out by hand.
+</Gotcha>
+
+<Gotcha title="A value that is neither a string nor a number stops the search">
+Nothing checks this field at the moment it is assigned. A number put here is read as the
+text of that number and searched as one strange template; anything else — a table, a
+boolean, or the field cleared to `nil` — makes the next search raise instead of searching,
+and the complaint arrives from the next call that searches rather than from the line that
+did the damage.
+</Gotcha>
+
+## See also
+
+- [`package.cpath`](/docs/standard-library/package/cpath) — the same template scheme, searched after this one, for modules written in C
+- [`package.config`](/docs/standard-library/package/config) — where the separator and the mark used here are reported
+- [`require()`](/docs/standard-library/globals/require) — the call that reads this string
+- [`dofile()`](/docs/standard-library/globals/dofile) — running a file named outright, with no searching and nothing recorded
+- [`loadfile()`](/docs/standard-library/globals/loadfile) — compiling a file named outright without running it

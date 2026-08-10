@@ -82,11 +82,11 @@ What the loader hands back is the module. Lua fills that list with four searcher
 - *Loaders registered by hand.* `package.preload` is a table keyed by module name, and a
   function stored there is taken as the loader with nothing read from disk. It is how a module
   can be built into a program that has no filesystem to search.
-- *Lua files, through `package.path`.* That is a string of templates separated by semicolons,
+- *Lua files, through [`package.path`](/docs/standard-library/package/path).* That is a string of templates separated by semicolons,
   each carrying a `?`. The `?` is replaced by the module name with every dot turned into a
   directory separator, and the first template whose file can be opened for reading is the one
   used.
-- *C libraries, through `package.cpath`.* The same template scheme against a separate string of
+- *C libraries, through [`package.cpath`](/docs/standard-library/package/cpath).* The same template scheme against a separate string of
   templates. The library is linked in and a function inside it becomes the loader; that
   function's name is `luaopen_` followed by the module name with each dot turned into an
   underscore. Where the name carries a version after a hyphen, the hyphen and what follows it

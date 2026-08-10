@@ -1,8 +1,124 @@
 ---
 title: package.cpath
-description: ""
+description: The string of templates require() searches when it is asked for a module written in C.
+lua-compat: package.cpath
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.cpath
 ---
 
-{/* Not yet written. */}
+The list of places [`require()`](/docs/standard-library/globals/require) looks for a module
+written in C rather than in Lua. It is built out of the same templates as
+[`package.path`](/docs/standard-library/package/path) and read by the same call, and it is
+tried only after the Lua path has been searched and found nothing.
+
+<RunnableExample code={`local templates = {}\nfor template in string.gmatch(package.cpath, "[^;]+") do\n  templates[#templates + 1] = template\nend\n\nprint(#templates > 0)\nprint(string.find(templates[1], "?", 1, true) ~= nil)\n-- Expected output:\n-- true\n-- true`} />
+
+## Value
+
+A string holding templates separated by the same character
+[`package.path`](/docs/standard-library/package/path) uses, marked the same way and filled
+in the same way:
+[what a template is](/docs/standard-library/package/path#what-a-template-is) covers both
+strings and is not repeated here. The one part of it that shows up here more often is the
+template with no mark at all: the defaults an interpreter ships with tend to end in a
+catch-all library file that answers to whatever name is asked for.
+
+What differs is what the templates name. These end in whatever this system calls a
+dynamically loadable library — `.so`, `.dll`, something else again — and that ending is
+ordinary text inside the template rather than something Lua supplies, so a template written
+with one system's ending does not match another's. The default an interpreter ships with is
+written for the system it was compiled on, which is the practical reason this is a separate
+string from the Lua path rather than more entries in it.
+
+The value is a property of the build in the same way, and just as open to being read,
+added to and replaced by the program.
+
+## What happens once a file is found
+
+Finding the file is only the first half. The library is linked into the running program,
+and then a function *inside* it is looked up to serve as the loader — the module is
+whatever that function produces when it is called.
+
+The name of that function is `luaopen_` followed by the module's name with each dot turned
+into an underscore, so `shop.orders` wants a function called `luaopen_shop_orders`. A name
+carrying a hyphen is treated specially, and
+[How a module is found](/docs/standard-library/globals/require#how-a-module-is-found) sets
+out that rule with the fallback that goes with it.
+
+This path is then read a second time for a dotted name. After the search above comes an
+all-in-one attempt: the same templates are searched for a library named after the *root* of
+the module name — `shop`, for `shop.orders` — and if one turns up, the same
+`luaopen_shop_orders` is looked for inside it. That is what lets a package ship several C
+submodules in a single library file, each keeping the opening function it would have had on
+its own.
+
+## Where the value comes from
+
+The same start-up sequence as the Lua path, against its own pair of names: an environment
+variable called `LUA_CPATH` with the version of the language appended and its dot written
+as an underscore, then plain `LUA_CPATH`, then the default compiled into the interpreter.
+The splice of the first `;;` in such a value, and the stand-alone interpreter's `-E`, apply
+here too;
+[where the value comes from](/docs/standard-library/package/path#where-the-value-comes-from)
+describes all of it.
+
+## Examples
+
+### What the search actually tried
+
+<RunnableExample code={`local original_path, original_cpath = package.path, package.cpath\n\npackage.path = "app-?.lua"\npackage.cpath = "app-?.so"\n\nlocal found, complaint = pcall(require, "chart_renderer")\n\npackage.path, package.cpath = original_path, original_cpath\n\nprint(found)\nprint(string.find(complaint, "app-chart_renderer.lua", 1, true) ~= nil)\nprint(string.find(complaint, "app-chart_renderer.so", 1, true) ~= nil)\n-- Expected output:\n-- false\n-- true\n-- true`} />
+
+Cutting both paths down to one template each makes the report readable. It names the Lua
+candidate before the C one, which is the order the two paths are searched in, and it shows
+the mark being filled in on both sides from the same module name.
+
+### The name of the function inside the library
+
+<RunnableExample usesEntry={false} code={`local module_name = "shop.orders"\nlocal opening_function = "luaopen_" .. (string.gsub(module_name, "%.", "_"))\nprint(opening_function)\n-- Expected output: luaopen_shop_orders`} />
+
+Two substitutions run on the same module name and they do not agree with each other: the
+dots become directory separators to build the file name, and underscores to build the
+function name. A library that is found and then refused is most often a mismatch between the
+second of those and the name the library actually exports.
+
+### Adding a place to look
+
+<RunnableExample code={`local original_cpath = package.cpath\n\npackage.cpath = "vendored-?.so;" .. original_cpath\nprint(string.sub(package.cpath, 1, 14))\n\npackage.cpath = original_cpath\nprint(package.cpath == original_cpath)\n-- Expected output:\n-- vendored-?.so;\n-- true`} />
+
+An ordinary string assignment, exactly as on the Lua path, and worth the same care: this
+field belongs to the whole program, so a library that overwrites it rather than adding to
+it takes away everybody else's C modules.
+
+## Gotchas
+
+<Gotcha title="A library found here and unusable stops the search outright">
+Trouble after the file has been located does not turn into another *not found* line and let
+the next template be tried. Whatever went wrong — the library refusing to link, or linking
+without a function under the name built from the module name — is raised there and then,
+naming the file it came from, and the templates behind it and the all-in-one attempt after
+it are never reached. So a search that ends complaining about one specific file has found
+something and could not use it, which is a different problem from a search that ran out of
+places to look.
+</Gotcha>
+
+<Gotcha title="Nothing here travels between systems the way a Lua module does">
+The templates name a file whose extension, layout and calling convention belong to one
+operating system and one build of Lua. A path meant to work in more than one place has to
+list every ending it might need, and nothing in the search checks that a library it links
+was built for this interpreter — matching the file name is the whole of the test.
+</Gotcha>
+
+<Gotcha title="It is searched after the Lua path, not instead of it">
+A module name present in both places is loaded from the Lua file, because that search runs
+first and stops as soon as it succeeds. A C library meant to replace a Lua module of the
+same name has to be reached some other way — by taking the Lua template out of
+[`package.path`](/docs/standard-library/package/path), or by putting the module into the
+record before anything asks for it.
+</Gotcha>
+
+## See also
+
+- [`package.path`](/docs/standard-library/package/path) — the same scheme for modules written in Lua, searched first
+- [`package.config`](/docs/standard-library/package/config) — where the separator, the mark and the hyphen rule's character are reported
+- [`require()`](/docs/standard-library/globals/require) — the call that reads this string
+- [`os.getenv()`](/docs/standard-library/os/getenv) — reading the environment variables that can replace this string before a program starts

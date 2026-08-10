@@ -150,6 +150,9 @@ import ioFileClose from './data/io.file-close.json';
 import ioPopen from './data/io.popen.json';
 import ioTmpfile from './data/io.tmpfile.json';
 import ioLibrary from './data/io.library.json';
+import packagePath from './data/package.path.json';
+import packageCpath from './data/package.cpath.json';
+import packageConfig from './data/package.config.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1560,6 +1563,60 @@ const raw: Record<string, unknown> = {
   'io.popen': ioPopen,
   'io.tmpfile': ioTmpfile,
   'io.library': ioLibrary,
+
+  // ## `package.path`, `package.cpath`, `package.config` — the three search-path strings
+  //
+  // **These three values are decided by the build, not by the language**, and both paths can
+  // be replaced from the environment before a program's first line runs. `luaconf.h` names
+  // every default under `CHANGE them if…`, no manual states what any of them holds, and the
+  // three entries therefore describe *shape* and never assert a value. The two defaults did
+  // move — 5.1 puts `./?.lua` first and 5.2 moves it last, 5.3 adds `?/init.lua` and a shared
+  // directory — and none of that is recorded, because recording compile-time configuration as
+  // a version fact would mark four surfaces "changed" for something a builder chooses.
+  //
+  // **Two real boundaries, both on the two paths and both corroborated from both axes.**
+  //   1. **5.2 — the versioned environment variable, and `-E`.** `setpath` takes one env name
+  //      at `v5.1`, `v5.1.1` and shipped 5.1.5 (`getenv(envname)` alone, no `noenv`), and two
+  //      from `v5.2.0` on (versioned name, then plain, then `noenv(L)` — the registry field
+  //      `LUA_NOENV` the stand-alone interpreter sets for `-E`). The manuals agree exactly:
+  //      `pdf-package.path` names `LUA_PATH` alone in 5.1 and `LUA_PATH_5_x` *or* `LUA_PATH`
+  //      from 5.2, and §7 documents `-E` from 5.2 with `package.path`/`package.cpath` named in
+  //      the paragraph. The 5.3.4 refactor (five parameters to four, the versioned name built
+  //      from `LUA_VERSUFFIX` inside `setpath`) is the same two lookups in the same order.
+  //   2. **5.4 — only the first `;;` is spliced.** `v5.1` through `v5.3.6` use
+  //      `luaL_gsub(path, ";;", ";AUXMARK;")` and replace *every* occurrence; `v5.4.0` through
+  //      `v5.5.1` use one `strstr` and rebuild the string around that single hit. Clean at the
+  //      minor boundary — all 15 earlier artefacts gsub, all 11 later ones strstr, no
+  //      patch-level residual. The manuals moved with it, from "Any `;;`" (5.1–5.3) to
+  //      "A `;;`" (5.4, 5.5), which is the rare case where a wording change *is* the change.
+  //
+  // **`package.config` is the batch's one disagreement between the two axes.** `loadlib.c`
+  // sets the field at `v5.1`, `v5.1.1` and shipped 5.1.5, so a stock 5.1 build has it — but
+  // 5.1's manual never mentions it, and the settled ruling is that a version has a symbol iff
+  // that version's manual asserts its existence. `version_added: "5.2"`, therefore, the same
+  // call T3 made for `unpack` at 5.2 and with the same residual: the 5.1 reader gets a callout
+  // their build contradicts. Recorded in the P1 report rather than left to be rediscovered.
+  //
+  // **No `changed_in` on `package.config`, and the tempting one would be wrong.** The literal
+  // is `LUA_DIRSEP "\n" LUA_PATH_SEP "\n" LUA_PATH_MARK "\n" LUA_EXEC_DIR "\n" LUA_IGMARK` at
+  // all 26 artefacts — five items, never four and never six — with a trailing `"\n"` added at
+  // `v5.2.0`, which is 5.1's undocumented value differing and not a change inside the entry's
+  // life. The manual's *description* of the fifth line flips at 5.3, from "ignore all text
+  // before it" to "…after it", and that is documentation catching up, not behaviour: `loadfunc`
+  // already tries the part before the mark first, with the old form as a fallback, at `v5.2.0`
+  // and at shipped 5.2.4. G10's fix round established this from 5.3 §8.2's own closing
+  // parenthesis ("Lua 5.2 already worked that way, but it did not document the change"), and
+  // `globals.require`'s `changed_in["5.2"]` is where it is dated. A note here would have said
+  // the rule changed at a version where it did not.
+  //
+  // **None of the three is named in any Incompatibilities chapter.** 5.2's, 5.3's, 5.4's and
+  // 5.5's §8 searched for `path`, `package`, `template` and `environment variable`: the sole
+  // hit across four chapters is 5.2 §8.2's `package.loaders` → `package.searchers`, which is
+  // P2's. 5.1 §7.2 mentions `package.path` — "require gets the path from package.path instead
+  // of from LUA_PATH" — but that is a 5.0-to-5.1 change, before the range this site documents.
+  'package.path': packagePath,
+  'package.cpath': packageCpath,
+  'package.config': packageConfig,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

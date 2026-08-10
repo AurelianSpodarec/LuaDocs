@@ -1,8 +1,121 @@
 ---
 title: package.config
-description: ""
+description: A string reporting the characters this build of Lua uses to put a search path together.
+lua-compat: package.config
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.config
 ---
 
-{/* Not yet written. */}
+A string reporting the handful of characters this interpreter was compiled to use when it
+builds and reads a search path — the directory separator, the character between templates,
+the mark a module name replaces, and two more. It is there so a program can take a path
+apart, or build one, without writing those characters into itself.
+
+<RunnableExample code={`local items = {}\nfor item in string.gmatch(package.config, "[^\\n]+") do\n  items[#items + 1] = item\nend\n\nprint(#items)\nprint(string.sub(package.config, -1) == "\\n")\n-- Expected output:\n-- 5\n-- true`} />
+
+## Value
+
+A string of five items, one to a line, each ended by a newline — including the last, so the
+string closes on a line ending rather than on its final item. The order is fixed and is what
+identifies each item; there are no labels in it.
+
+Every one of them is compiled into the interpreter, which is where the *config* in the name
+comes from. One of the five is decided by the system Lua was built for and the other four are
+the same everywhere on a stock build, but all five are open to whoever built the interpreter,
+and reporting them is the entire purpose of this field. Reading it is how a program stops
+assuming.
+
+## What each line is
+
+| Line | What it holds | Usual value |
+|---|---|---|
+| 1 | The directory separator — what a dot in a module name becomes on the way to a file name | `\` on Windows, `/` elsewhere |
+| 2 | The character between one template and the next in a path | `;` |
+| 3 | The mark inside a template that the module name replaces | `?` |
+| 4 | The text in a path that stands for the directory holding the running executable | `!` |
+| 5 | The mark after which the rest of a module name is dropped when a C library's opening function name is built | `-` |
+
+The fourth is the odd one. Its substitution is done on Windows and nowhere else, which is
+what makes a path shipped as a relative offset from the interpreter work there; on other
+systems the character is reported all the same and left in the path untouched. It is applied
+to whatever the path started out as, so it reaches a value taken from the environment and the
+compiled-in default alike.
+
+The fifth belongs to the C search rather than to the Lua one, and
+[How a module is found](/docs/standard-library/globals/require#how-a-module-is-found) sets
+out the whole rule, including what is tried when the name built that way turns up nothing.
+
+## What it is for
+
+The character between templates and the mark inside them are both here, so splitting
+[`package.path`](/docs/standard-library/package/path) or
+[`package.cpath`](/docs/standard-library/package/cpath) into templates, or joining templates
+back into a path, can be done without a semicolon written out by hand. Building a file name
+the way a searcher would — dots turned into directory separators, the mark filled in — needs
+the first line and the third.
+
+This is worth doing in code that has to run on more than one machine, and worth skipping in
+code that does not. A program that only ever runs where it was written can spell the
+characters out and be right every time; a library that will be dropped into somebody else's
+interpreter cannot know what that interpreter was compiled with, and this field is what
+tells it.
+
+What the field does *not* say is anything about the paths themselves. It reports the
+grammar, never the contents: where modules will actually be looked for is in the two path
+strings, and reading this one says nothing about either.
+
+## Examples
+
+### Splitting a path without writing the separator down
+
+<RunnableExample code={`local template_separator = string.match(package.config, "^[^\\n]*\\n([^\\n]*)")\n\nlocal templates = {}\nfor template in string.gmatch(package.path, "[^" .. template_separator .. "]+") do\n  templates[#templates + 1] = template\nend\n\nprint(#templates > 0)\nprint(string.find(templates[1], "?", 1, true) ~= nil)\n-- Expected output:\n-- true\n-- true`} />
+
+The second line of the field goes straight into the character class, so the same code splits
+a path on an interpreter compiled to separate templates with something else. The pattern
+itself is still written by hand here, which is the honest limit of this approach: a
+separator that happened to be a pattern character would need escaping first.
+
+### Turning a dotted name into a file name
+
+<RunnableExample code={`local directory_separator = string.match(package.config, "^([^\\n]*)")\nlocal as_path = (string.gsub("shop.orders", "%.", directory_separator))\n\nprint(as_path == "shop" .. directory_separator .. "orders")\n-- Expected output: true`} />
+
+This is the step a searcher takes before it fills in any template, and doing it with the
+reported separator is what makes the result right on a system whose separator is not the one
+the code was written on.
+
+### The first three lines describe the search paths
+
+<RunnableExample code={`local directory_separator, template_separator, mark =\n  string.match(package.config, "^([^\\n]*)\\n([^\\n]*)\\n([^\\n]*)\\n")\n\nprint(#directory_separator > 0)\nprint(string.find(package.path, template_separator, 1, true) ~= nil)\nprint(string.find(package.path, mark, 1, true) ~= nil)\n-- Expected output:\n-- true\n-- true\n-- true`} />
+
+One `match` pulls out as many lines as are wanted, in order. The two checks that follow are
+the field earning its keep: the characters it names are the ones actually holding the Lua
+path together on this interpreter.
+
+## Gotchas
+
+<Gotcha title="It reports the configuration, it does not set it">
+This is a plain string field and writing over it is allowed, but nothing inside Lua reads it
+back. The searchers use the values compiled into them, so a program that assigns a different separator
+here changes what its own path-splitting code sees and changes nothing at all about where
+modules are found. There is no way to reconfigure this from Lua.
+</Gotcha>
+
+<Gotcha title="The last item is ended like the others">
+Every line closes with a newline, so the final character of the string is that newline and
+not the fifth item. Code that reaches for the end of the string directly picks up the
+terminator; splitting on line endings and taking the fifth piece is what gets the item.
+</Gotcha>
+
+<Gotcha title="The first line describes the build, not the machine">
+The directory separator is fixed when the interpreter is compiled, so it describes the system
+Lua was built for. That is almost always the system it is running on and is not guaranteed to
+be — an interpreter built for one platform and run under an emulation layer for another
+reports what it was built with, and the paths it was shipped with match.
+</Gotcha>
+
+## See also
+
+- [`package.path`](/docs/standard-library/package/path) — the string these characters are used to build and take apart
+- [`package.cpath`](/docs/standard-library/package/cpath) — the same, for modules written in C
+- [`require()`](/docs/standard-library/globals/require) — the call whose searching these characters describe
+- [`string.gmatch()`](/docs/standard-library/string/gmatch) — walking the lines out of the string
