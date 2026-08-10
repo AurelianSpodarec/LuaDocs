@@ -4,7 +4,9 @@
 puts Parameters, Return values and Errors beneath Syntax. It never says what a **row** in
 those lists contains, and 292 entries were authored into the gap. This ADR closes it.
 
-Six rules:
+Six rules. **Rules 3, 4 and 5 are amended at the foot of this document** — the worked
+example in [`2026-08-10-entry-body-demo.md`](../plans/2026-08-10-entry-body-demo.md)
+falsified all three, and they are read together with the amendment.
 
 1. **Parameters and Return values are one shape: name, then type.** A parameter adds
    `optional` and, when it has one, `default`.
@@ -174,7 +176,7 @@ established term, and only from this column.
 | a coroutine | `coroutine` | — |
 | the string operated on | `text` | `subject` — the string a pattern searches |
 | a function argument | `callback` | `comparator` — `table.sort`; `hook` — `debug.sethook` |
-| a table argument | `list` when ordered, `table_argument` when not | — |
+| a table argument | `list` when ordered, `table` when not | — |
 
 Multi-word names are `snake_case`, matching example identifiers under
 [ADR 0008](0008-example-conventions.md).
@@ -203,3 +205,95 @@ Multi-word names are `snake_case`, matching example identifiers under
   a reader sees as new content rather than as a tidier version of what was already there.
 - Rule 6 is a judgement, not a check. No test can tell a summary restated from a summary
   developed, which is why it is written as what to look for rather than as a limit.
+
+## Amendment — 2026-08-10, after the worked example
+
+One entry was rewritten under these rules before any content moved
+([`2026-08-10-entry-body-demo.md`](../plans/2026-08-10-entry-body-demo.md), on
+`string.find`, chosen because it exercises more of this ADR at once than any other). It
+falsified three of the six rules. All three failed the same way — a rule stated
+unconditionally that is only right conditionally.
+
+### Rule 4 is conditional: two or more returns
+
+Required where an entry returns two or more values; permitted where it returns one.
+
+Counted after the fact: **85 entries return exactly one value, 67 return two or more.** The
+ambiguity this rule exists to fix — indistinguishable `<dt>` terms — cannot occur on a
+single-row list. So the rule as written bought 85 invented labels, `uppercased` for
+`string.upper` among them, and fixed nothing on any of those 85 pages.
+
+The reason given for requiring it everywhere was ragged rows, and that reason was simply
+wrong: a single-return entry renders **one** row, so there is nothing on the page for it to
+be ragged against. Raggedness between two different entries is not visible to a reader
+looking at one of them.
+
+The cost falls from 266 names on 152 entries to **195 on 67**.
+
+### Rule 4 also understated where the names come from
+
+"A label this site chose" is true of few of them. `string.find`'s three shipped examples
+already destructure its returns:
+
+```lua
+local start_index, end_index = string.find(log_line, "WARN")
+```
+
+Its prose uses the same two identifiers. The names existed in the entry; the schema was the
+only thing that could not hold them, which is why the prose had to smuggle them in beside a
+list that could not declare them.
+
+So an entry's **examples are read first** and their identifiers adopted. Choosing fresh
+names where the examples already have them would put three vocabularies on one page — the
+list's, the prose's, and the code's — which is a worse version of the defect rule 9
+addresses.
+
+### Rule 3 conflated two different severities
+
+Lua's keywords are `and break do else elseif end false for function goto if in local nil not
+or repeat return then true until while`. `function` and `local` are on that list. `table` and
+`string` are **not** — they name a library and a type.
+
+Those are not the same problem. A parameter named `local` or `end` is unreadable inside the
+Lua that the Syntax block quotes, which is a defect. A parameter named `table` merely repeats
+its own type in the neighbouring column, which MDN does routinely and legibly as
+`array: Array`.
+
+So: **keywords are forbidden; a library or type name is discouraged where a better word
+exists and permitted where none does.** `table` is restored to the canonical table and
+`table_argument` — proposed here, and bad — is deleted from it.
+
+### Rule 5 is conditional: three or more distinct applications
+
+Use cases is expected where a function has three or more genuinely distinct applications and
+**omitted** where it does one thing.
+
+Stated universally it mandates a section on `math.sin`, where the only honest content is
+"computing a sine" — which is the summary, one screen higher, in fewer words. The evidence
+for the section was the old site carrying it on `string.format` and `string.gsub`
+([`old-site-content.md`](../research/old-site-content.md)), both rich multi-purpose calls,
+and on nothing resembling `math.sin`. Generalising from two rich entries to all 152 was the
+error.
+
+The demo's own test for whether the section is honest is the one to keep: each item should
+be a task one of the entry's examples already demonstrates. Filler cannot pass it.
+
+### What the demo did not settle
+
+`string.find`'s `init` is a lone starting point with no partner, and rule 7 sends `i`/`j` to
+`first`/`last` — a rule written for the **pair** that bounds a run. `first` without a `last`
+reads as half of something, and the alternative used in the demo, `start_position`, puts
+`position`, `first`/`last` and `start_position` in play as three spellings of one idea. That
+is precisely the drift rule 9 exists to stop, appearing inside the rules meant to stop it.
+
+Left open deliberately. It affects `string.find`, `string.match`, `string.gmatch`,
+`string.gsub`, `io.file-seek` and `utf8`, and it is Phase 0 of
+[the migration plan](../plans/2026-08-10-entry-body-migration.md) — decided once, centrally,
+rather than by whichever batch reaches it first.
+
+### What holds
+
+Rules 1, 2 and 6 came through unchanged, and rule 2 was confirmed from an unexpected
+direction: `plain` needed no rename. It is a word, it says what the argument does, and rule 3
+asks that and not whether a better synonym exists. Most of the migration will look like
+that — the rule leaving a name alone. Only shorthand moves.
