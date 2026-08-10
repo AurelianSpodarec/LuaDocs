@@ -29,16 +29,18 @@ npm run dev
 
 ## The record
 
-How the project thinks, as distinct from the documentation it publishes.
+How the project thinks, as distinct from the documentation it publishes — its decisions,
+conventions, and what building taught us.
 
-- [CONTEXT.md](CONTEXT.md) — the glossary, and nothing else
-- [docs/README.md](docs/README.md) — the record's index: decisions, conventions, findings,
-  open questions, and which of them exist yet
-- [docs/DEPRECATED/](docs/DEPRECATED/) — the previous record, kept intact for its evidence
+**It is being rebuilt from scratch.** As of 2026-08-10 the previous record had reached 97,000
+words in which decisions, findings and open questions had grown into each other, so all of it
+was deprecated in one move and none of it has been replaced yet.
 
-The record is mid-rebuild as of 2026-08-10: 97,000 words in which decisions, findings and
-open questions had grown into each other. `docs/README.md` explains the shape replacing it
-and tracks what has been rebuilt so far.
+- [docs/DEPRECATED/](docs/DEPRECATED/) — the whole previous record, kept intact rather than
+  deleted, because its evidence is what makes its successors believable. Not authoritative.
+
+Anyone reading the code will find comments citing `docs/adr/…` paths that now live under
+`docs/DEPRECATED/adr/`. They are repointed when the rebuilt decisions are numbered.
 
 ## Licence
 
