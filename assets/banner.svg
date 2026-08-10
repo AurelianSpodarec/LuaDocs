@@ -29,9 +29,12 @@
 
   <rect width="1600" height="560" fill="#08090c"/>
 
-  <!-- Faint token field: Lua keywords and operators, drawn from the language rather than from
-       its name. Scaled down with the rest and spread over the taller canvas. -->
-  <g fill="#16181f" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="22">
+  <!-- Token field: Lua keywords and operators, drawn from the language rather than from its
+       name. At #16181f it measured 1.12:1 against the background and was effectively
+       invisible; #485065 is 2.48:1 — legible as texture while staying well below the version
+       line (5.27) and the wordmark (18.4), so it reads as a field rather than as something to
+       be read. -->
+  <g fill="#485065" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="22">
     <text x="1180" y="132">function</text>
     <text x="1424" y="176">end</text>
     <text x="1206" y="192">..</text>
