@@ -1,76 +1,78 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420" width="1600" height="420" role="img" aria-label="LuaDocs — a reference for Lua 5.1 through 5.5">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 560" width="1600" height="560" role="img" aria-label="LuaDocs — a reference for Lua 5.1 through 5.5">
   <!--
-    Temporary README banner.
+    README banner.
 
-    The Lua mark here is a **hand-drawn approximation**, not the official asset — the logo
-    was supplied as an image in conversation and could not be written to disk. Replace it by
+    Proportions follow MDN's: a small lockup floating in a lot of space, not a mark that fills
+    the frame. Theirs sits at roughly 31% of the width and an eighth of the height of a 2.5:1
+    canvas; an earlier pass here had the mark at 58% of the height, which read as cramped.
+    Hence 1600x560 with ~38% vertical padding above and below.
+
+    The Lua mark is a **hand-drawn approximation**, not the official asset — the logo was
+    supplied as an image in conversation and could not be written to disk. Replace it by
     dropping the real file into `assets/` and swapping the `<g id="lua-mark">` group for an
     `<image>`. Lua's logo belongs to Lua.org / PUC-Rio; this project is not affiliated with
-    them, which is why README.md says so directly and why the wordmark beside the mark is
-    LuaDocs' own rather than a variation on theirs.
+    them, which is why README.md says so directly.
 
     Lua's navy is #000080, which against a near-black field is a dark blob with no readable
     edge. A white plate behind it fixed the contrast and looked like a sticker, so the sphere
-    is instead lifted to #1e25a8 with a thin lighter rim — the ordinary dark-mode adaptation,
-    and far less intrusive than boxing the mark. The white "Lua" and the highlight need no
-    change; they already read against the navy, and the ring is mid-grey.
+    is lifted to #1e25a8 with a thin lighter rim — the ordinary dark-mode adaptation. The white
+    "Lua" and the highlight need no change, and the ring is mid-grey.
+
+    `LuaDocs`, not `luadocs`. The codebase already draws this line: human-facing uses are
+    camel-case and every lowercase one is a machine identifier — localStorage keys, DOM ids,
+    the worker's output buffer, the domain. MDN's lowercase wordmark works because `mdn` is an
+    initialism; `Lua` is a proper noun Lua.org always capitalises.
 
     Presentation attributes rather than a <style> block, because GitHub's SVG sanitiser strips
     embedded stylesheets.
   -->
 
-  <rect width="1600" height="420" fill="#08090c"/>
+  <rect width="1600" height="560" fill="#08090c"/>
 
-  <!-- Faint token field: Lua keywords and operators, drawn from the language rather than
-       from its name. -->
-  <g fill="#181b22" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="30">
-    <text x="1178" y="92">function</text>
-    <text x="1426" y="140">end</text>
-    <text x="1210" y="152">..</text>
-    <text x="1282" y="196">~=</text>
-    <text x="1158" y="236">local</text>
-    <text x="1368" y="228">#</text>
-    <text x="1450" y="292">nil</text>
-    <text x="1226" y="300">[[ ]]</text>
-    <text x="1340" y="352">then</text>
-    <text x="1162" y="360">::</text>
-    <text x="1482" y="196">{ }</text>
-    <text x="1298" y="108">or</text>
+  <!-- Faint token field: Lua keywords and operators, drawn from the language rather than from
+       its name. Scaled down with the rest and spread over the taller canvas. -->
+  <g fill="#16181f" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="22">
+    <text x="1180" y="132">function</text>
+    <text x="1424" y="176">end</text>
+    <text x="1206" y="192">..</text>
+    <text x="1288" y="236">~=</text>
+    <text x="1152" y="268">local</text>
+    <text x="1372" y="256">#</text>
+    <text x="1448" y="330">nil</text>
+    <text x="1232" y="336">[[ ]]</text>
+    <text x="1338" y="392">then</text>
+    <text x="1166" y="400">::</text>
+    <text x="1470" y="232">{ }</text>
+    <text x="1306" y="148">or</text>
+    <text x="1198" y="446">repeat</text>
+    <text x="1408" y="446">..=</text>
   </g>
 
   <g id="lua-mark">
-    <!-- Centred at x=478 rather than 450: dropping the plate narrowed the mark, which left an
-         88px gap to the wordmark and read as two objects instead of one lockup. -->
     <!-- Dashed orbital ring -->
-    <circle cx="478" cy="210" r="122" fill="none" stroke="#7e8494" stroke-width="3" stroke-dasharray="12 10"/>
-    <!-- Sphere. Rim is one step lighter than the fill, enough to define the edge without
-         reading as an outline. -->
-    <circle cx="478" cy="210" r="96" fill="#1e25a8" stroke="#3742d6" stroke-width="2"/>
+    <circle cx="640" cy="280" r="64" fill="none" stroke="#7e8494" stroke-width="2" stroke-dasharray="7 6"/>
+    <!-- Sphere. Rim one step lighter than the fill, enough to define the edge. -->
+    <circle cx="640" cy="280" r="50" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
     <!-- Terminator highlight, upper right inside the sphere -->
-    <circle cx="520" cy="168" r="27" fill="#ffffff"/>
+    <circle cx="658" cy="262" r="14" fill="#ffffff"/>
     <!-- Satellite, sitting on the ring at roughly one o'clock -->
-    <circle cx="564" cy="124" r="28" fill="#1e25a8" stroke="#3742d6" stroke-width="2"/>
-    <!-- Wordmark inside the sphere, set slightly left of centre as in the original -->
-    <text x="466" y="248"
+    <circle cx="685" cy="235" r="15" fill="#1e25a8" stroke="#3742d6" stroke-width="1.5"/>
+    <!-- Wordmark inside the sphere, slightly left of centre as in the original -->
+    <text x="634" y="295"
           font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"
-          font-size="68" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
+          font-size="36" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
   </g>
 
-  <!-- LuaDocs' own wordmark.
-
-       `LuaDocs`, not `luadocs`. The codebase already draws this line — 21 human-facing uses
-       are camel-case (site title, nav, prose) and every lowercase one is a machine identifier:
-       localStorage keys, DOM ids, the worker's output buffer, the domain. MDN's lowercase
-       wordmark works because `mdn` is an initialism; `Lua` is a proper noun that Lua.org
-       always capitalises, and lowercasing it beside their own mark reads as a mistake. -->
-  <text x="660" y="196"
+  <!-- LuaDocs' own wordmark -->
+  <text x="740" y="268"
         font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
-        font-size="92" font-weight="600" letter-spacing="-1"
+        font-size="62" font-weight="600" letter-spacing="-1"
         fill="#f4f6fa" dominant-baseline="central">LuaDocs</text>
 
-  <!-- Version range. `y` clears the wordmark's box, which reaches 250. -->
-  <text x="664" y="284"
+  <!-- Version range. `y` is 328 because the wordmark's box reaches 305 and 316 left a 6px
+       overlap — invisible, since `LuaDocs` has no descenders, but the spacing read as wrong. -->
+  <text x="743" y="328"
         font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
-        font-size="26" letter-spacing="4"
+        font-size="18" letter-spacing="3"
         fill="#5b6472">LUA 5.1 &#8212; 5.5</text>
 </svg>
