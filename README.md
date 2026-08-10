@@ -1,3 +1,5 @@
+![LuaDocs — a reference for Lua 5.1 through 5.5](assets/banner.svg)
+
 # Welcome to LuaDocs
 
 An MDN-style reference for the Lua language — one page per function, operator and language

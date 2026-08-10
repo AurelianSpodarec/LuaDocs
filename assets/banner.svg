@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 420" width="1600" height="420" role="img" aria-label="LuaDocs — a reference for Lua 5.1 through 5.5">
+  <!--
+    Temporary README banner.
+
+    The Lua mark here is a **hand-drawn approximation**, not the official asset — the logo
+    was supplied as an image in conversation and could not be written to disk. Replace it by
+    dropping the real file into `assets/` and swapping the `<g id="lua-mark">` group for an
+    `<image>`. Lua's logo belongs to Lua.org / PUC-Rio; this project is not affiliated with
+    them, which is why README.md says so directly and why the wordmark beside the mark is
+    LuaDocs' own rather than a variation on theirs.
+
+    The white plate is not decoration. Lua's navy (#000080) on a near-black field is close to
+    invisible, and the alternatives were recolouring the logo — worse, it is not ours to
+    restyle — or lightening the whole banner. A light plate keeps the mark's colours exact.
+
+    Presentation attributes rather than a <style> block, because GitHub's SVG sanitiser strips
+    embedded stylesheets.
+  -->
+
+  <rect width="1600" height="420" fill="#08090c"/>
+
+  <!-- Faint token field: Lua keywords and operators, drawn from the language rather than
+       from its name. -->
+  <g fill="#181b22" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace" font-size="30">
+    <text x="1178" y="92">function</text>
+    <text x="1426" y="140">end</text>
+    <text x="1210" y="152">..</text>
+    <text x="1282" y="196">~=</text>
+    <text x="1158" y="236">local</text>
+    <text x="1368" y="228">#</text>
+    <text x="1450" y="292">nil</text>
+    <text x="1226" y="300">[[ ]]</text>
+    <text x="1340" y="352">then</text>
+    <text x="1162" y="360">::</text>
+    <text x="1482" y="196">{ }</text>
+    <text x="1298" y="108">or</text>
+  </g>
+
+  <g id="lua-mark">
+    <!-- Light plate, so the navy reads against the dark field. -->
+    <circle cx="450" cy="210" r="152" fill="#ffffff"/>
+    <!-- Dashed orbital ring -->
+    <circle cx="450" cy="210" r="112" fill="none" stroke="#8a8a8a" stroke-width="3" stroke-dasharray="11 9"/>
+    <!-- Sphere -->
+    <circle cx="450" cy="210" r="88" fill="#000080"/>
+    <!-- Terminator highlight, upper right inside the sphere -->
+    <circle cx="488" cy="172" r="25" fill="#ffffff"/>
+    <!-- Satellite, upper right, sitting across the ring -->
+    <circle cx="529" cy="131" r="26" fill="#000080"/>
+    <!-- Wordmark inside the sphere -->
+    <text x="440" y="243"
+          font-family="'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif"
+          font-size="62" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
+  </g>
+
+  <!-- LuaDocs' own wordmark -->
+  <text x="660" y="196"
+        font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+        font-size="92" font-weight="600" letter-spacing="-1"
+        fill="#f4f6fa" dominant-baseline="central">luadocs</text>
+
+  <!-- Version range. `y` clears the wordmark's box, which reaches 250. -->
+  <text x="664" y="284"
+        font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
+        font-size="26" letter-spacing="4"
+        fill="#5b6472">LUA 5.1 &#8212; 5.5</text>
+</svg>
