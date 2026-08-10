@@ -1,8 +1,178 @@
 ---
 title: debug.traceback()
-description: ""
+description: Build a readable description of the call stack, with a message on the front — or hand that message straight back when it is not text.
+lua-compat: debug.traceback
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.traceback
 ---
 
-{/* Not yet written. */}
+Builds a description of the call stack as it stands and hands it back as a string. A
+`message` given here goes on the front of it. Where that message is a value text cannot be
+made of, no traceback is built at all and the message comes straight back — the rule that
+lets this be handed to
+[`xpcall()`](/docs/standard-library/globals/xpcall) as a handler without wrapping.
+
+<RunnableExample code={`local function settle_invoice()\n  local report = debug.traceback("could not settle")\n  return report\nend\n\nlocal report = settle_invoice()\nprint(type(report))\nprint(report:sub(1, #"could not settle") == "could not settle")\nprint(#report > #"could not settle")\n-- Expected output:\n-- string\n-- true\n-- true`} />
+
+## Syntax
+
+```lua
+debug.traceback([thread,] [message [, level]])
+```
+
+<Parameters>
+  <Param name="thread">The thread whose stack to describe. Left out, it is the thread the call is made from.</Param>
+  <Param name="message">What to put on the front of the traceback, or the value to hand straight back. Left out, or `nil`, nothing is put on the front.</Param>
+  <Param name="level">Which call to start from, counted outwards. `1`, the default, is the function that called this one; `0` starts at this call's own frame. Where a `thread` was named there is no such frame on the stack being described, so the default is `0` and the listing starts at that thread's innermost call.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="string">The traceback: `message` if there was one, then a line announcing what follows, then a line per call on the stack, innermost first, with the middle abbreviated where the stack is deep.</Return>
+  <Return type="any">Where `message` is a value text cannot be made of, that same value, unchanged: it is not converted, and no `__tostring` metamethod is consulted. Nothing is built.</Return>
+</Returns>
+
+<Errors>
+
+- <Since v="5.2" /> Raises when `level` is a value that is neither a number nor a string that reads as one.
+- <Since v="5.3" /> Raises when `level` is a number carrying a fraction rather than an exact whole-number value.
+- A `level` naming a call that is not there does not raise. The traceback then has nothing to list under its opening line.
+- Nothing written as `message` raises. Each value either goes on the front of the traceback or comes straight back. A thread written first is the exception: it is read as `thread` rather than as a message.
+
+</Errors>
+
+## Description
+
+The traceback is text meant for a person: a line per call that is running, innermost first,
+naming the chunk the call is in, the line it has reached where there is one to report, and
+the best name that could be found for it. A stack too deep to print in full has its middle
+left out rather than being printed at length.
+
+What it describes is the stack *at the moment of the call*. That is why this is usually
+written inside a handler rather than after one: by the time a protected call has returned,
+the frames that failed are gone, and a traceback taken then describes the code that is doing
+the asking.
+[`xpcall()`](/docs/standard-library/globals/xpcall#what-the-handler-sees) runs its handler
+before any of that is unwound, which is what makes a description of the failing stack
+possible.
+
+What a line reports about a level is what
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo#what-each-field-says) reports about
+it: the chunk name is that level's `short_src`, the line is its `currentline`, and the name is
+the best one that could be found for the call. A program that wants to *act* on any of it
+should ask that call for the fields rather than take this text apart again.
+
+## When the message comes straight back
+
+Whether a traceback is built at all depends on what `message` is, and this is the part
+readers get wrong.
+
+- *A string, or a number* — a traceback is built, with the message on its front. A number is
+  turned into its digits first, so it behaves like the text of itself rather than being handed
+  back.
+- *Nothing at all, or `nil`* — a traceback is built with nothing on its front.
+- *Anything else* — a table, a boolean, a function, a userdata — the value is returned as it
+  arrived, and no traceback is built. It is not converted and no `__tostring` metamethod is
+  consulted.
+
+A thread written in the first position reaches none of those three, because it is read as
+`thread` rather than as a message.
+
+The third case is not an oversight, it is the design. It is what makes
+`xpcall(work, debug.traceback)` behave: a failure carrying a string comes back with a
+description of where it happened glued on, and a failure carrying a
+[table of its own](/docs/standard-library/globals/error#what-an-error-carries) comes back
+intact so the catcher can still read its fields. One handler, and neither kind of error
+object is damaged.
+
+The cost of that is worth stating plainly: for a failure carrying a table, this handler
+produces no traceback and nothing reports that it did not. Where a description is wanted
+whatever the error object turns out to be, the handler has to build one itself — calling this
+with a message of its own and keeping the original object beside the result.
+
+## Choosing where to start
+
+`level` decides which call the listing begins at, counted outwards the way
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo) counts them. `1` is the function
+that called this one and is what a handler almost always wants; `0` puts this call's own frame
+at the top of the listing, which is noise in a report about someone else's failure. Larger
+numbers drop the innermost calls, one per step, which is how a helper that builds reports for
+its own callers keeps itself out of them.
+
+A level past the outermost call leaves nothing to list. The opening line is still there, and
+so is the message; what follows it is empty.
+
+<RunnableExample code={`local function inner_report()\n  local from_here = debug.traceback("checkpoint", 1)\n  local from_caller = debug.traceback("checkpoint", 2)\n  return from_here, from_caller\nend\n\nlocal function outer_report()\n  local near, far = inner_report()\n  return near, far\nend\n\nlocal near, far = outer_report()\nprint(select(2, near:gsub("\\n", "")) - select(2, far:gsub("\\n", "")))\nprint(#far < #near)\nprint(far:sub(1, #"checkpoint") == "checkpoint")\n-- Expected output:\n-- 1\n-- true\n-- true`} />
+
+Starting one level further out costs a line — the innermost call, which is the one that
+asked. The message stays where it was.
+
+## Describing another thread's stack
+
+A thread written in front of everything else describes *that* thread's stack instead, and
+every later argument shifts along to make room. A coroutine that has stopped part-way through
+keeps its frames while it waits, so this is how the state of one is reported from outside; a
+thread that has finished, and one that has not been started yet, have no frames and produce an
+opening line with nothing under it.
+
+Naming a thread also changes what `level` defaults to. Without one, the default of `1` skips
+this call's own frame; with one, this call is not on the described stack at all, so there is
+nothing to skip and the default is `0`.
+
+<RunnableExample code={`local worker = coroutine.create(function()\n  coroutine.yield()\nend)\ncoroutine.resume(worker)\n\nlocal traced = debug.traceback(worker, "paused here")\nprint(type(traced))\nprint(traced:sub(1, #"paused here") == "paused here")\nprint(#traced > #"paused here")\n-- Expected output:\n-- string\n-- true\n-- true`} />
+
+## Examples
+
+### Handing it to a protected call as the handler
+
+<RunnableExample code={`local function load_rates()\n  error("the rates file is empty", 0)\nend\n\nlocal function refresh_prices()\n  load_rates()\nend\n\nlocal completed, report = xpcall(refresh_prices, debug.traceback)\nprint(completed)\nprint(report:sub(1, #"the rates file is empty") == "the rates file is empty")\nprint(#report > #"the rates file is empty")\n-- Expected output:\n-- false\n-- true\n-- true`} />
+
+No wrapper, no closure: the handler is called with the error object, and the error object is
+a string, so the traceback is built with that string on the front. The frames from
+`refresh_prices()` down to `load_rates()` are still standing at the moment it runs, which is
+why they can be described at all.
+
+### The rule, in one card
+
+<RunnableExample code={`local failure = { code = "NO_RATES" }\nprint(debug.traceback(failure) == failure)\nprint(debug.traceback("NO_RATES") == "NO_RATES")\nprint(type(debug.traceback(42)))\nprint(debug.traceback(42):sub(1, 2))\n-- Expected output:\n-- true\n-- false\n-- string\n-- 42`} />
+
+The table comes back as itself — the same table, not a copy of it. The string does not: what
+comes back is a longer string that begins with it. And a number goes the way of the string
+rather than the way of the table, which is the case most likely to be guessed wrong.
+
+## Gotchas
+
+<Gotcha title="A coroutine written first is the thread, not the message">
+A thread in the first position is read as the `thread` argument, always. So
+`debug.traceback(worker)` does not hand `worker` back — it describes `worker`'s stack. A
+handler that expects to return whatever it was given returns a string instead the day
+somebody raises a coroutine as an error object, and nothing anywhere reports a problem. Put
+it inside a table if it has to survive the trip.
+
+<RunnableExample code={`local worker = coroutine.create(function() return 1 end)\nlocal as_message = debug.traceback(worker)\nprint(as_message == worker)\nprint(type(as_message))\nprint(type(debug.traceback({ worker })))\n-- Expected output:\n-- false\n-- string\n-- table`} />
+</Gotcha>
+
+<Gotcha title="The text is for reading, not for comparing">
+What comes out carries chunk names the host chose, line numbers from the source as it stands,
+and an abbreviated middle once the stack is deep enough. Two tracebacks of the same message
+taken from different places are different strings, and the same one taken from the same place
+changes the moment a line is added above it. Code that needs to know *where* should ask
+[`debug.getinfo()`](/docs/standard-library/debug/getinfo) and read fields; a test that pins
+this string down is a test that fails on the next edit.
+
+<RunnableExample code={`local first = debug.traceback("same words")\nlocal function one_deeper()\n  local second = debug.traceback("same words")\n  return second\nend\nlocal second = one_deeper()\nprint(first == second)\nprint(first:sub(1, #"same words") == second:sub(1, #"same words"))\n-- Expected output:\n-- false\n-- true`} />
+</Gotcha>
+
+<Gotcha title="Taken after the call came back, it describes the wrong stack">
+`local completed, reason = pcall(work)` and then a traceback on the next line reports the
+frames that are running *now* — the ones around the `pcall()`, which did not fail. The frames
+that did are gone by then, discarded on the way back. The description has to be taken while
+they are still there, which means inside a handler.
+</Gotcha>
+
+## See also
+
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — the same stack read one level at a time, as fields rather than as text
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — the call that runs a handler early enough for this to describe a failing stack
+- [`pcall()`](/docs/standard-library/globals/pcall) — catching without a handler, and therefore without a description of where
+- [`error()`](/docs/standard-library/globals/error) — raising the failure a handler is called for, and choosing the position glued to its message
+- [`coroutine.status()`](/docs/standard-library/coroutine/status) — what a thread is doing, including the finished state that leaves nothing to describe

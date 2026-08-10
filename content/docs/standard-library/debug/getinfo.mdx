@@ -1,8 +1,246 @@
 ---
 title: debug.getinfo()
-description: ""
+description: Ask Lua what it knows about a function — where it was defined, what it is called, and which line the call has reached.
+lua-compat: debug.getinfo
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getinfo
 ---
 
-{/* Not yet written. */}
+Reports what Lua knows about a function, as a table. Name the function itself, or give a
+number and ask about whichever function is running that many calls out from here. The `what`
+string narrows the answer to the fields worth collecting.
+
+<RunnableExample code={`local function reconcile_totals()\n  local frame = debug.getinfo(1)\n  return frame\nend\n\nlocal running_frame = reconcile_totals()\nprint(running_frame.what)\nprint(running_frame.func == reconcile_totals)\nprint(type(running_frame.currentline))\nprint(running_frame.activelines)\n-- Expected output:\n-- Lua\n-- true\n-- number\n-- nil`} />
+
+## Syntax
+
+```lua
+debug.getinfo([thread,] f [, what])
+```
+
+<Parameters>
+  <Param name="thread">The thread whose call stack a level counts in. Left out, it is the thread the call is made from.</Param>
+  <Param name="f">What to describe: a function value, or a number naming a level of the call stack. With no `thread` named, level `0` is this call, level `1` the function that called it, and each step up one caller further out.</Param>
+  <Param name="what">Which fields to fill in, written as a string of letters. Left out, everything available is filled in except the table of lines carrying code.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">A table carrying the fields `what` asked for. It is built fresh on every call and nothing else holds on to it, so writing into it changes nothing outside it.</Return>
+  <Return type="nil">Where `f` is a level number past the outermost call on the stack. Describing a function value cannot answer this way.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `f` is neither a function nor a number nor a string that reads as one, and when it is left out altogether.
+- <Since v="5.3" /> Raises when `f` is a number carrying a fraction rather than an exact whole-number value. `debug.getinfo(1.0)` is accepted; `debug.getinfo(1.5)` is not.
+- Raises when `what` carries a letter that names none of the options. Nothing is handed back in that case — the fields the other letters asked for do not arrive either. A number written there is read as its digits and refused by the same test.
+- Raises when `what` is a value that cannot be read as a string, such as a boolean or a table.
+- <Since v="5.4" /> Raises when `what` begins with `>`. That marker belongs to the interface C code uses and means something this call already does for you.
+- A level number past the outermost call does not raise. It arrives as `nil`, which is what lets a walk outwards through the stack know it has run out.
+
+</Errors>
+
+## Description
+
+There are two questions here and one call for both. Handed a function value, it describes
+*that function*: where its definition begins and ends, whether it is written in Lua or in C,
+how many upvalues it closes over. Handed a number, it describes a *call in progress* — a
+function running some number of frames out from this one — which adds what a function value
+alone cannot supply: the line that call has reached, the name it was reached under, and how
+it was reached.
+
+Levels are counted from this call outwards. Level `0` is `debug.getinfo` itself, level `1`
+the function that asked, level `2` its caller, and so on out to the outermost call the
+thread still has. Counting past that answers `nil` rather than raising, so a loop that walks
+outwards stops by testing the answer.
+
+A tail call — `return helper(value)`, with nothing left to do once `helper` answers — takes
+over its caller's frame instead of stacking a new one on top. There is no level for the
+frame that is gone, so a count made through one lands a caller further out than the code
+reads as though it should. A level entered that way has `istailcall` set, and that is the
+signal that the caller a further step outwards would have found is missing. The same
+miscount is what makes [`error()`](/docs/standard-library/globals/error#where-the-blame-lands)
+blame the wrong line.
+
+Everything here is a snapshot taken when the call was made. A second call a line later
+answers with a different table holding a different `currentline`, and neither table is a
+window onto anything: assigning to a field of one changes what your program can read from
+that table and nothing about the function it describes.
+
+## Choosing which fields to fill in
+
+Each letter in `what` asks for one group of fields, and the groups may be combined in any
+order — `"Sl"` and `"lS"` ask for the same thing.
+
+| Letter | Fields it fills in |
+|---|---|
+| `S` | `source`, `short_src`, `linedefined`, `lastlinedefined`, `what` |
+| `l` | `currentline` |
+| `n` | `name`, `namewhat` |
+| `u` | `nups`, `nparams`, `isvararg` |
+| `t` | `istailcall`, `extraargs` |
+| `r` | `ftransfer`, `ntransfer` |
+| `f` | `func` |
+| `L` | `activelines` |
+
+Left out, `what` asks for every one of these except `L`. That asymmetry is worth holding on
+to, because it goes the way most readers guess only half of: `func` *does* arrive without
+being asked for, and `activelines` does *not*. A field a letter did not ask for is simply
+absent from the table, so reading it answers `nil`.
+
+Narrowing is the reason `what` exists. Naming a call means decoding the instruction that made
+it, and the table of lines means building a table with a key for every line the function has
+code on — work that is wasted when the caller only wanted a line number. Code that asks this
+question often asks for the least it can.
+
+## What each field says
+
+- `source` — where the chunk the function came from was itself loaded from. A leading `@`
+  means a file, and what follows is its name; a leading `=` means the host described the
+  origin in its own way, and the rest is that description; anything else is the chunk's own
+  text, because the chunk was loaded from a string.
+- `short_src` — a shortened, printable form of `source`, cut down to fit in a message. This
+  is the name that appears in error messages and in a
+  [traceback](/docs/standard-library/debug/traceback).
+- `linedefined`, `lastlinedefined` — the lines the definition starts and ends on. Both are
+  `-1` for a function written in C, and `linedefined` is `0` for the body of a chunk, which
+  has no `function` line of its own.
+- `what` — `"Lua"` for a function written in Lua, `"C"` for one written in C, `"main"` for
+  the body of a chunk.
+- `currentline` — the line the call has reached. It is `-1` when there is no line to report,
+  which covers a function written in C and every question asked about a function value rather
+  than about a call.
+- `name`, `namewhat` — a name for the function and a short word saying where that name came
+  from: `"global"`, `"local"`, `"method"`, `"field"` and `"upvalue"` are the everyday
+  answers, and there are others for names found in less usual ways. Functions are values in
+  Lua and have no name of their own, so what is reported is the name the *call* used. Where
+  none could be found, `name` is absent and `namewhat` is the empty string.
+- `nups` — how many upvalues the function closes over.
+- `nparams` — how many named parameters it declares, which is `0` for a function written in C.
+- `isvararg` — whether it takes `...` as well, which is `true` for a function written in C.
+- `istailcall` — whether this level was reached by a tail call, and therefore whether its
+  immediate caller is absent from the stack.
+- `func` — the function itself, which is how a level number turns back into a value you can
+  pass around.
+- `activelines` — a table whose keys are the lines the function has code on and whose values
+  are `true`. Empty lines and comment lines are not keys, which makes this the answer to
+  *may a breakpoint go here*. It is `nil` for a function written in C, and an empty table for
+  a Lua function whose line information was stripped out.
+- `ftransfer`, `ntransfer` — where the values being passed into a call, or handed back from a
+  return, begin and how many there are. They mean something only while a call or return
+  [hook](/docs/standard-library/debug/sethook) is running.
+- `extraargs` — how many arguments a chain of `__call` metavalues added on the way in, each
+  link of the chain contributing the object it was called on.
+
+## Looking at another thread
+
+A thread written in front of everything else moves the whole question to that thread's call
+stack, and every later argument shifts along to make room. Left out, the thread is whichever
+one is running — which is what a call written without it always means, including inside a
+coroutine.
+
+This is what makes another thread's stack readable at all. A coroutine that has stopped
+part-way through keeps its frames, so its levels can be counted through from outside while it
+waits, while one that has finished and one that has not been started yet both answer `nil`
+from level `0` upwards, having no frames to find.
+
+Naming a thread also shifts what the numbering means, and this is the part worth reading
+twice. Without a thread, level `0` is this call and level `1` the function that asked. With
+one, this call is not on the described stack at all, so level `0` is *that thread's innermost
+call* — where it has got to — and every number counts outwards from there.
+
+<RunnableExample code={`local worker = coroutine.create(function()\n  coroutine.yield()\nend)\ncoroutine.resume(worker)\n\nlocal inside = debug.getinfo(worker, 1, "S")\nprint(inside.what)\nprint(debug.getinfo(worker, 50))\n-- Expected output:\n-- Lua\n-- nil`} />
+
+Level `1` in that coroutine is its body — one step out from the call it is paused inside —
+and a level past its outermost call answers `nil` exactly as it would on this thread. The
+same optional first argument turns up on the other calls in this library that operate on a
+thread, and it means the same thing on each of them.
+
+## Examples
+
+### Describing a function rather than a call
+
+<RunnableExample code={`local function apply_discount(price, rate)\n  return price - price * rate\nend\n\nlocal defined = debug.getinfo(apply_discount, "S")\nprint(defined.what)\nprint(defined.lastlinedefined - defined.linedefined)\nprint(debug.getinfo(string.rep, "S").what)\nprint(debug.getinfo(string.rep, "S").linedefined)\n-- Expected output:\n-- Lua\n-- 2\n-- C\n-- -1`} />
+
+The definition spans two lines past the one it opens on. Asked the same thing about a
+function written in C there is nothing to report, so both line numbers come back as `-1` —
+the value that means *no line*, rather than a line.
+
+### Asking for less than everything
+
+<RunnableExample code={`local function ledger_line()\n  local narrow = debug.getinfo(1, "l")\n  local wider = debug.getinfo(1, "lS")\n  return narrow, wider\nend\n\nlocal narrow, wider = ledger_line()\nprint(type(narrow.currentline))\nprint(narrow.what)\nprint(type(wider.currentline))\nprint(wider.what)\n-- Expected output:\n-- number\n-- nil\n-- number\n-- Lua`} />
+
+`"l"` fills in one field and leaves the rest absent, so `narrow.what` reads `nil` — not
+because the function has no kind, but because nothing asked. Adding `S` to the string is what
+puts it there.
+
+### The name a call was made under
+
+<RunnableExample code={`local function post_ledger()\n  local named = debug.getinfo(1, "n")\n  return named\nend\n\nlocal named = post_ledger()\nprint(named.name)\nprint(named.namewhat)\n\nlocal unnamed = debug.getinfo(function() return 1 end, "n")\nprint(unnamed.name)\nprint(#unnamed.namewhat)\n-- Expected output:\n-- post_ledger\n-- local\n-- nil\n-- 0`} />
+
+The first call was made through a local variable, and that is what gets reported — the name
+belongs to the call site, not to the function. The second question is about a function value
+with no call site to inspect, so there is nothing to find: `name` is absent and `namewhat` is
+the empty string.
+
+### Where a breakpoint could go
+
+<RunnableExample code={`local function build_receipt(amounts)\n  local total = 0\n  for index = 1, #amounts do\n    total = total + amounts[index]\n  end\n  return total\nend\n\nlocal shape = debug.getinfo(build_receipt, "SL")\nprint(type(shape.activelines))\nprint(shape.activelines[shape.linedefined + 1])\nprint(debug.getinfo(string.rep, "L").activelines)\n-- Expected output:\n-- table\n-- true\n-- nil`} />
+
+The line after the one the definition opens on carries code, so it is a key in the table. A
+function written in C has no lines at all, and `activelines` for one is `nil` rather than an
+empty table — a distinction worth checking for before looping over it.
+
+## Gotchas
+
+<Gotcha title="Level 0 is this call, so your own function is level 1">
+With no thread named, the counting starts at `debug.getinfo` itself, so `0` describes this
+call — a function written in C — rather than yours. Code that wants *the function asking the
+question* wants `1`, and code that wants *whoever called it* wants `2`. Reaching for `0` by
+analogy with a zero-based index gets an answer rather than a complaint, which is what makes
+the mistake quiet.
+
+<RunnableExample code={`local function record_position()\n  local mine = debug.getinfo(1, "S")\n  local itself = debug.getinfo(0, "S")\n  return mine, itself\nend\n\nlocal mine, itself = record_position()\nprint(mine.what)\nprint(itself.what)\n-- Expected output:\n-- Lua\n-- C`} />
+</Gotcha>
+
+<Gotcha title="Walking outwards ends in nil, not in an error">
+A level past the outermost call answers `nil`, so `debug.getinfo(level).currentline` inside a
+loop raises on the step after the last real one — not because the level was refused, but
+because the loop indexed the `nil` it was handed. Test the table before reading a field off
+it.
+
+<RunnableExample code={`local level = 1\nlocal depth = 0\nwhile debug.getinfo(level, "S") do\n  depth = depth + 1\n  level = level + 1\nend\nprint(depth > 0)\nprint(debug.getinfo(level, "S"))\n-- Expected output:\n-- true\n-- nil`} />
+</Gotcha>
+
+<Gotcha title="The table is a copy of an instant, not a live view">
+Every call builds a new table, and the values in it describe the stack as it stood when the
+call was made. Holding one across a few more statements and reading `currentline` from it
+gives the line the program was on *then*. Nothing updates, and nothing written into the table
+travels back the other way.
+
+<RunnableExample code={`local function running_line()\n  local snapshot = debug.getinfo(1, "l")\n  local later = debug.getinfo(1, "l")\n  return snapshot, later\nend\n\nlocal snapshot, later = running_line()\nprint(snapshot ~= later)\nprint(later.currentline > snapshot.currentline)\n-- Expected output:\n-- true\n-- true`} />
+</Gotcha>
+
+<Gotcha title="This is a debugging tool, and it is priced like one">
+Filling in the whole table means decoding the calling instruction to look for a name and
+copying the chunk's description into a shortened form, on every call. That is fine in a
+handler that runs when something has already gone wrong, and it is not fine on a path the
+program takes thousands of times a second. Where the answer is genuinely needed in ordinary
+code, name the letters you need and no more.
+</Gotcha>
+
+<Gotcha title="short_src is for reading, not for opening">
+`source` and `short_src` describe where a chunk came from as far as Lua was told, which is
+whatever the host handed over when it loaded the chunk. A chunk loaded from a string carries
+that string; a chunk the host named for itself carries that name. Neither is promised to be a
+path anything can open, and `short_src` is shortened to fit a message besides.
+</Gotcha>
+
+## See also
+
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — the same stack, written out as one string instead of read one level at a time
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal) — the values a level's local variables are holding, found by the same level count
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — the calls during which `ftransfer` and `ntransfer` mean something
+- [`xpcall()`](/docs/standard-library/globals/xpcall) — running a handler early enough that the frames this call describes are still standing
+- [`error()`](/docs/standard-library/globals/error) — raising with a position chosen by a level counted the same way
+- [`coroutine.running()`](/docs/standard-library/coroutine/running) — asking from inside a coroutine which one is executing

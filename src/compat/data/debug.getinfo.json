@@ -1,0 +1,9 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "Adds the option `t`, which fills in `istailcall`, and widens `u` to fill in `nparams` and `isvararg` beside `nups`. A tail call also stops occupying a level of its own: earlier versions report a placeholder level for one, whose `what` reads `\"tail\"`, whose `func` is `nil` and which carries nothing else useful, where from here the tail-called function takes over its caller's frame and `istailcall` is what says the caller above it is missing. `namewhat` answers with more kinds of name than before, among them `\"metamethod\"` and `\"for iterator\"`.",
+    "5.3": "A level carrying a fraction is refused: `debug.getinfo(1.5)` raises rather than being cut down to level `1`, and so is a number too large to hold an exact whole-number value. `debug.getinfo(1.0)` is still accepted.",
+    "5.4": "Adds the option `r`, which fills in `ftransfer` and `ntransfer` — where the values being passed into a call or handed back from a return begin, and how many there are — and puts it in the set a call with no `what` asks for. A `what` beginning with `>` also raises from here: that marker belongs to the interface C code uses and means nothing on this call, and earlier versions do not check for it.",
+    "5.5": "The option `t` fills in `extraargs` as well as `istailcall` — the number of arguments a chain of `__call` metavalues added on the way into the call, one for each link of the chain."
+  }
+}

@@ -161,6 +161,8 @@ import packageSearchpath from './data/package.searchpath.json';
 import packageLoadlib from './data/package.loadlib.json';
 import packageSeeall from './data/package.seeall.json';
 import packageLibrary from './data/package.library.json';
+import debugGetinfo from './data/debug.getinfo.json';
+import debugTraceback from './data/debug.traceback.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1797,6 +1799,114 @@ const raw: Record<string, unknown> = {
   'package.loadlib': packageLoadlib,
   'package.seeall': packageSeeall,
   'package.library': packageLibrary,
+
+  // ## `debug` — batch DB1
+  //
+  // Manuals read from disk for all five versions; C read at **every** tag of `ldblib.c`,
+  // `ldebug.c` and `lauxlib.c` (`v5.1`, `v5.1.1`, `v5.2.0`–`v5.2.3`, `v5.3.0`–`v5.3.6`,
+  // `v5.4.0`–`v5.4.8`, `v5.5.0`, `v5.5.1`) plus the two shipped finals with no tag, 5.1.5
+  // and 5.2.4, from `www.lua.org/source/5.1/…` and `/5.2/…` — the path takes the *minor*
+  // line, `/source/5.1.5/` is a 404. Whole files were diffed per release rather than
+  // extracted function bodies, which is what the `io.open` mode-set defect asked for.
+  //
+  // ### The Debug Library's section number moves twice
+  //
+  // §5.9 in 5.1, §6.10 in 5.2, 5.3 and 5.4, §6.11 in 5.5. (The *Debug Interface* chapter,
+  // which is where `lua_getinfo` and `lua_Debug` live, is §3.8 / §4.9 / §4.9 / §4.7 / §4.7.)
+  //
+  // ### `debug.getinfo`'s `what` letters, per version — the table the entry is written from
+  //
+  // Read off `db_getinfo` in `ldblib.c` and `auxgetinfo` in `ldebug.c` at every artefact, not
+  // off the manual, because the manual documents `lua_getinfo`'s letters and `db_getinfo`
+  // decides which of the filled-in fields reach a Lua table.
+  //
+  // | Letter | 5.1 | 5.2 | 5.3 | 5.4 | 5.5 |
+  // |---|---|---|---|---|---|
+  // | `S` | `source`, `short_src`, `linedefined`, `lastlinedefined`, `what` | same | same | same | same |
+  // | `l` | `currentline` | same | same | same | same |
+  // | `n` | `name`, `namewhat` | same | same | same | same |
+  // | `u` | `nups` | + `nparams`, `isvararg` | same | same | same |
+  // | `t` | — | `istailcall` | `istailcall` | `istailcall` | + `extraargs` |
+  // | `r` | — | — | — | `ftransfer`, `ntransfer` | same |
+  // | `f` | `func` | same | same | same | same |
+  // | `L` | `activelines` | same | same | same | same |
+  //
+  // **The default `what` is `"flnSu"` at 5.1, `"flnStu"` at 5.2 and 5.3, `"flnSrtu"` at 5.4
+  // and 5.5** — so **`f` is in the default set on every version and `L` is not**. A brief
+  // asked this batch to establish "why `f` and `L` are not in the default set"; half of that
+  // premise is false, and the entry states the asymmetry outright because it is the fact a
+  // reader is most likely to have backwards. The manual agrees from the other side — *all
+  // information available, except the table of valid lines*.
+  //
+  // `srclen` is a `lua_Debug` field under `S` from 5.4 and is **never** a field of the Lua
+  // table: `db_getinfo` uses it to push `source` with an explicit length instead of as a
+  // NUL-terminated string, so a chunk name containing a zero byte survives from 5.4. Not
+  // recorded — no manual states it and nothing in a stock host produces such a name.
+  //
+  // ### The 5.2 tail-call change is a `getinfo` fact, and no Incompatibilities chapter says so
+  //
+  // 5.1's `lua_getstack` answers `1` for a *lost* tail call with `ar->i_ci = 0`, and
+  // `lua_getinfo` then runs `info_tailcall`, which sets `what` to `"tail"`, `source` to
+  // `"=(tail call)"`, `name`/`namewhat` to the empty string, `nups` to `0` and all three line
+  // numbers to `-1`; `func` comes back `nil` because `f == NULL`. From `v5.2.0` there is no
+  // such level and `t`/`istailcall` replaces it. 5.1's `lua_Debug` documents `"tail"` as a
+  // value of `what` and 5.2's does not, and 5.2's `debug.getinfo` passage adds *(except for
+  // tail calls, which do not count on the stack)*. **5.2 §8.1 mentions only the hook side of
+  // it** ("The event `tail return` in debug hooks was removed"), which is D2's; neither
+  // `debug.getinfo` nor `debug.traceback` is named in any Incompatibilities chapter of 5.2,
+  // 5.3, 5.4 or 5.5, nor in 5.1's §7.
+  //
+  // ### `namewhat`'s value set widens twice, and only the first is recorded
+  //
+  // `""`, `global`, `local`, `method`, `field`, `upvalue` at 5.1; `for iterator`,
+  // `metamethod` and `constant` from `v5.2.0`; `hook` from `v5.3.0`. The 5.2 note names two
+  // of the new ones and deliberately does not claim a complete list; there is **no 5.3 note**,
+  // because `hook` is reachable only from inside a hook function and the entry enumerates
+  // nothing that a fourth value would contradict. 5.5's manual is the first to admit its own
+  // list is partial (*plus some other options*) and is also the first to drop `method` from
+  // it — the C still produces `"method"` at `v5.5.1`, so that is a documentation edit and not
+  // a delta.
+  //
+  // ### Patch-level residuals — recorded because minor-line granularity cannot hold them
+  //
+  // | Edit | First tag | Effect |
+  // |---|---|---|
+  // | `luaL_argcheck(options[0] != '>')` in `db_getinfo` | **v5.4.3** | the `<Since v="5.4" />` bullet. At `v5.4.0`–`v5.4.2` a `what` of `">S"` with a *function* still raises (the `>` is doubled and the second is an invalid option), and with a *level* it makes `lua_getinfo` treat whatever is on the stack top as a function. Credited to 5.4, which is what its final release does |
+  // | `checkstack(L, L1, 3)` in `db_getinfo` | **5.2.4** and **v5.3.1** | raises `stack overflow` instead of corrupting another thread's stack. Absent at `v5.2.0`–`v5.2.3` and `v5.3.0`. Not observable as a behaviour a program relies on |
+  // | `luaL_pushfail` replaces `lua_pushnil` for the out-of-range level | v5.4.0 | the same `nil` |
+  // | `l_unlikely` wrappers, `lua_pushstring` → `lua_pushliteral` | v5.4.3 | none |
+  //
+  // ### `debug.traceback` — one behaviour boundary, and the rest is text
+  //
+  // 5.1's `db_errorfb` and 5.2's `db_traceback` agree on the rule the entry is built around:
+  // a message that is present and is not a string is returned untouched. They disagree on
+  // exactly one value. 5.1 tests `lua_isstring`, which is **false for `nil`**, so
+  // `debug.traceback(nil)` returns `nil`; from `v5.2.0` the test is `lua_tostring == NULL &&
+  // !lua_isnoneornil`, so `nil` joins "no message at all". `lua_isstring` and `lua_tostring`
+  // both accept a *number*, so a numeric message is converted and prefixed on every version —
+  // the case a reader is most likely to guess the other way, and the reason the entry cards it.
+  //
+  // The second 5.2 clause is the `level` check: 5.1 does `if (lua_isnumber(...))` and silently
+  // uses the default otherwise, `v5.2.0` onwards `luaL_optint`, which raises. `luaL_optint`
+  // becomes `luaL_optinteger` at `v5.3.0` and that is the 5.3 note — a fractional level is
+  // refused rather than truncated, the same boundary `globals.error`, `globals.collectgarbage`
+  // and `io.file-seek` record.
+  //
+  // **Everything else that moved in a traceback is its text, and nothing is recorded for it.**
+  // The tail-call marker arrives with `luaL_traceback` at `v5.2.0`; `pushfuncname` tries a
+  // global name first from `v5.3.0` and prints `namewhat 'name'` where 5.1 and 5.2 print
+  // `function 'name'`; `v5.4.0` rewrites the abbreviation of a deep stack to say how many
+  // levels it skipped; `v5.5.0` reorders `pushfuncname` so a name from the code beats a global
+  // one. The entry deliberately asserts only the shape — message, an opening line, one line per
+  // call innermost first, an abbreviated middle when the stack is deep — and its Gotcha says in
+  // as many words that the text is not something to compare against. **No card prints any part
+  // of a traceback except a prefix the card itself supplied.**
+  //
+  // The literal `stack traceback:` is byte-identical at all 26 artefacts, and is still not
+  // named in either entry: naming it would be an assertion on wording, which is the rule
+  // `io.close` arrived at for `cannot close standard file`.
+  'debug.getinfo': debugGetinfo,
+  'debug.traceback': debugTraceback,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

@@ -1,0 +1,7 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "A `message` of `nil` now counts as no message at all and a traceback is built for it. Earlier versions treat `nil` like any other value no text can be made of and hand it straight back, so `debug.traceback(nil)` answers `nil` there and describes nothing. A `level` that is neither a number nor a string reading as one also raises from here, where earlier versions ignore it and start from the default.",
+    "5.3": "A `level` carrying a fraction is refused rather than being cut down to a whole number, and so is one too large to hold an exact whole-number value."
+  }
+}
