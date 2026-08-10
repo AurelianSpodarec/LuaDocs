@@ -34,7 +34,7 @@ file:write(···)
     <Return type="file">The file it was called on, when everything asked for went out. Handing the file back rather than a count is what lets one write be written onto the end of another — see [What a write hands back](#what-a-write-hands-back).</Return>
   </Only>
   <Only before="5.2">
-    <Return type="boolean">`true`, when everything asked for went out. The answer says that the write went through and nothing further: not how much of it did, and not which file it went to.</Return>
+    <Return type="boolean">`true`, when everything asked for went out. The answer says that the write went through and nothing further: not how much of it did, and not which file it went to. See [What a write hands back](#what-a-write-hands-back).</Return>
   </Only>
   <Return type="nil">Where the system reported trouble with the stream instead — the first of the values that describe it. See [What a write hands back](#what-a-write-hands-back).</Return>
   <Return type="string">The system's own description of that trouble, in the system's wording rather than Lua's.</Return>
@@ -94,10 +94,34 @@ byte for byte what this call was handed.
 [`io.open()`](/docs/standard-library/io/open#the-mode-string) is where the `b` that asks for
 the other treatment is set out.
 
-A number is turned into text first, and it comes out looking the way
+<Only since="5.5">
+
+A number is turned into text first, and it comes out looking exactly the way
 [`tostring()`](/docs/standard-library/globals/tostring) renders it: a whole number written out
-in full, a fractional one in decimal, and a value too large or too small for either in
+in full, a whole-valued float carrying the `.0` that marks it as one, a fractional one with
+enough digits to read back as the same number, and a value too large or too small for that in
 exponent notation.
+
+</Only>
+
+<Only since="5.3" before="5.5">
+
+A number is turned into text first, and which text depends on which kind of number it is. A
+whole number is written out in full. Anything held as a float is written to fourteen
+significant digits, in exponent notation once it needs more than that — and a float that
+happens to be whole goes that way too, reaching the file with no fractional part at all, which
+is not what [`tostring()`](/docs/standard-library/globals/tostring) does with the same value.
+
+</Only>
+
+<Only before="5.3">
+
+A number is turned into text first, the same way
+[`tostring()`](/docs/standard-library/globals/tostring) renders it: fourteen significant
+digits, in exponent notation once a value needs more than that. A number large enough goes
+into the file in exponent form even when it is whole.
+
+</Only>
 
 A value of any other kind is refused rather than converted, and a `__tostring` metamethod does
 not change that. A program that wants a table, a boolean or `nil` in the file calls
@@ -111,10 +135,25 @@ refused *after* the arguments in front of it have already been written.
 
 ## What a write hands back
 
+<Only since="5.2">
+
 A write that went through hands back the file it was called on. That is what makes a run of
 writes read as one statement — `writing:write("cocoa"):write(",")` writes both — and it is
 also what a program should not mistake for a count: what comes back from a write that went
 through says that it did, and says nothing about how much of it did.
+
+</Only>
+
+<Only before="5.2">
+
+A write that went through hands back `true`, and that is the whole of what it says: not how
+much was written, and not which file it was written to. There is nothing in the answer for a
+second call to be written onto, so each write in a run is written out on its own with the
+handle named again.
+
+</Only>
+
+<Only since="5.5">
 
 Where the system reported trouble with the stream instead, the answer is a `nil` and the
 values that describe it: the system's own description of what went wrong, its numeric code
@@ -124,7 +163,23 @@ same one
 [`io.open()`](/docs/standard-library/io/open#when-the-open-fails) uses when it cannot open a
 file, and the one
 [`file:read()`](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble)
-uses for a read that went wrong rather than one that ran out of file.
+uses for a read that went wrong rather than one that ran out of file. The count on the end is
+this call's own, and it is what tells a program how far a partial write got.
+
+</Only>
+
+<Only before="5.5">
+
+Where the system reported trouble with the stream instead, the answer is a `nil`, the system's
+own description of what went wrong, and its numeric code for the same thing. That is the shape
+most of this library reports trouble in — the same one
+[`io.open()`](/docs/standard-library/io/open#when-the-open-fails) uses when it cannot open a
+file, and the one
+[`file:read()`](/docs/standard-library/io/file-read#telling-the-end-of-the-file-from-trouble)
+uses for a read that went wrong rather than one that ran out of file. Nothing in it says how
+much of the write got through.
+
+</Only>
 
 So a write is checked by looking at what came back, not at whether the call came back at all.
 The failing answer is a `nil`, and a handle opened for reading alone is the everyday way to

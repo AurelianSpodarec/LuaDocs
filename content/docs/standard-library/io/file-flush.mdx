@@ -79,9 +79,16 @@ library that answers it.
 it asks for a buffering scheme rather than for a single handover, and a handle set to hand
 over after every line has already done what a flush after every line would do.
 
-The answer is `true` rather than the file it was called on, so it is not something a further
-call can be written onto: a boolean has no methods, and a `:` after a flush is where a chain
-of calls stops.
+The answer is `true`, not a handle, so it is not something a further call can be written onto:
+a boolean has no methods, and a `:` after a flush is where a chain of calls stops.
+
+<Only since="5.2">
+
+That is where this call and
+[`file:write()`](/docs/standard-library/io/file-write#what-a-write-hands-back) part company,
+because a write hands the file back and carries the next call along.
+
+</Only>
 
 ## Examples
 

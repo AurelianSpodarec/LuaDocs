@@ -72,10 +72,10 @@ two files, or a function that should write to whichever file its caller means �
 `file:write()` say what is going on where this call does not.
 
 It is worth being clear about what this call is not. It is not
-[`print()`](/docs/standard-library/globals/print): there is no tab between the arguments and
-no newline after them, and nothing is put through `tostring` on the way — a value that is
-neither a string nor a number is refused here rather than converted. And `print()` does not go
-through the default output file at all, so redirecting the one does not redirect the other.
+[`print()`](/docs/standard-library/globals/print): there is no tab between the arguments, no
+newline after them, and no conversion on the way — a value that is neither a string nor a
+number is refused here rather than turned into text for you. And `print()` does not go through
+the default output file at all, so redirecting the one does not redirect the other.
 
 ## Which file this writes
 
@@ -174,4 +174,4 @@ nothing.
 - [`io.read()`](/docs/standard-library/io/read) — the same idea for the default input file
 - [`io.stdout`](/docs/standard-library/io/stdout) — the handle this writes to until something changes it
 - [`io.open()`](/docs/standard-library/io/open) — opening a file to write through a handle instead
-- [`print()`](/docs/standard-library/globals/print) — putting text out with separators, a newline, and `tostring` applied
+- [`print()`](/docs/standard-library/globals/print) — putting text out with separators, a newline, and every value turned into text for you
