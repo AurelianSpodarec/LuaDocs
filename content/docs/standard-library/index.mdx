@@ -1,8 +1,66 @@
 ---
 title: Standard Library
-description: ""
-entry-type: overview
+description: The ten libraries every Lua program starts with — text, tables and numbers, files and the operating system, coroutines, modules, and the debug interface.
 source: https://www.lua.org/manual/5.5/manual.html#6
 ---
 
-{/* Not yet written. */}
+The language itself is small. Almost everything a Lua program actually calls comes from
+here: ten tables of functions that arrive already loaded, with nothing to require and
+nothing to install.
+
+They are not a privileged part of the language. Each one is a C module written against the
+same [C API](/docs/c-api) a host program has, which is why the manual groups them by what
+they are *for* rather than by how they got there — some provide services the language
+leans on, some reach outside the program to files and the clock, and some could have been
+written in Lua and are written in C because that is where they earn their keep.
+[`table.sort()`](/docs/standard-library/table/sort) is the standard example of the third
+kind.
+
+<RunnableExample code={`local words = {}\nfor word in string.gmatch("the quick brown fox", "%a+") do\n  words[#words + 1] = word\nend\n\ntable.sort(words)\nprint(table.concat(words, " "))\nprint(#words, math.max(#words, 3))\n-- Expected output:\n-- brown fox quick the\n-- 4\t4`} />
+
+Three libraries in six lines, and no ceremony to reach any of them: `string` cut the text
+up, `table` ordered it and put it back together, `math` compared two numbers. That is the
+usual shape of Lua code.
+
+<Note>
+A host embedding Lua decides which of these to open, so a program running inside another
+application may find some of them missing — `os` and `io` are the ones most often left out
+deliberately. The stand-alone `lua` interpreter opens all of them, and every entry on this
+site is written for a Lua that has.
+</Note>
+
+## The names with no table in front
+
+The one library whose functions a program calls bare, because they are set directly in the
+global environment rather than gathered under a name of their own.
+
+- [Globals](/docs/standard-library/globals) — type checks and conversions, table traversal, metatables, error handling, loading code, printing, and the collector
+
+## Working with values
+
+The four libraries that operate on what a program is already holding, rather than on
+anything outside it.
+
+- [`string`](/docs/standard-library/string) — searching, cutting, formatting, and reading or writing raw bytes
+- [`table`](/docs/standard-library/table) — tables used as lists: adding, removing, ordering, copying and reading them out
+- [`math`](/docs/standard-library/math) — rounding, roots and logarithms, trigonometry, pseudo-random numbers, and the limits worth naming
+- [`utf8`](/docs/standard-library/utf8) — treating the bytes of a string as UTF-8 characters, on the lines that have it
+
+## Reaching outside the program
+
+- [`io`](/docs/standard-library/io) — reading and writing files, the handles a program holds, and the three streams it starts with
+- [`os`](/docs/standard-library/os) — the clock and the calendar, files by name, the environment, the shell, the locale, and the way out
+
+## Structuring a program
+
+- [`coroutine`](/docs/standard-library/coroutine) — a line of execution that can stop part-way through, hand control back, and be resumed where it left off
+- [`package`](/docs/standard-library/package) — what sits behind `require()`: where a module is looked for, what is already loaded, and the searchers that do the work
+
+## Looking inside a running one
+
+- [`debug`](/docs/standard-library/debug) — the call stack, the variables a call and a closure are holding, and metatables the ordinary calls will not touch
+
+## See also
+
+- [The reference manual, §6](https://www.lua.org/manual/5.5/manual.html#6) — the passage every entry on this site was written from
+- [Playground](/playground) — somewhere to run any of it without leaving the browser

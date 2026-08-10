@@ -77,19 +77,19 @@ async function authoredCount(dir: string): Promise<number> {
 }
 
 describe('the authored corpus', () => {
-  it('is 182 of the 292 pages under content/docs', async () => {
+  it('is 183 of the 292 pages under content/docs', async () => {
     // Moves as content lands. Update it deliberately — a drop is a regression in the
-    // predicate, not noise.
-    expect(await authoredCount('content/docs')).toBe(182);
+    // predicate, not noise. 182 before the Standard Library front door was written.
+    expect(await authoredCount('content/docs')).toBe(183);
   });
 
   it('is both blog posts', async () => {
     expect(await authoredCount('content/blog')).toBe(2);
   });
 
-  it('totals 187 sitemap URLs with the standalone routes', async () => {
+  it('totals 188 sitemap URLs with the standalone routes', async () => {
     const docs = await authoredCount('content/docs');
     const blog = await authoredCount('content/blog');
-    expect(docs + blog + STANDALONE_URLS.length).toBe(187);
+    expect(docs + blog + STANDALONE_URLS.length).toBe(188);
   });
 });
