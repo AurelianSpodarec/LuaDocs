@@ -113,11 +113,19 @@ afterwards.
 
 A loop left early does not close it. A `break`, a `return` out of the loop, and something
 inside the body raising all leave the file open, and leave the program with nothing to write
-`:close()` on: what came back was an iterator and nothing else. The file is not beyond reach
-— the iterator is holding it, and
-[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) will hand it back — but that
-is a rescue rather than a way to write a program. Left alone, what closes the file is the
-collector, at a moment nothing in the program decides.
+`:close()` on: what came back was an iterator and nothing else. Left alone, what closes the
+file is the collector, at a moment nothing in the program decides.
+
+<Only since="5.2">
+
+The file is not quite beyond reach. The iterator is a function written in C, and the file is
+one of the values it is
+[carrying](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries), so the
+debug library can read it back off the iterator. Which position it sits in is the
+implementation's business rather than a documented one, which is part of why that is a rescue
+rather than a way to write a program.
+
+</Only>
 
 So a loop that might not reach the end of the file is the case this call does not cover.
 [`io.open()`](/docs/standard-library/io/open) and
