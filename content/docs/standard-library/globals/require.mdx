@@ -73,13 +73,13 @@ it may not have wraps the call in [`pcall()`](/docs/standard-library/globals/pca
 
 ## How a module is found
 
-`package.searchers` is a list of search functions, tried in order. Each one is handed the
+[`package.searchers`](/docs/standard-library/package/searchers) is a list of search functions, tried in order. Each one is handed the
 module name and either answers with a *loader* — the function that will actually produce the
 module — or explains why it could not. The first one to answer wins, and its loader is then
 called with the module name and with whatever extra value the searcher supplied alongside it.
 What the loader hands back is the module. Lua fills that list with four searchers:
 
-- *Loaders registered by hand.* `package.preload` is a table keyed by module name, and a
+- *Loaders registered by hand.* [`package.preload`](/docs/standard-library/package/preload) is a table keyed by module name, and a
   function stored there is taken as the loader with nothing read from disk. It is how a module
   can be built into a program that has no filesystem to search.
 - *Lua files, through [`package.path`](/docs/standard-library/package/path).* That is a string of templates separated by semicolons,
@@ -108,7 +108,7 @@ rather than a bare complaint.
 
 ## What gets remembered
 
-`package.loaded` is the record: a table keyed by module name, holding what each loaded module
+[`package.loaded`](/docs/standard-library/package/loaded) is the record: a table keyed by module name, holding what each loaded module
 produced. This call consults it before it searches for anything, and writes to it once the
 loader has finished.
 

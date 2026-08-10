@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.2" } },
+  "changed_in": {
+    "5.4": "The second value a searcher hands back alongside its loader now reaches the caller as well: `require()` returns it as a second result, where before it went only to the loader. The first searcher, which had handed back no second value at all, now hands back the string `\":preload:\"`."
+  }
+}

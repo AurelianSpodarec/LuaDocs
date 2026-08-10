@@ -153,6 +153,10 @@ import ioLibrary from './data/io.library.json';
 import packagePath from './data/package.path.json';
 import packageCpath from './data/package.cpath.json';
 import packageConfig from './data/package.config.json';
+import packageLoaded from './data/package.loaded.json';
+import packagePreload from './data/package.preload.json';
+import packageSearchers from './data/package.searchers.json';
+import packageLoaders from './data/package.loaders.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -1617,6 +1621,90 @@ const raw: Record<string, unknown> = {
   'package.path': packagePath,
   'package.cpath': packageCpath,
   'package.config': packageConfig,
+
+  // ## `package.loaded`, `package.preload`, `package.searchers`, `package.loaders`
+  //
+  // ### The rename, and why it is two entries
+  //
+  // 5.2 §8.2: *"The table `package.loaders` was renamed `package.searchers`."* One sentence,
+  // no parenthesis, no compatibility clause — and *renamed* asserts that the old spelling no
+  // longer names anything, exactly as `unpack`'s "must be called as `table.unpack`" does. So
+  // the settled removal ruling gives `package.loaders` `version_removed: "5.2"` and
+  // `package.searchers` `version_added: "5.2"`, and the pair is modelled the way
+  // `unpack`/`table.unpack` already is: the retired name takes the removal fork and names its
+  // successor undated in prose, the surviving name takes an ordinary `version_added` and names
+  // its predecessor undated in a `<Note>`. Each link's target carries the dated surface for the
+  // other name, which is what keeps both pages honest without either naming a version.
+  //
+  // **The build axis disagrees at 5.2 and the manual wins.** `loadlib.c` keeps a
+  // `#if defined(LUA_COMPAT_LOADERS)` alias — `package.loaders` pointing at the same table as
+  // `package.searchers` — from `v5.2.0` through `v5.3.6`, and it is gone from `v5.4.0` on.
+  // 5.2's `luaconf.h` defines that flag under `LUA_COMPAT_ALL` and 5.2's shipped makefile
+  // passes `-DLUA_COMPAT_ALL`, so **a stock 5.2 build has `package.loaders`**; 5.3's
+  // `luaconf.h` defines it only under `LUA_COMPAT_5_1` while 5.3's makefile passes
+  // `-DLUA_COMPAT_5_2`, so a stock 5.3 build does not. No manual in scope names
+  // `LUA_COMPAT_LOADERS` (all five grepped for `LUA_COMPAT_[A-Z0-9_]*`: 5.1's six, nothing in
+  // 5.2–5.4, `LUA_COMPAT_GLOBAL` in 5.5), so per T4's and M6's precedent the compatibility
+  // route stays out of the prose. The residual is `table.maxn`'s, pointing the other way.
+  //
+  // ### The three real boundaries, each clean at the minor line
+  //
+  // Established by diffing whole `loadlib.c` files across **26 artefacts** — every release tag
+  // from `v5.1` to `v5.5.1` plus shipped 5.1.5 and 5.2.4 from `lua.org/source` — not by
+  // extrapolating from the two ends.
+  //
+  //   1. **5.2 — `package.preload` became a reference.** 5.1's preload searcher reads
+  //      `lua_getfield(L, LUA_ENVIRONINDEX, "preload")`, which is the field on the `package`
+  //      table, and raises where it is not a table; from `v5.2.0` it reads the registry
+  //      (`"_PRELOAD"`, spelled `LUA_PRELOAD_TABLE` from `v5.3.4` with the same value). So
+  //      replacing the field worked on 5.1 and does nothing after. The manual states it from
+  //      the other side at exactly 5.2 — the *"only a reference to the real table"* sentence
+  //      appears on `pdf-package.preload` from 5.2 on. Both axes agree.
+  //   2. **5.2 — a searcher hands back a second value.** `lua_call(L, 1, 1)` at all three 5.1
+  //      artefacts, `lua_call(L, 1, 2)` at all 23 later ones. This is `globals.require`'s
+  //      `changed_in["5.2"]` seen from the table's side, and it is why `package.loaders`'
+  //      base prose describes a searcher answering with a loader alone.
+  //   3. **5.4 — `":preload:"`.** `searcher_preload` ends `return 1;` through `v5.3.6` and
+  //      `return 2;` with `lua_pushliteral(L, ":preload:")` from `v5.4.0`; the manual moves
+  //      with it, from *"The first searcher returns no extra value"* to *"always returns the
+  //      string `\":preload:\"`"*. It rides in `package.searchers`' one note together with
+  //      `require()` gaining a second result, which is the same version and the same sentence
+  //      of `pdf-package.searchers`.
+  //
+  // Patch-level diffs were read rather than assumed: nothing at `v5.2.0`→`v5.2.1` (the CLIBS
+  // rewrite), `v5.3.3`→`v5.3.4` (the `_PRELOAD`/`_LOADED` macros, same strings),
+  // `v5.4.2`→`v5.4.3` (`l_unlikely`), `v5.4.4`→`v5.4.5` (formatting) or `v5.5.0`→`v5.5.1`
+  // (`luaL_loadfilex`) touches any of these four.
+  //
+  // ### The two `changed_in` notes that are deliberately absent
+  //
+  // **`package.loaded` carries none.** Its *"only a reference"* sentence also arrives at 5.2,
+  // and unlike `preload`'s it is documentation catching up: 5.1's `ll_require` already reads
+  // `lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED")` while `luaopen_package` puts that very
+  // table into the field, so assigning over `package.loaded` never changed what `require()`
+  // reads. A note here would be the `string.gsub` trap ADR 0010 records, and would have told
+  // every 5.1 reader that something moved under them that did not.
+  //
+  // **Nothing dates 5.4's registry-key sentence** (*"stored in the C registry … indexed by the
+  // key `LUA_LOADED_TABLE`"*, likewise `LUA_PRELOAD_TABLE`). Both macros are `"_LOADED"` and
+  // `"_PRELOAD"` from `v5.3.4` and both strings are what the code used before the macros
+  // existed; the sentence is the C API's, not the field's, and no page states the key names.
+  //
+  // ### What is in the manuals and what is not
+  //
+  // `package.loaders` is named in exactly two places across all five manuals — 5.1's own entry
+  // plus `pdf-require`, and 5.2 §8.2's rename sentence. 5.3's, 5.4's and 5.5's chapter 8 say
+  // nothing about any of these four; 5.3 §8.2's one nearby item is the C searcher's versioned
+  // names, which `globals.require` already dates at 5.2 on that chapter's own closing
+  // parenthesis. Two further wording moves are *not* recorded: `pdf-require`'s preload value
+  // goes from *"should be a function"* (5.1, 5.2) to *"must be a function"* (5.3 on) while
+  // nothing has ever checked it — a non-function is passed over in silence at all 26 artefacts
+  // — and 5.4 rewords `pdf-package.searchers` from *"how to load modules"* to *"how to find
+  // modules"* and from file *name* to file *path*.
+  'package.loaded': packageLoaded,
+  'package.preload': packagePreload,
+  'package.searchers': packageSearchers,
+  'package.loaders': packageLoaders,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

@@ -1,8 +1,109 @@
 ---
 title: package.loaders
-description: ""
+description: The earlier name of the list of search functions require() works through when it is asked for a module.
+lua-compat: package.loaders
 entry-type: constant
 source: https://www.lua.org/manual/5.1/manual.html#pdf-package.loaders
 ---
 
-{/* Not yet written. */}
+The list of *searchers* [`require()`](/docs/standard-library/globals/require) works through when
+it is asked for a module it has not loaded. This is the earlier name of
+[`package.searchers`](/docs/standard-library/package/searchers): one table under two spellings
+rather than two lists that resemble each other, so code carrying this name wants the other one
+put in its place — with one thing worth re-reading while it is being changed, because what a
+searcher hands back on success grew a second value.
+
+<RunnableExample usesEntry={false} code={`local built_in_modules = {\n  package_loaders_example_colours = { warning = "amber" },\n}\n\nlocal function built_in_searcher(module_name)\n  local module_value = built_in_modules[module_name]\n  if not module_value then\n    return "not built into this program"\n  end\n  return function() return module_value end\nend\n\nlocal loader = built_in_searcher("package_loaders_example_colours")\nprint(loader("package_loaders_example_colours").warning)\nprint(type(built_in_searcher("package_loaders_example_missing")))\n-- Expected output:\n-- amber\n-- string`} />
+
+<Note>
+Nothing on this page reads the field under this name. The examples run on a Lua that reaches the
+list under its later spelling, so the two that install a searcher ask for whichever of the two
+names is there. What they show about how a searcher is written holds under both.
+</Note>
+
+## Value
+
+A list of plain functions in the numbered positions of an ordinary table, four of them to start
+with. Lua reads the field at the moment a search begins rather than holding on to the list it was
+given, so writing into the table and assigning a different table over the field both take effect.
+
+The order is the meaning. The searcher at position `1` is tried first and the rest in ascending
+order, and the first to answer with a loader ends the search; nothing further down is consulted,
+whatever it might have found. Lua fills the list with four: loaders registered by hand in
+[`package.preload`](/docs/standard-library/package/preload), Lua files through
+[`package.path`](/docs/standard-library/package/path), C libraries through
+[`package.cpath`](/docs/standard-library/package/cpath), and one C library holding several
+submodules.
+
+## What a searcher is handed, and what it hands back
+
+A searcher is called with one argument, the module name, spelled exactly as it was asked for. It
+answers in one of two ways: with a *loader*, the function that will actually produce the module,
+or with a string saying why it found nothing — or with nothing at all, where it has nothing worth
+saying. The strings are collected as the search goes on, and where no searcher answers with a
+loader they are what the failure `require()` raises is built from.
+
+The loader is then called with the module name, and what it hands back becomes the module. That
+two-step shape — find, then load — is what lets a searcher decide *where* a module comes from
+without deciding *what* it is.
+
+Nothing runs a searcher under protection, so one that raises stops the whole call rather than
+being passed over, and the searchers behind it are never asked.
+
+## Moving to the name it has now
+
+The rename is the whole of the change on this side: the table, its contents, their order and the
+way `require()` walks them are the same under both names, so putting the other spelling in place
+of this one leaves the rest of the code alone.
+
+What is worth checking while the edit is being made is any searcher the program supplies itself.
+Under the newer name a searcher hands back a second value alongside its loader, and the loader
+receives that value as an argument after the module name; a searcher written against this page
+hands back the loader alone.
+[`package.searchers`](/docs/standard-library/package/searchers) is where that second value and
+what becomes of it are set out. Handing back only a loader keeps working under the newer name —
+the second value simply arrives as nothing — so the rename is safe to make on its own, and
+supplying the second value is a separate improvement rather than a condition of it.
+
+## Examples
+
+### Putting a searcher of your own in the list
+
+<RunnableExample usesEntry={false} code={`local searchers = package.searchers or package.loaders\n\ntable.insert(searchers, function(module_name)\n  if module_name ~= "package_loaders_example_stamps" then\n    return "not one of ours"\n  end\n  return function() return { second_class = 85 } end\nend)\n\nprint(require("package_loaders_example_stamps").second_class)\n\ntable.remove(searchers)\npackage.loaded["package_loaders_example_stamps"] = nil\nprint(#searchers)\n-- Expected output:\n-- 85\n-- 4`} />
+
+Added at the end, the searcher is reached only after the four Lua supplied have all declined —
+which is what makes it a fallback rather than an override. Putting the list back afterwards
+matters as much as adding to it: this is one list shared by every module the program will ever
+load.
+
+### The one nearest the front wins
+
+<RunnableExample usesEntry={false} code={`local searchers = package.searchers or package.loaders\n\nlocal function answering_searcher(answer)\n  return function()\n    return function() return { source = answer } end\n  end\nend\n\ntable.insert(searchers, answering_searcher("the one added last"))\ntable.insert(searchers, 1, answering_searcher("the one added first"))\n\nprint(require("package_loaders_example_rota").source)\n\ntable.remove(searchers, 1)\ntable.remove(searchers)\npackage.loaded["package_loaders_example_rota"] = nil\nprint(#searchers)\n-- Expected output:\n-- the one added first\n-- 4`} />
+
+Two searchers that would both have answered, and only the one in front was asked. Position
+decides, so a searcher meant to take precedence over the paths goes in at `1` and one meant as a
+last resort goes on the end.
+
+## Gotchas
+
+<Gotcha title="A string answer is an explanation, not a refusal">
+Handing back a string does not end the search — it adds a line to the report `require()` will
+raise if nothing else answers. A searcher that means to say *this module is not mine* says it by
+handing back a string, or by handing back nothing at all, and either way the next position is
+tried. The only answer that ends a search is a function.
+</Gotcha>
+
+<Gotcha title="Changing the list does not reach a module already loaded">
+[`package.loaded`](/docs/standard-library/package/loaded) is consulted before any searcher is,
+so a module the record already counts as loaded comes back from the record and this list is never
+read. A searcher added to take over a module has to be added before anything asks for that
+module, or the record entry has to be cleared as well.
+</Gotcha>
+
+## See also
+
+- [`package.searchers`](/docs/standard-library/package/searchers) — the name this same list is reached under now, and where a searcher's second answer is set out
+- [`require()`](/docs/standard-library/globals/require) — the call that works through this list, and where [how a module is found](/docs/standard-library/globals/require#how-a-module-is-found) is set out
+- [`package.preload`](/docs/standard-library/package/preload) — the table the first searcher reads
+- [`package.path`](/docs/standard-library/package/path) — the templates the second searcher runs through
+- [`package.loaded`](/docs/standard-library/package/loaded) — the record consulted before this list is

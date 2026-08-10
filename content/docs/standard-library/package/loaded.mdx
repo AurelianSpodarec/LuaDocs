@@ -1,8 +1,123 @@
 ---
 title: package.loaded
-description: ""
+description: The table require() keeps its record in — one entry per module already loaded, holding what that module produced.
+lua-compat: package.loaded
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.loaded
 ---
 
-{/* Not yet written. */}
+The record [`require()`](/docs/standard-library/globals/require) keeps: a table keyed by module
+name, holding what each module that has been loaded produced. It is consulted before any
+searching happens, so a name the record already counts as loaded is answered from it rather than
+looked for again.
+
+<RunnableExample code={`local rates_path = "package_loaded_example_rates.lua"\nlocal module_file = assert(io.open(rates_path, "w"))\nmodule_file:write("return { first_class = 12 }")\nmodule_file:close()\n\nlocal postage = require("package_loaded_example_rates")\nprint(package.loaded["package_loaded_example_rates"] == postage)\nprint(postage.first_class)\n\npackage.loaded["package_loaded_example_rates"] = nil\nos.remove(rates_path)\n-- Expected output:\n-- true\n-- 12`} />
+
+<Note>
+The examples here run against a sandbox with its own in-memory filesystem, so the ones that
+need a module file write one first, then remove it and clear the record the load left behind.
+Nothing on this page reads or writes a file on your own machine.
+</Note>
+
+## Value
+
+An ordinary table. Its keys are module names written exactly as they were asked for, and its
+values are whatever each of those modules produced — usually a table of functions, sometimes
+`true` where the module produced nothing of its own.
+
+Reading this field hands over the table itself rather than a copy, so writing an entry into it,
+or clearing one, changes what `require()` will find. Assigning a whole new table over the
+field is the operation that does *not* work: the field points at a table Lua holds elsewhere,
+and replacing the pointer leaves that table where it was.
+
+## What is already in it
+
+A program does not start with an empty record. The libraries the host opened are in it under
+their own names before the first line runs, each holding the library table itself — so
+`package.loaded.string` and the global `string` are two names for one value, and
+`require("string")` hands back that same table rather than building a second one.
+
+Which libraries those are is the host's decision rather than the language's. An interpreter
+that opens fewer of them starts with fewer entries here, and a host that means a library to be
+loaded only if it is asked for puts a loader in
+[`package.preload`](/docs/standard-library/package/preload) instead of loading it up front.
+
+## Writing to it yourself
+
+What `require()` puts here, and when, belongs to the call rather than to the table.
+[What gets remembered](/docs/standard-library/globals/require#what-gets-remembered) sets that out
+in full: what a module's own `return` decides, what happens where it returns nothing, and the one
+value the record does not count as loaded.
+
+The other direction belongs here. Because the record is an ordinary table, a program can write to
+it without going through `require()` at all:
+
+- *Writing an entry* settles what a module is before anybody asks. The record is the first place
+  looked, so a name whose entry the record counts as loaded needs no file anywhere. This is the
+  seam a test uses to put something predictable in front of something slow or absent.
+- *Clearing an entry* puts a module back to being unloaded as far as `require()` is concerned.
+  The next mention of that name searches again and runs the module again.
+
+## Examples
+
+### Standing in for a module that has no file
+
+<RunnableExample code={`package.loaded["package_loaded_example_clock"] = {\n  now = function() return "09:30" end,\n}\n\nprint(require("package_loaded_example_clock").now())\n\npackage.loaded["package_loaded_example_clock"] = nil\n-- Expected output: 09:30`} />
+
+The entry was written before anything read it, so the module was settled before it was asked
+for: nothing was searched for and no file had to exist, because looking here is the first thing
+the call does.
+
+### Clearing an entry makes the module load again
+
+<RunnableExample code={`local counter_path = "package_loaded_example_counter.lua"\nlocal module_file = assert(io.open(counter_path, "w"))\nmodule_file:write("package_loaded_example_runs = (package_loaded_example_runs or 0) + 1 return { runs = package_loaded_example_runs }")\nmodule_file:close()\n\nrequire("package_loaded_example_counter")\nrequire("package_loaded_example_counter")\nprint(package_loaded_example_runs)\n\npackage.loaded["package_loaded_example_counter"] = nil\nprint(require("package_loaded_example_counter").runs)\n\npackage_loaded_example_runs = nil\npackage.loaded["package_loaded_example_counter"] = nil\nos.remove(counter_path)\n-- Expected output:\n-- 1\n-- 2`} />
+
+Two calls, one run: the second read the record. Clearing the entry and asking a third time ran
+the module's body over again, which is how a program picks up a module that has been rewritten
+on disk while it was running.
+
+### The standard libraries are in the record already
+
+<RunnableExample code={`print(package.loaded.string == string)\nprint(package.loaded.table == table)\n-- Expected output:\n-- true\n-- true`} />
+
+Each of them is in the record under its own name, holding the library table itself rather than a
+copy of it — the same table the global of that name holds. That is why `require("table")` costs
+nothing, and why an entry of your own written over one of those names becomes what a later
+`require()` of that name hands over.
+
+## Gotchas
+
+<Gotcha title="Replacing the whole table changes nothing">
+Writing into this table works; writing *over* it does not. The table `require()` reads is held
+somewhere a program cannot reach, and this field is a second name for it — so a new table
+assigned here is a table nothing consults, and the record carries on being what it was.
+
+<RunnableExample code={`local real_record = package.loaded\npackage.loaded = {}\npackage.loaded["package_loaded_example_gauge"] = { reading = 4 }\nlocal found = pcall(require, "package_loaded_example_gauge")\npackage.loaded = real_record\n\nprint(found)\nprint(package.loaded["package_loaded_example_gauge"])\n-- Expected output:\n-- false\n-- nil`} />
+
+The entry written into the substitute was never looked at, so the call searched for a module
+with no file and failed. Clearing this field rather than replacing it is worse still: it takes
+the record away from the reader without taking it away from the call.
+</Gotcha>
+
+<Gotcha title="Clearing an entry does not unload anything">
+It only takes the module out of the record. Globals the module set stay set, files it opened
+stay open, and every name already bound to the value it produced still holds that value. The
+next call naming the module gets whatever running the body again produces, over whatever the
+first run left behind — so where a module builds something new each time it runs, two copies of
+what was meant to be one shared thing end up in circulation at once.
+</Gotcha>
+
+<Gotcha title="It is one record for the whole program">
+Every piece of code in the program shares this table, which is the point of it and the risk in
+it. A library that clears an entry to force its own dependency to reload forces it to reload
+for everybody, and a library that writes an entry to stand something in has stood it in for
+everybody. Both are reasonable in a test and hard to justify in code that ships.
+</Gotcha>
+
+## See also
+
+- [`require()`](/docs/standard-library/globals/require) — the call that reads this record and writes to it
+- [`package.preload`](/docs/standard-library/package/preload) — loaders registered by hand, the first place looked once the record has nothing to answer with
+- [`package.searchers`](/docs/standard-library/package/searchers) — the list of search functions worked through when nothing here answers
+- [`package.path`](/docs/standard-library/package/path) — the templates the search for a Lua module runs through
+- [`dofile()`](/docs/standard-library/globals/dofile) — running a file every time it is named, with nothing recorded here

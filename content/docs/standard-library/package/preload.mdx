@@ -1,8 +1,127 @@
 ---
 title: package.preload
-description: ""
+description: A table of loaders registered by hand, keyed by module name, looked in before anything is searched for on disk.
+lua-compat: package.preload
 entry-type: constant
 source: https://www.lua.org/manual/5.5/manual.html#pdf-package.preload
 ---
 
-{/* Not yet written. */}
+A table of *loaders* a program registers for itself, keyed by module name. The first of the
+search functions [`require()`](/docs/standard-library/globals/require) tries looks here, so a
+name with a loader in this table is answered without a path being read or a file being opened.
+
+<RunnableExample code={`package.preload["package_preload_example_units"] = function()\n  return { millimetres_per_inch = 25.4 }\nend\n\nlocal units = require("package_preload_example_units")\nprint(units.millimetres_per_inch)\n\npackage.loaded["package_preload_example_units"] = nil\npackage.preload["package_preload_example_units"] = nil\n-- Expected output: 25.4`} />
+
+<Note>
+The examples here run against a sandbox shared with the rest of the site, so each one clears
+the entry it registered and the record its load left behind. A page that leaves either in place
+changes what the next example sees.
+</Note>
+
+## Value
+
+An ordinary table. A stock interpreter starts with nothing in it; a host that embeds Lua may
+arrive with entries already registered. Each key is a module name, written exactly as it will be
+asked for, and each value is a *loader*: a function that will be called to produce the module.
+The loader is handed the module name it was asked for, and what it hands back becomes the
+module.
+
+The loader is not the module — it is the thing that builds it. What it builds goes into
+[`package.loaded`](/docs/standard-library/package/loaded), and calls after that read the record
+rather than coming back here, so a loader that stays registered runs only when the record has
+nothing it counts as loaded under that name. Storing the module value itself here, instead of a
+function that produces it, does not shorten that route — nothing calls it and nothing complains.
+The Gotchas below say what happens instead.
+
+Reading this field hands over the table itself, so writing entries into it is how it is used.
+Assigning a whole new table over the field is the operation that does not work, because the
+field points at a table Lua holds elsewhere.
+
+## What it is for
+
+Registering a loader by hand is how a module gets into a program that has nothing to search.
+An interpreter embedded in an application may have no filesystem worth the name, or a
+deliberately empty [`package.path`](/docs/standard-library/package/path); a loader here still
+answers, because the first search function never reads a path.
+
+That makes it the natural home for three things:
+
+- *Modules compiled into the program.* A host that ships its Lua code inside its own binary
+  registers a loader for each one, and the `require()` calls in that code work unchanged.
+- *Modules built rather than read.* A loader is a function, so a module can be generated on the
+  spot from configuration, from a database, or from an archive that never touches the disk.
+- *Standing in during a test.* A loader here takes precedence over anything the paths would
+  find, so a slow or absent dependency can be replaced without moving a file. The blunter
+  version of the same trick writes straight into
+  [`package.loaded`](/docs/standard-library/package/loaded), which skips the loader too.
+
+## How it is reached
+
+[`package.searchers`](/docs/standard-library/package/searchers) is the list of search functions
+`require()` works through, and this table is what its first entry reads. That ordering is the
+whole of the relationship: because that searcher is first, a name with a loader here is found
+before [`package.path`](/docs/standard-library/package/path) or
+[`package.cpath`](/docs/standard-library/package/cpath) is consulted, and a module file of the
+same name sitting on the path is never opened.
+
+Whatever else that searcher hands on to `require()` alongside the loader is set out under
+[`package.searchers`](/docs/standard-library/package/searchers). A loader written here is free
+to ignore it, and most do — the module name is the argument that matters.
+
+## Examples
+
+### The entry stays, and serves again once the record is cleared
+
+<RunnableExample code={`local builds = 0\npackage.preload["package_preload_example_palette"] = function()\n  builds = builds + 1\n  return { ink = "indigo" }\nend\n\nrequire("package_preload_example_palette")\nrequire("package_preload_example_palette")\nprint(builds)\nprint(package.preload["package_preload_example_palette"] ~= nil)\n\npackage.loaded["package_preload_example_palette"] = nil\nprint(require("package_preload_example_palette").ink)\nprint(builds)\n\npackage.loaded["package_preload_example_palette"] = nil\npackage.preload["package_preload_example_palette"] = nil\n-- Expected output:\n-- 1\n-- true\n-- indigo\n-- 2`} />
+
+Two calls built the module once, because the second read the record. Registering a loader does
+not consume it: the entry is still here afterwards, so clearing the record is enough to have it
+run again.
+
+### One loader, several names
+
+<RunnableExample code={`local function greeting_module(module_name)\n  return { greet = function() return "hello from " .. module_name end }\nend\n\npackage.preload["package_preload_example_english"] = greeting_module\npackage.preload["package_preload_example_pirate"] = greeting_module\n\nprint(require("package_preload_example_english").greet())\nprint(require("package_preload_example_pirate").greet())\n\npackage.loaded["package_preload_example_english"] = nil\npackage.loaded["package_preload_example_pirate"] = nil\npackage.preload["package_preload_example_english"] = nil\npackage.preload["package_preload_example_pirate"] = nil\n-- Expected output:\n-- hello from package_preload_example_english\n-- hello from package_preload_example_pirate`} />
+
+The loader is told which name it is answering for, so one function can serve a family of them.
+Each name gets its own record entry, so the two modules are separate values even though one
+function built both.
+
+## Gotchas
+
+<Gotcha title="A value here that is not a function is passed over in silence">
+The entry is meant to be the loader, and nothing checks that it is one. A table stored here —
+the module itself, say, rather than something that builds it — is neither called nor complained
+about: the searcher offers it, the offer is not taken, and the search carries on to the paths as
+though the name had never been registered. Storing a module value directly is a job for
+[`package.loaded`](/docs/standard-library/package/loaded).
+
+<RunnableExample code={`local module_path = "package_preload_example_ledger.lua"\nlocal module_file = assert(io.open(module_path, "w"))\nmodule_file:write("return { source = 'a file on the path' }")\nmodule_file:close()\n\npackage.preload["package_preload_example_ledger"] = { source = "the preload table" }\n\nprint(require("package_preload_example_ledger").source)\n\npackage.loaded["package_preload_example_ledger"] = nil\npackage.preload["package_preload_example_ledger"] = nil\nos.remove(module_path)\n-- Expected output: a file on the path`} />
+
+A string stored here behaves differently again, and just as quietly: a searcher answering with a
+string is understood to be explaining why it found nothing, so the text goes into the report
+`require()` builds when nothing else answers either.
+</Gotcha>
+
+<Gotcha title="Registering after the module has loaded changes nothing">
+The record is read before any search, so a loader registered for a name
+[`package.loaded`](/docs/standard-library/package/loaded) already counts as loaded is never
+reached. Code that means to take over a module somebody has already required has to clear that
+record entry as well as register the loader — and clearing it does not undo whatever the first
+load did.
+</Gotcha>
+
+<Gotcha title="Replacing the whole table does not move the search">
+This field is a second name for a table Lua holds elsewhere, so a fresh table assigned over it
+is a table the searcher never reads. Clearing the field is just as inert: the searcher goes on
+reading the table it always read, and the only thing that changes is what code reading
+`package.preload` can see. Registering entries in the table that is already here is what takes
+effect; the field itself is best left alone.
+</Gotcha>
+
+## See also
+
+- [`require()`](/docs/standard-library/globals/require) — the call whose first searcher looks here
+- [`package.searchers`](/docs/standard-library/package/searchers) — the list whose first entry reads this table
+- [`package.loaded`](/docs/standard-library/package/loaded) — the record a loaded module lands in, and the blunter way to stand a module in
+- [`package.path`](/docs/standard-library/package/path) — the templates consulted when nothing here answers
+- [`load()`](/docs/standard-library/globals/load) — compiling a module's source into the function that can serve as its loader

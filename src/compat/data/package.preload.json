@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "This field became a reference to a table held out of the program's reach, so assigning a whole new table over it stopped changing where loaders are looked for. Earlier versions read the field itself at every search, so replacing it worked — and emptying it did too, in the wrong direction: a field holding anything other than a table made the next search raise instead of searching."
+  }
+}
