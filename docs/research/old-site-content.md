@@ -8,10 +8,11 @@ Structure only. Per [ADR 0003](../adr/0003-dual-license-prose-and-code.md) and
 [ADR 0010](../adr/0010-entries-are-written-from-the-manual.md) no prose is carried over
 from it — the old site is not a source for claims, only for shape.
 
-**The headline: it teaches us one thing.** A first pass through this comparison found two,
-and the second was wrong in the site's favour. The correction is recorded below rather than
-deleted, because the mistake is instructive: the gap looked obvious and the entry was
-already complete.
+**The headline: it teaches us two things.** A first pass found two, one of which was wrong in
+the site's favour; the correction is recorded below rather than deleted, because the mistake
+is instructive — the gap looked obvious and the entry was already complete. A later pass,
+prompted by looking at the old page rather than reading a summary of it, found a real second
+one that the summary had thrown away.
 
 ## Confidence
 
@@ -51,6 +52,36 @@ this reads") rather than this entry. A reader arriving cold from a search engine
 neither.
 
 This is the whole of what the old site has and we do not.
+
+## What it does better, 2: the name is boxed and the type is not
+
+On `string.pack`, the old site draws `format` in a **bordered pill** — rounded, mono, its own
+box — with `string` in muted mono beside it, unboxed. Ours renders both as plain text.
+
+Copying it is worth it for a reason the old site probably did not intend. Under
+[ADR 0013](../adr/0013-the-body-of-a-reference-entry.md) a parameter row carries four things
+— name, type, optional, default — and with no anchor the eye must work out where the name
+stops. The pill also removes the one genuine ambiguity in the plain version, which the
+rendered comparison on `/demo/entry-body` shows directly: a row whose name and type are the
+same word reads as
+
+```
+table table
+```
+
+— two words with no visual grammar. Its raw text content is literally `tabletable`. Boxed, it
+is a labelled thing with its type beside it, and the ambiguity is gone without renaming
+anything.
+
+That is load-bearing for ADR 0013's amended rule 3. Library and type names are *discouraged,
+not forbidden*, and `table` stays permitted where no better word exists — a permission that
+only survives contact with a reader if the name is visually distinguishable from its type.
+
+**Method note.** This was missed on the first pass because that pass read a summarising fetch
+of the page, which reports structure and discards presentation. It was found by looking at
+the page. The same failure produced the `string.format` error below, from the same cause:
+substituting a description of an artefact for the artefact. That is the argument for
+[ADR 0015](../adr/0015-rendered-before-ratified.md) arriving twice in one afternoon.
 
 ## The correction: `string.format` was not a gap
 
@@ -161,6 +192,8 @@ the example is whatever the example earned.
 
 - **A Use cases section, and the prose-economy rule** →
   [ADR 0013](../adr/0013-the-body-of-a-reference-entry.md).
+- **The boxed name treatment** → rendered both ways on `/demo/entry-body`; wants folding into
+  ADR 0013 once picked.
 - **The four vocabulary forms, and `string.pack`'s discoverability** →
   [ADR 0014](../adr/0014-where-a-closed-vocabulary-lives.md).
 - **`%F` in `string.format`** → unverified; needs a vendored manual.
