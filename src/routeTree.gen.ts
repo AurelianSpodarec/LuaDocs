@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DemoRouteImport } from './routes/demo'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as PlaygroundRouteImport } from './routes/playground'
@@ -19,17 +18,17 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
+import { Route as DemoIndexRouteImport } from './routes/demo/index'
+import { Route as DemoEntryBodyRouteImport } from './routes/demo/entry-body'
+import { Route as DemoEntryLengthRouteImport } from './routes/demo/entry-length'
+import { Route as DemoExampleLabelRouteImport } from './routes/demo/example-label'
+import { Route as DemoKitchenSinkRouteImport } from './routes/demo/kitchen-sink'
 import { Route as DocsSplatRouteImport } from './routes/docs/$'
 import { Route as DocsChar123Char125DotmdRouteImport } from './routes/docs/{$}[.]md'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoRoute = DemoRouteImport.update({
-  id: '/demo',
-  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LlmsFullDottxtRoute = LlmsFullDottxtRouteImport.update({
@@ -72,6 +71,31 @@ const BlogSlugRoute = BlogSlugRouteImport.update({
   path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemoIndexRoute = DemoIndexRouteImport.update({
+  id: '/demo/',
+  path: '/demo/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoEntryBodyRoute = DemoEntryBodyRouteImport.update({
+  id: '/demo/entry-body',
+  path: '/demo/entry-body',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoEntryLengthRoute = DemoEntryLengthRouteImport.update({
+  id: '/demo/entry-length',
+  path: '/demo/entry-length',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoExampleLabelRoute = DemoExampleLabelRouteImport.update({
+  id: '/demo/example-label',
+  path: '/demo/example-label',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoKitchenSinkRoute = DemoKitchenSinkRouteImport.update({
+  id: '/demo/kitchen-sink',
+  path: '/demo/kitchen-sink',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsSplatRoute = DocsSplatRouteImport.update({
   id: '/docs/$',
   path: '/docs/$',
@@ -85,7 +109,6 @@ const DocsChar123Char125DotmdRoute = DocsChar123Char125DotmdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/demo': typeof DemoRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/playground': typeof PlaygroundRoute
@@ -93,13 +116,17 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/search': typeof ApiSearchRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/demo/entry-body': typeof DemoEntryBodyRoute
+  '/demo/entry-length': typeof DemoEntryLengthRoute
+  '/demo/example-label': typeof DemoExampleLabelRoute
+  '/demo/kitchen-sink': typeof DemoKitchenSinkRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog/': typeof BlogIndexRoute
+  '/demo/': typeof DemoIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/demo': typeof DemoRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/playground': typeof PlaygroundRoute
@@ -107,14 +134,18 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/search': typeof ApiSearchRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/demo/entry-body': typeof DemoEntryBodyRoute
+  '/demo/entry-length': typeof DemoEntryLengthRoute
+  '/demo/example-label': typeof DemoExampleLabelRoute
+  '/demo/kitchen-sink': typeof DemoKitchenSinkRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog': typeof BlogIndexRoute
+  '/demo': typeof DemoIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/demo': typeof DemoRoute
   '/llms-full.txt': typeof LlmsFullDottxtRoute
   '/llms.txt': typeof LlmsDottxtRoute
   '/playground': typeof PlaygroundRoute
@@ -122,15 +153,19 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/search': typeof ApiSearchRoute
   '/blog/$slug': typeof BlogSlugRoute
+  '/demo/entry-body': typeof DemoEntryBodyRoute
+  '/demo/entry-length': typeof DemoEntryLengthRoute
+  '/demo/example-label': typeof DemoExampleLabelRoute
+  '/demo/kitchen-sink': typeof DemoKitchenSinkRoute
   '/docs/$': typeof DocsSplatRoute
   '/docs/{$}.md': typeof DocsChar123Char125DotmdRoute
   '/blog/': typeof BlogIndexRoute
+  '/demo/': typeof DemoIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/demo'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/playground'
@@ -138,13 +173,17 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/search'
     | '/blog/$slug'
+    | '/demo/entry-body'
+    | '/demo/entry-length'
+    | '/demo/example-label'
+    | '/demo/kitchen-sink'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog/'
+    | '/demo/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/demo'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/playground'
@@ -152,13 +191,17 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/search'
     | '/blog/$slug'
+    | '/demo/entry-body'
+    | '/demo/entry-length'
+    | '/demo/example-label'
+    | '/demo/kitchen-sink'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog'
+    | '/demo'
   id:
     | '__root__'
     | '/'
-    | '/demo'
     | '/llms-full.txt'
     | '/llms.txt'
     | '/playground'
@@ -166,14 +209,18 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/search'
     | '/blog/$slug'
+    | '/demo/entry-body'
+    | '/demo/entry-length'
+    | '/demo/example-label'
+    | '/demo/kitchen-sink'
     | '/docs/$'
     | '/docs/{$}.md'
     | '/blog/'
+    | '/demo/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DemoRoute: typeof DemoRoute
   LlmsFullDottxtRoute: typeof LlmsFullDottxtRoute
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   PlaygroundRoute: typeof PlaygroundRoute
@@ -181,9 +228,14 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiSearchRoute: typeof ApiSearchRoute
   BlogSlugRoute: typeof BlogSlugRoute
+  DemoEntryBodyRoute: typeof DemoEntryBodyRoute
+  DemoEntryLengthRoute: typeof DemoEntryLengthRoute
+  DemoExampleLabelRoute: typeof DemoExampleLabelRoute
+  DemoKitchenSinkRoute: typeof DemoKitchenSinkRoute
   DocsSplatRoute: typeof DocsSplatRoute
   DocsChar123Char125DotmdRoute: typeof DocsChar123Char125DotmdRoute
   BlogIndexRoute: typeof BlogIndexRoute
+  DemoIndexRoute: typeof DemoIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -193,13 +245,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo': {
-      id: '/demo'
-      path: '/demo'
-      fullPath: '/demo'
-      preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/llms-full.txt': {
@@ -258,6 +303,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demo/': {
+      id: '/demo/'
+      path: '/demo'
+      fullPath: '/demo/'
+      preLoaderRoute: typeof DemoIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/entry-body': {
+      id: '/demo/entry-body'
+      path: '/demo/entry-body'
+      fullPath: '/demo/entry-body'
+      preLoaderRoute: typeof DemoEntryBodyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/entry-length': {
+      id: '/demo/entry-length'
+      path: '/demo/entry-length'
+      fullPath: '/demo/entry-length'
+      preLoaderRoute: typeof DemoEntryLengthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/example-label': {
+      id: '/demo/example-label'
+      path: '/demo/example-label'
+      fullPath: '/demo/example-label'
+      preLoaderRoute: typeof DemoExampleLabelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo/kitchen-sink': {
+      id: '/demo/kitchen-sink'
+      path: '/demo/kitchen-sink'
+      fullPath: '/demo/kitchen-sink'
+      preLoaderRoute: typeof DemoKitchenSinkRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/$': {
       id: '/docs/$'
       path: '/docs/$'
@@ -277,7 +357,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DemoRoute: DemoRoute,
   LlmsFullDottxtRoute: LlmsFullDottxtRoute,
   LlmsDottxtRoute: LlmsDottxtRoute,
   PlaygroundRoute: PlaygroundRoute,
@@ -285,9 +364,14 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiSearchRoute: ApiSearchRoute,
   BlogSlugRoute: BlogSlugRoute,
+  DemoEntryBodyRoute: DemoEntryBodyRoute,
+  DemoEntryLengthRoute: DemoEntryLengthRoute,
+  DemoExampleLabelRoute: DemoExampleLabelRoute,
+  DemoKitchenSinkRoute: DemoKitchenSinkRoute,
   DocsSplatRoute: DocsSplatRoute,
   DocsChar123Char125DotmdRoute: DocsChar123Char125DotmdRoute,
   BlogIndexRoute: BlogIndexRoute,
+  DemoIndexRoute: DemoIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

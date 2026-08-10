@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Param, Parameters } from '@/entry/Parameters';
 import { Return, Returns } from '@/entry/Returns';
@@ -8,6 +7,7 @@ import {
   ProposedReturn,
   ProposedReturns,
 } from './ProposedLists';
+import { Column, Comparison, DemoHeading, DemoShell, Delta, Syntax } from './Shell';
 
 /**
  * Side-by-side of the shipping entry lists against ADR 0013's proposal.
@@ -23,57 +23,10 @@ import {
  * parameters with three different kinds of default, including one that is an expression.
  */
 
-function Syntax({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-lg border bg-fd-muted/40 px-4 py-2.5 font-mono text-[0.8125rem] text-fd-foreground">
-      {children}
-    </pre>
-  );
-}
 
-function Column({
-  label,
-  tone,
-  children,
-}: {
-  label: string;
-  tone: 'now' | 'proposed';
-  children: ReactNode;
-}) {
-  return (
-    <div className="min-w-0 rounded-xl border bg-fd-card p-4 sm:p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <span
-          className={`rounded px-2 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-wider ${
-            tone === 'now'
-              ? 'bg-fd-muted text-fd-muted-foreground'
-              : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-          }`}
-        >
-          {tone === 'now' ? 'Now' : 'Proposed'}
-        </span>
-        <span className="text-sm text-fd-muted-foreground">{label}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
 
-function Comparison({ children }: { children: ReactNode }) {
-  return <div className="my-5 grid gap-4 lg:grid-cols-2">{children}</div>;
-}
 
-function Delta({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-5 rounded-lg border-s-2 border-s-fd-primary bg-fd-muted/30 px-4 py-3 text-sm text-fd-muted-foreground">
-      {children}
-    </div>
-  );
-}
 
-function Heading({ children }: { children: ReactNode }) {
-  return <h2 className="mt-12 mb-1 text-xl font-semibold text-fd-foreground">{children}</h2>;
-}
 
 /** ADR 0009's disclosure, drawn rather than imported — see the note beside it on the page. */
 function IllustrativeNumericNote() {
@@ -91,23 +44,22 @@ function IllustrativeNumericNote() {
 
 export function EntryBodyDemo() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-fd-muted-foreground">
-        Internal — not linked from the site, not in the sitemap, <code>noindex</code>
-      </p>
-      <h1 className="text-3xl font-semibold tracking-tight text-fd-foreground">
-        Entry body: now vs proposed
-      </h1>
-      <p className="mt-3 max-w-3xl text-fd-muted-foreground">
-        ADR 0013 gives parameters a type and return values a name. The left column below is
-        the live renderer — the same components 292 entries use — so every difference you can
-        see is a real one. Written up in <code>docs/adr/0013-the-body-of-a-reference-entry.md</code>{' '}
-        and <code>docs/plans/2026-08-10-entry-body-demo.md</code>.
-      </p>
+    <DemoShell
+      title="Entry body: now vs proposed"
+      standfirst={
+        <p>
+          ADR 0013 gives parameters a type and return values a name. The left column below is
+          the live renderer — the same components 292 entries use — so every difference you can
+          see is a real one. Written up in{' '}
+          <code>docs/adr/0013-the-body-of-a-reference-entry.md</code> and{' '}
+          <code>docs/plans/2026-08-10-entry-body-demo.md</code>.
+        </p>
+      }
+    >
 
-      <Heading>
+      <DemoHeading>
         1. <code>string.find</code> — the defect that started it
-      </Heading>
+      </DemoHeading>
       <p className="max-w-3xl text-sm text-fd-muted-foreground">
         Compare the two Return values lists first. On the left, the first two rows are both
         the bare word <code>integer</code> with nothing to tell them apart — and the second
@@ -192,9 +144,9 @@ export function EntryBodyDemo() {
         than choosing fresh labels — which would put a third vocabulary on the page.
       </Delta>
 
-      <Heading>
+      <DemoHeading>
         2. <code>table.concat</code> — optional, and three kinds of default
-      </Heading>
+      </DemoHeading>
       <p className="max-w-3xl text-sm text-fd-muted-foreground">
         Here the interesting column is Parameters. On the left, whether an argument may be
         omitted is recoverable only from the brackets in the Syntax line and from a sentence
@@ -266,7 +218,67 @@ export function EntryBodyDemo() {
         documented lie.
       </Delta>
 
-      <Heading>Still undecided</Heading>
+      <DemoHeading>
+        3. Boxed or plain — the old site’s treatment
+      </DemoHeading>
+      <p className="max-w-3xl text-sm text-fd-muted-foreground">
+        luadocs.com draws the name in a bordered pill with the type in muted mono beside it.
+        Both columns below carry identical data; only the name’s treatment differs. The right
+        column is what the two comparisons above use.
+      </p>
+
+      <Comparison>
+        <Column tone="neutral" label="Plain name">
+          <ProposedParameters>
+            <ProposedParam style="plain" name="format" type="string">
+              The format string describing the layout to write.
+            </ProposedParam>
+            <ProposedParam style="plain" name="table" type="table">
+              A row whose name and type are the same word — the ambiguous case.
+            </ProposedParam>
+            <ProposedParam
+              style="plain"
+              name="start_position"
+              type="integer"
+              optional
+              default="1"
+            >
+              A row carrying all four things at once.
+            </ProposedParam>
+          </ProposedParameters>
+        </Column>
+
+        <Column tone="proposed" label="Boxed name — the old site’s">
+          <ProposedParameters>
+            <ProposedParam name="format" type="string">
+              The format string describing the layout to write.
+            </ProposedParam>
+            <ProposedParam name="table" type="table">
+              A row whose name and type are the same word — the ambiguous case.
+            </ProposedParam>
+            <ProposedParam name="start_position" type="integer" optional default="1">
+              A row carrying all four things at once.
+            </ProposedParam>
+          </ProposedParameters>
+        </Column>
+      </Comparison>
+
+      <Delta>
+        <strong className="text-fd-foreground">The second row is the argument.</strong> Plain,
+        it reads <code>table table</code> — two words with no visual grammar, and a reader has
+        to work out that the first is a name and the second its type. Boxed, it is a labelled
+        thing with its type beside it, and the ambiguity is gone without renaming anything.
+        <br />
+        <br />
+        That matters more than it looks, because it is what lets ADR 0013’s amended rule 3
+        stand: library and type names are <em>discouraged, not forbidden</em>, and{' '}
+        <code>table</code> is permitted where no better word exists. The pill is what makes
+        that permission survive contact with a reader — which is the third thing the old site
+        turned out to be right about, after Use cases and the specifier table it did not
+        actually win.
+      </Delta>
+
+      <DemoHeading>Still undecided</DemoHeading>
       <p className="max-w-3xl text-sm text-fd-muted-foreground">
         <code>string.find</code>'s <code>init</code> above is rendered as{' '}
         <code>start_position</code>, and that is a guess, not a decision.{' '}
@@ -298,6 +310,6 @@ export function EntryBodyDemo() {
         </Link>
         .
       </p>
-    </main>
+    </DemoShell>
   );
 }
