@@ -80,4 +80,4 @@ They are repointed once the rebuilt decisions are numbered.
 
 Prose is CC BY 4.0; example code is CC0. Entries are written from the official Lua reference
 manual, which is © Lua.org, PUC-Rio and freely available under the Lua (MIT) licence. See
-[LICENSE](LICENSE).
+[LICENSE.md](LICENSE.md).

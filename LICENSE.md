@@ -1,7 +1,7 @@
 # Licences
 
 LuaDocs is licensed in two parts, because prose and example code are used
-differently ([ADR 0003](docs/adr/0003-dual-license-prose-and-code.md)).
+differently ([ADR 0003](docs/_DEPRECATED/adr/0003-dual-license-prose-and-code.md)).
 
 ## Prose — CC BY 4.0
 
