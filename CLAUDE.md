@@ -11,7 +11,12 @@
   targeting `main` on your own initiative.
 - **Always ask explicitly, and wait for a clear yes, before any merge.** Approval
   for one merge is not approval for the next one.
-- Pushing `dev` to `origin/dev` is also an explicit-permission action — ask first.
+- Committing work and pushing `dev` to `origin/dev` needs no permission — commit
+  and push as a matter of course, without asking. This applies to `dev` only; the
+  rules above about `main` are untouched by it.
+- Commit only the work you did. Other sessions edit this tree at the same time,
+  so stage named paths rather than `git add -A`, and leave changes you did not
+  make to whoever made them.
 
 Reading commands are fine (`git log`, `git diff`, `git merge-base` — the last one
 only prints a commit hash, it does not merge).
