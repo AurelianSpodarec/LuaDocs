@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.2": "The value handed in comes back, so the call can be written where its result is wanted. Earlier it answers `true` instead — the same `true` for every type, for an attachment and for a removal alike — so nothing the call hands back distinguishes one outcome from another."
+  }
+}

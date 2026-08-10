@@ -1,8 +1,160 @@
 ---
 title: debug.setfenv()
-description: ""
+description: Replace the environment table of any object that had one — a function written in C, a full userdata, a thread.
+lua-compat: debug.setfenv
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-debug.setfenv
 ---
 
-{/* Not yet written. */}
+Puts a table under an object as its environment, and hands the object back. Where
+[`setfenv()`](/docs/standard-library/globals/setfenv) worked on Lua functions and on the
+running thread, this worked on anything that carried an environment: a function written in C,
+a full userdata, any thread. No one call reaches all of that now. The table is chosen where the
+code is written or where it is loaded, and the sections below say what that looks like for
+each of the three.
+
+<RunnableExample usesEntry={false} code={`local allowances = { overnight_allowed = true }\nlocal guarded = assert(load("return overnight_allowed", "guarded", "t", {}))\n\n-- debug.setfenv(guarded, allowances) put this table under an already-built function\nprint(guarded())\nprint(debug.setupvalue(guarded, 1, allowances))\nprint(guarded())\n-- Expected output:\n-- nil\n-- _ENV\n-- true`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so
+they show the standing-in code doing the work and name the old call in a comment beside it.
+The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+debug.setfenv(object, table)
+```
+
+<Parameters>
+  <Param name="object">The object to change. A function, a full userdata or a thread; anything else is refused.</Param>
+  <Param name="table">The table the object is to resolve its global names through from then on. It has to be a table — `nil` is not a way to take an environment away.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="any">The object handed in — the first argument itself, not the table and not a copy.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when `table` is not a table, including when it is left out. This is checked before the first argument is looked at, so a bad second argument is reported whatever the first one holds.
+- Raises when `object` is of a type that carries no environment — a table, a number, a string, a boolean. This is the one failure the call reports about its first argument, and it is reported after the second argument has been checked.
+
+</Errors>
+
+## Description
+
+[`getfenv()`](/docs/standard-library/globals/getfenv#what-a-function-environment-is) sets out
+what an environment is and how a value comes by one, and
+[`debug.getfenv()`](/docs/standard-library/debug/getfenv) covers the three kinds of value this
+library reached that the basic library did not. This is the writing half of that pair, and
+everything below is what it adds.
+
+The change was made to the object rather than to one use of it, and took effect at once. A
+function handed a new table read its remaining global names out of it, and so did every later
+call. Nothing was saved and put back afterwards: the previous table was gone from that object's
+point of view unless the caller had kept a reference to it first.
+
+Where the basic call refused a function written in C, this one changed it. That was the
+sharpest thing it could do — the table a library's own C functions used as their environment
+was as reachable as any Lua function's, and a whole thread could be moved onto a different
+table of globals whether or not it was the thread doing the moving.
+
+The second argument had to be a table. There was no removing an environment, only replacing
+one, so an object that had a table went on having one for the rest of its life.
+
+## Setting an environment without this call
+
+Environments did not disappear; they stopped being one thing with one accessor, and each of
+the three cases went its own way.
+
+*A Lua function.* Its environment is a variable named `_ENV` now, following the ordinary scope
+rules, so the choice is made where the code is written or where it is loaded rather than
+afterwards. [`load()`](/docs/standard-library/globals/load#choosing-the-environment) takes the
+table as an argument, and `local _ENV = wherever` at the top of a function or a `do` block
+redirects every global name in the text below it. For a function already built and handed over,
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) can write its `_ENV` — which is
+this call's nearest surviving relative, and reaches only functions that mention a global at
+all, since the rest carry no such variable.
+
+*A function written in C.* Nothing reaches it, because there is nothing to reach: C functions
+have no environments. The values one carries are its upvalues, which
+[`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) writes and
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries)
+reads, and what a library does with them is its own business rather than a set of globals.
+
+*A full userdata.* What was a userdata's environment is its *user value* now, and
+[`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) writes it — with the
+positions and the count decided by the C code that made the userdata, so a write only lands
+where that code left room for one.
+
+*A thread.* There is one global environment for the state rather than a table per thread, so
+there is no per-thread environment left to replace. Redirecting where *newly loaded* chunks
+start is what [`load()`](/docs/standard-library/globals/load#choosing-the-environment) does, one
+chunk at a time.
+
+The practical consequence is that a sandbox is built at the door rather than after the fact:
+the table is decided when the source is loaded, and code already running is left where it is.
+
+## Examples
+
+### Giving a chunk a table it can see the effects of
+
+<RunnableExample usesEntry={false} code={`local sandbox = { unit_name = "kg" }\n-- debug.setfenv(weigh, sandbox) put this table under the compiled chunk\nlocal weigh = assert(load("return 'weighed in ' .. unit_name", "weigh", "t", sandbox))\n\nprint(weigh())\nsandbox.unit_name = "lb"\nprint(weigh())\n-- Expected output:\n-- weighed in kg\n-- weighed in lb`} />
+
+Handing the table over at load time gives the caller the same hold on it that this call gave,
+without a second step. It stays the live table afterwards, so a field written into it is a
+global the chunk sees from its next line onward.
+
+### A function written in C has nothing to put a table under
+
+<RunnableExample usesEntry={false} code={`-- debug.setfenv(string.rep, table) changed a C function's environment\nprint(type(string.rep))\nprint(select("#", debug.setupvalue(string.rep, 1, {})))\n-- Expected output:\n-- function\n-- 0`} />
+
+The write is not refused; there is simply no position for it to land in, and the call answers
+with nothing to say so. That is the shape of what became of this ability — not a replacement
+that fails loudly, but a place where the thing being changed no longer exists.
+
+### Finding `_ENV` rather than assuming where it sits
+
+<RunnableExample usesEntry={false} code={`local function describe_in(_ENV)\n  local heading = "measured in "\n  return function()\n    return heading .. unit_name\n  end\nend\n\nlocal describe = describe_in({ unit_name = "kg" })\nlocal replacements = { unit_name = "lb" }\n\n-- debug.setfenv(describe, replacements) needed nothing looked up first\nlocal index = 1\nwhile true do\n  local name = debug.getupvalue(describe, index)\n  if name == nil then break end\n  if name == "_ENV" then debug.setupvalue(describe, index, replacements) end\n  index = index + 1\nend\n\nprint(describe())\n-- Expected output: measured in lb`} />
+
+A chunk from [`load()`](/docs/standard-library/globals/load) carries `_ENV` and nothing else,
+so the lead example could name position `1`. This function captured a second variable as well,
+in an order nothing promises, so the position has to be found by name — which
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed) sets
+out. Writing an upvalue writes the variable itself, so a function sharing that variable with
+others is not one to redirect this way.
+
+## Gotchas
+
+<Gotcha title="A bad second argument was reported before a bad first one">
+The table was checked before the object was looked at, so a call with both arguments wrong was
+refused for the table and the object was never examined. Fixing the table then produced a
+second refusal for the object, which is a debugging session with two rounds in it where one
+would have done.
+</Gotcha>
+
+<Gotcha title="Nothing put the old table back">
+The call replaced the reference and kept no history, so an object redirected in order to do one
+thing differently could not be returned to where it started unless the previous table had been
+read and kept first. This is the strongest argument for deciding the table where the code is
+loaded: a chunk given a table when it was built cannot lose track of where it started, because
+it never started anywhere else.
+</Gotcha>
+
+<Gotcha title="Functions made afterwards inherited the change and functions made before did not">
+A function picked up its environment when it was created, so changing an object's environment
+left the closures it had already built reading the old table while the ones it built from then
+on read the new one. Code that redirected globals halfway through a run ended up with two sets
+of functions disagreeing about what a global name meant, and nothing in either of them said so.
+</Gotcha>
+
+## See also
+
+- [`debug.getfenv()`](/docs/standard-library/debug/getfenv) — the reading direction, and where the three kinds of environment are set out
+- [`setfenv()`](/docs/standard-library/globals/setfenv) — the basic library's narrower version, which refused a function written in C
+- [`debug.setupvalue()`](/docs/standard-library/debug/setupvalue) — writing a Lua function's `_ENV` from outside, which is the nearest thing left
+- [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) — where a full userdata's environment went
+- [`load()`](/docs/standard-library/globals/load#choosing-the-environment) — handing a chunk its table when it is compiled, which is where the choice is made now
+- [`_G`](/docs/standard-library/globals/_g) — the one global environment a state has, in place of a table per thread

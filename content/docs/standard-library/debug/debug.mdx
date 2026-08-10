@@ -1,8 +1,196 @@
 ---
 title: debug.debug()
-description: ""
+description: Stop where you are and read lines from standard input, running each one, until a line says cont.
+lua-compat: debug.debug
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.debug
 ---
 
-{/* Not yet written. */}
+Stops the program where it is and starts reading lines from standard input, running each one
+as it arrives, until a line consisting of the word `cont` sends the caller on its way. It is
+the smallest interactive prompt Lua ships: a place to stand inside a running program and ask
+it questions.
+
+```lua
+local function post_ledger(entries)
+  if #entries == 0 then
+    print("nothing to post — dropping to a prompt")
+    debug.debug()
+  end
+  return apply(entries)
+end
+```
+
+<Note>
+No example on this page runs. The call reads from standard input, which the examples here
+have nothing to give it, so a card would sit waiting rather than printing anything. Every
+listing below is shown rather than executed.
+</Note>
+
+## Syntax
+
+```lua
+debug.debug()
+```
+
+<Parameters></Parameters>
+
+<Returns>
+  <Return type="none">Nothing. The call comes back when the prompt is finished with, and the caller carries on from the line after it.</Return>
+</Returns>
+
+<Errors>
+
+- Nothing here fails. Arguments handed to this call are ignored, and a line that fails to compile or raises while it runs is reported at the prompt rather than passed on to the caller.
+
+</Errors>
+
+## Description
+
+This is a read-run-report loop and nothing more. A prompt is written to the error stream, a
+line is read from standard input, and unless the line is exactly the word `cont` it is
+compiled and called. Then the loop goes round again.
+
+Two other things end it. Standard input running out ends it — the same end-of-file the shell
+sends with a keystroke, or a script arriving down a pipe simply stopping — and so does
+anything that ends the program outright, since nothing here is protecting against that.
+Ending the prompt is not a return value: the call answers nothing either way, and the caller
+cannot tell how the prompt was left.
+
+A line that fails does not end anything. It is run inside a protected call, its error is
+reported, and the prompt comes back. So a typo costs a line rather than the session, and code
+typed at the prompt cannot raise past the call that opened it.
+
+What each line can reach is the subject of the next section, and it is narrower than it looks.
+
+## What a typed line can reach
+
+Each line is compiled as a chunk of its own and called with nothing. Three consequences follow
+from that:
+
+*Locals are not in scope.* The line is not written inside the function that called this one —
+it is not written inside any function — so the variables that function is holding cannot be
+named. This is the one the manual troubles to point out, and it is the reason a session at
+this prompt leans on [`debug.getlocal()`](/docs/standard-library/debug/getlocal) and
+[`debug.setlocal()`](/docs/standard-library/debug/setlocal), which reach a call's variables by
+position rather than by name.
+
+*Globals are.* A chunk resolves its global names the ordinary way, so the standard libraries,
+and anything the program keeps in a global, are all reachable by name. So is everything the
+rest of this library offers — [`debug.traceback()`](/docs/standard-library/debug/traceback) for
+where the program is, [`debug.getinfo()`](/docs/standard-library/debug/getinfo) for what it is
+running, [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue) for what a function is
+holding on to.
+
+*Nothing a line evaluates is shown.* Results are discarded rather than printed, which is the
+difference between this prompt and the interpreter's own. A line reading `return #entries`
+prints nothing at all; `print(#entries)` is the line that answers. Each line also stands alone, so a
+local declared on one line has gone by the next — a value worth keeping through a session
+has to be kept in a global or written back where it came from.
+
+## Where it is worth using
+
+The call belongs where a program has reached a state that is hard to reproduce and worth
+looking at from the inside: a branch that should be unreachable, an assertion that fails once
+in a long run, a value that is wrong by the time it arrives and right where it was made.
+Dropping a call to this in that branch turns the next occurrence into a session rather than
+into a line of output guessed at in advance.
+
+Two things make it a poor fit elsewhere. It needs a person at a terminal, so a program running
+unattended — a build step, a service, anything reading its own standard input — meets it and
+either waits forever or is handed input meant for something else. And it reads from standard
+input, which the program may be using for its own data; a call that steals a line from a pipe
+does more than pause.
+
+For a program that is going to run without anyone watching,
+[`debug.traceback()`](/docs/standard-library/debug/traceback) written into a log is the tool
+that answers the same question afterwards.
+
+## Examples
+
+None of the listings below runs here; see the note at the top of the page.
+
+### Reaching a caller's variables from the prompt
+
+```lua
+-- One line at a time, once the program has stopped in `post_ledger`.
+print(debug.traceback())
+print(debug.getlocal(3, 1))
+debug.setlocal(3, 1, {})
+cont
+```
+
+The locals of the function that opened the prompt cannot be named, so they are reached by
+position instead. The level is counted outward from the typed line, which is a frame of its
+own with this call's frame between it and the function to ask about — so the function that
+opened the prompt is level `3`, and a traceback is the quickest way to check that against
+what is actually on the stack.
+
+### Keeping something between lines
+
+```lua
+-- One line at a time again.
+print(#collected_batches)
+saved_batch = collected_batches[1]
+print(saved_batch.customer)
+cont
+```
+
+Each line is its own chunk, so `local saved_batch = …` would be gone before the next line ran.
+Writing to a global instead is what carries a value across, at the cost of leaving it behind
+in the program — worth clearing before continuing if the program goes on to look at its own
+globals.
+
+### Guarding the call so a batch run never meets it
+
+```lua
+local function drop_to_prompt()
+  if os.getenv("LEDGER_INTERACTIVE") then
+    debug.debug()
+  end
+end
+```
+
+The call waits for a person, and nothing in the standard library tells a program whether one
+is there. A guard around it is what keeps the same branch usable in a program that runs
+unattended.
+
+## Gotchas
+
+<Gotcha title="It reads the program's own standard input">
+There is one standard input, and this takes lines from it. A program that reads its own data
+from there — a filter with something piped into it, a script reading a here-document — loses
+whatever this prompt consumes, and there is no putting it back. If the data matters, this call
+belongs behind a check that the program is being run by hand.
+</Gotcha>
+
+<Gotcha title="Only cont on a line of its own ends it">
+The word is compared against the whole line, so a line with anything else on it — a trailing
+space, a comment, `cont()` — is not the ending and is compiled and run like any other. The
+ending line goes the other way: it is recognised before anything is compiled, so it never
+reaches the compiler at all.
+</Gotcha>
+
+<Gotcha title="A very long line is not read as one line">
+Input is taken in fixed-size pieces, so a line longer than one piece arrives as several, and
+each piece is compiled on its own. A long expression pasted at the prompt is unlikely to
+survive being cut in two that way — a session that needs something long is better served by
+putting it in a file and loading that.
+</Gotcha>
+
+<Gotcha title="What the prompt writes is not the program's output">
+The prompt itself, and the report of a line that failed, are written to the error stream
+rather than the output stream, so a program whose output is being captured does not get a
+debugging session mixed into it. Anything a typed line prints goes wherever that program's
+`print` sends it, which is the other stream — so the two halves of a session arrive in
+different places.
+</Gotcha>
+
+## See also
+
+- [`debug.getlocal()`](/docs/standard-library/debug/getlocal#how-a-local-is-addressed) — reaching a call's local variables, which a typed line cannot name
+- [`debug.setlocal()`](/docs/standard-library/debug/setlocal) — changing one of them from the prompt
+- [`debug.traceback()`](/docs/standard-library/debug/traceback) — where the program is, and the tool to reach for when nobody is at the terminal
+- [`debug.getinfo()`](/docs/standard-library/debug/getinfo) — what each call on the stack is running
+- [`debug.sethook()`](/docs/standard-library/debug/sethook) — stopping on a condition rather than at a line written in advance
+- [`load()`](/docs/standard-library/globals/load) — compiling a line of source, which is what each typed line goes through

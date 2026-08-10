@@ -174,6 +174,11 @@ import debugUpvaluejoin from './data/debug.upvaluejoin.json';
 import debugGetuservalue from './data/debug.getuservalue.json';
 import debugSetuservalue from './data/debug.setuservalue.json';
 import debugGetregistry from './data/debug.getregistry.json';
+import debugGetmetatable from './data/debug.getmetatable.json';
+import debugSetmetatable from './data/debug.setmetatable.json';
+import debugDebug from './data/debug.debug.json';
+import debugGetfenv from './data/debug.getfenv.json';
+import debugSetfenv from './data/debug.setfenv.json';
 
 /**
  * Every compat dataset, keyed by the `lua-compat` value an entry declares in its
@@ -2208,6 +2213,100 @@ const raw: Record<string, unknown> = {
   'debug.getuservalue': debugGetuservalue,
   'debug.setuservalue': debugSetuservalue,
   'debug.getregistry': debugGetregistry,
+
+  // ## `debug` — batch DB5: the metatable pair, the prompt, and the environment pair
+  //
+  // Same reading discipline as DB1–DB4. All five manuals on disk, read at
+  // `pdf-debug.getmetatable`, `pdf-debug.setmetatable`, `pdf-debug.debug`,
+  // `pdf-debug.getfenv` and `pdf-debug.setfenv`, at §2.4/§2.8 (Metatables), at 5.1 §2.1 and
+  // §2.9 (Environments), at the Debug Library preamble in each, and at every
+  // Incompatibilities chapter end to end. `ldblib.c`, `lapi.c` and `lbaselib.c` diffed whole
+  // at every tag of every line — `v5.1`, `v5.1.1`, `v5.2.0`–`v5.2.3`, `v5.3.0`–`v5.3.6`,
+  // `v5.4.0`–`v5.4.8`, `v5.5.0`, `v5.5.1` — plus the shipped 5.1.5 and 5.2.4 from
+  // `lua.org/source/5.1` and `/5.2`, and `luaconf.h` at five tags. Everything runnable was run
+  // on the harness's wasmoon 5.4 and on a stock `lua` 5.3.6 binary.
+  //
+  // **None of the five is named in any Incompatibilities chapter.** 5.2 §8.2's *"Functions
+  // `setfenv` and `getfenv` were removed, because of the changes in environments"* names the
+  // **basic library's** pair, and §8.3's *"Pseudoindex `LUA_ENVIRONINDEX` and functions
+  // `lua_getfenv`/`lua_setfenv` were removed"* names the C API's. The `debug.*` pair is
+  // removed by silence — DB1 flagged this and it holds: no manual from 5.2 on contains the
+  // string `fenv` at all.
+  //
+  // ### `debug.getfenv` / `debug.setfenv` — the removal, and how it compares with the globals
+  //
+  // Both axes agree, at the same version, and it is the **same version the globals pair
+  // leaves at** (`globals.getfenv`/`globals.setfenv`, `version_removed: "5.2"`):
+  //
+  // | | manual | `ldblib.c` | `lbaselib.c` |
+  // |---|---|---|---|
+  // | 5.1 | entries `pdf-debug.getfenv`, `pdf-debug.setfenv` | `db_getfenv`, `db_setfenv` registered unguarded | `getfenv`, `setfenv` registered unguarded |
+  // | 5.2 | no mention of either anywhere in the file | absent from `v5.2.0` on, in any form | absent from `v5.2.0` on |
+  //
+  // There is **no compatibility switch** for either pair: `luaconf.h` at `v5.2.0` names
+  // `LUA_COMPAT_UNPACK`, `LUA_COMPAT_LOADERS`, `LUA_COMPAT_LOG10`, `LUA_COMPAT_LOADSTRING`,
+  // `LUA_COMPAT_MAXN` and `LUA_COMPAT_MODULE`, and nothing `fenv`-shaped at any tag of any
+  // line. So this is not the `package.seeall`/`module` shape, where the two axes part company
+  // — checked rather than assumed, per the standing rule.
+  //
+  // `lua_getfenv` answers for a function (C or Lua), a full userdata and a thread, and pushes
+  // `nil` for everything else; `lua_setfenv` writes the same three and returns `0` otherwise,
+  // which `db_setfenv` turns into a raise. Shipped 5.1.5's `db_getfenv` opens with
+  // `luaL_checkany(L, 1)`; `v5.1` and `v5.1.1` do not, which is a patch-level residual the
+  // site cannot express — the line is credited with what its final release has.
+  //
+  // ### `debug.getmetatable` — nothing moved
+  //
+  // `db_getmetatable` is **byte-identical at all 28 artefacts**, and so is the shape of
+  // `lua_getmetatable` behind it (the edits are `ttype`→`ttypenv`→`ttnov`→`ttype` and
+  // `L->top`→`L->top.p`, none Lua-visible). A table and a full userdata carry their own; every
+  // other type reads `G(L)->mt[type]`, one metatable per basic type on every version. No
+  // `changed_in`.
+  //
+  // The difference from the basic library's call is exactly one thing: `luaB_getmetatable`
+  // ends with `luaL_getmetafield(L, 1, "__metatable")` and `db_getmetatable` does not. Both
+  // open with `luaL_checkany(L, 1)`, so both take any value and both refuse an empty call.
+  //
+  // ### `debug.setmetatable` — the return moved at 5.2, and that is the pair's one delta
+  //
+  // ```c
+  // lua_pushboolean(L, lua_setmetatable(L, 1)); return 1;   /* v5.1 → shipped 5.1.5 */
+  // lua_setmetatable(L, 1); return 1;  /* return 1st argument */   /* v5.2.0 → v5.5.1 */
+  // ```
+  //
+  // `lua_setmetatable` returns `1` unconditionally at every tag, so the 5.1 answer is `true`
+  // whatever happened — it is not a success report. `v5.4.0`'s `luaL_argcheck` →
+  // `luaL_argexpected` is message text only and is not recorded.
+  //
+  // **Deliberately not recorded: the 5.2 finalizer change.** `lua_setmetatable` gains
+  // `luaC_checkfinalizer` at `v5.2.0`, so from 5.2 a metatable carrying `__gc` attached from
+  // here marks a table for finalization, and a userdata's finalizer becomes set-time rather
+  // than collection-time. Both halves are observable through this call. Neither is stated in
+  // this entry's prose — `globals.setmetatable`'s 5.2 note owns the table half and no page
+  // yet owns the userdata half — and DB2's decision 2 is the precedent for carrying a chip
+  // only for a fact the page states. (`v5.2.0`/`v5.2.1` also call `luaC_checkfinalizer`
+  // outside the `if (mt)` guard; with a `NULL` metatable it returns immediately, so nothing
+  // is observable. Fixed at `v5.2.2`.)
+  //
+  // ### `debug.debug` — what changed is what it does with an error
+  //
+  // `db_debug` is a `fgets`/`luaL_loadbuffer`/`lua_pcall` loop, ended by a line that is
+  // exactly `cont` plus a newline or by end-of-input, with `lua_settop(L, 0)` discarding
+  // whatever a line returned. The **only** Lua-visible edit is at `v5.4.0`:
+  // `lua_tostring(L, -1)` becomes `luaL_tolstring(L, -1, NULL)`, so the reported text is
+  // produced the way `tostring()` produces it and a `__tostring` field is consulted. Before
+  // that, `lua_tostring` answers `NULL` for anything that is not already a string or a number.
+  //
+  // Two edits are **not** recorded. `fputs`/`luai_writestringerror`/`lua_writestringerror`
+  // (5.2, 5.3) are the same write to the error stream under three spellings. `v5.5.1` changes
+  // `luaL_loadbuffer` to `luaL_loadbufferx(..., "t")`, so a typed line is read as text only;
+  // it is patch-level inside 5.5, nothing on the page depends on it, and DB1 saw the same edit
+  // and left it alone.
+  'debug.getmetatable': debugGetmetatable,
+  'debug.setmetatable': debugSetmetatable,
+  'debug.debug': debugDebug,
+  'debug.getfenv': debugGetfenv,
+  'debug.setfenv': debugSetfenv,
 };
 
 export const compatNodes: Record<string, CompatNode> = Object.fromEntries(

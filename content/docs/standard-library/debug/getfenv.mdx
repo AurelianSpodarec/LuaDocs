@@ -1,8 +1,149 @@
 ---
 title: debug.getfenv()
-description: ""
+description: Read the environment table of any object that had one — a function written in C, a full userdata, a thread.
+lua-compat: debug.getfenv
 entry-type: function
 source: https://www.lua.org/manual/5.1/manual.html#pdf-debug.getfenv
 ---
 
-{/* Not yet written. */}
+Hands back the environment table of whatever it is given. Where
+[`getfenv()`](/docs/standard-library/globals/getfenv) reported only a Lua function's, or a
+stack level's, this reported anything that carried one at all: a function written in C,
+a full userdata, a thread. Nothing asks that question now, and what stands in its place depends
+on which of those three the code was holding — the sections below take them one at a time.
+
+<RunnableExample usesEntry={false} code={`local settings = { paper_size = "a4" }\nlocal reader = assert(load("return paper_size", "reader", "t", settings))\n\n-- debug.getfenv(reader) answered with the table this function reads its globals from\nlocal function environment_of(fn)\n  local index = 1\n  while true do\n    local name, held = debug.getupvalue(fn, index)\n    if name == nil then return nil end\n    if name == "_ENV" then return held end\n    index = index + 1\n  end\nend\n\nprint(environment_of(reader) == settings)\nprint(reader())\n-- Expected output:\n-- true\n-- a4`} />
+
+<Note>
+Nothing on this page calls the function. The examples run on a Lua that does not have it, so
+they show the standing-in code doing the work and name the old call in a comment beside it.
+The call itself is in the syntax below.
+</Note>
+
+## Syntax
+
+```lua
+debug.getfenv(o)
+```
+
+<Parameters>
+  <Param name="o">The object to ask about. Any value is accepted; the ones with an environment to report are functions, full userdata and threads.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The environment table the object carries.</Return>
+  <Return type="nil">When the object is of a type that has no environment — a table, a number, a string, a boolean.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value like any other and is answered with `nil`; nothing at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+An environment is a table a value resolves its global names through, and the basic library's
+[`getfenv()`](/docs/standard-library/globals/getfenv#what-a-function-environment-is) sets out
+what one is and how a Lua function comes by one. What this call added was reach. Three kinds
+of value carried an environment that the basic library would not report:
+
+- *A function written in C.* The basic call answered with the global environment for one,
+  whatever table it was actually carrying. This call reported the table it was carrying.
+- *A full userdata.* A userdata carried an environment of its own, put there by the C code that
+  made it, and nothing in the basic library reached it.
+- *A thread.* A thread carried the table its own chunks started with, and the basic call
+  reported a thread's environment only for the thread it was running on.
+
+It took the object itself and nothing else. There was no stack-level form here, so a helper
+that wanted to ask about its caller had to be handed the function; and there was no level `0`,
+because the global environment was one thread's table rather than a special case.
+
+Anything else — a table, a number, a string — was answered with `nil` rather than refused. Each
+of the three kinds that carried an environment always had one, so `nil` meant the argument was
+not one of them, and never that one of them had nothing attached.
+
+## Reading an environment without this call
+
+Environments did not disappear; they stopped being one thing with one accessor. Each of the
+three cases above went its own way, and the replacement is whichever one the code was after.
+
+*A Lua function.* Its environment is now a variable named `_ENV`, which every chunk is compiled
+inside the scope of, and a global name in the source is shorthand for a field of whatever that
+variable holds. A function that mentions a global carries `_ENV` as a captured variable, so it
+can be read from outside with
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed) —
+by name rather than by position, because the positions are not decided by anything a caller can
+predict. A function that mentions no global carries no such variable and has nothing to report.
+
+*A function written in C.* There is nothing to read. C functions no longer have environments
+at all, and the values one is carrying are its upvalues, which
+[`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#upvalues-a-c-function-carries)
+reads under an empty name.
+
+*A full userdata.* What was a userdata's environment is now its *user value*, and
+[`debug.getuservalue()`](/docs/standard-library/debug/getuservalue#what-a-user-value-is) is the
+call that reads it — the same idea, renamed and generalised, with the same restriction that
+only the C code that made the userdata decides what is in there.
+
+*A thread.* Threads no longer keep a table of globals apiece. There is one global environment
+for the state, and [`_G`](/docs/standard-library/globals/_g) is the name it goes by, so the
+question a thread argument used to answer has one answer for the whole program.
+
+What none of these gives back is a single call that answers *what globals does this thing see*
+for any value it is handed. That was this call's distinctive ability and it has no successor.
+
+## Examples
+
+### A function that mentions no global has nothing to find
+
+<RunnableExample usesEntry={false} code={`local function adds(first, second)\n  return first + second\nend\n\nlocal function total_so_far()\n  return running_total\nend\n\n-- debug.getfenv answered for both of these\nprint(select("#", debug.getupvalue(adds, 1)))\nprint((debug.getupvalue(total_so_far, 1)))\n-- Expected output:\n-- 0\n-- _ENV`} />
+
+One of these reads a global and the other does not, and only the one that does carries the
+table to prove it. Where the old call answered for both, looking for `_ENV` answers for the one
+that has something to answer with — a truer picture of what the function can reach, and a
+poorer replacement for code that expected a table every time.
+
+### A function written in C carries no environment
+
+<RunnableExample usesEntry={false} code={`-- debug.getfenv(string.rep) answered with a table\nprint(type(string.rep))\nprint(debug.getinfo(string.rep, "u").nups)\nprint(select("#", debug.getupvalue(string.rep, 1)))\n-- Expected output:\n-- function\n-- 0\n-- 0`} />
+
+It is still a function and it still resolves nothing through a table. The values a C function
+carries are its upvalues, and this one has none — which is the honest answer to a question that
+used to come back with the global environment whether or not that was where the function was
+looking.
+
+### The table a chunk is given when it is loaded
+
+<RunnableExample usesEntry={false} code={`local sandbox = { unit_name = "kg" }\n-- debug.getfenv(weigh) would have answered with sandbox\nlocal weigh = assert(load("return 'weighed in ' .. unit_name", "weigh", "t", sandbox))\n\nprint(weigh())\nsandbox.unit_name = "lb"\nprint(weigh())\n-- Expected output:\n-- weighed in kg\n-- weighed in lb`} />
+
+The reference kept here is the answer this call would have given, held from the start rather
+than fetched afterwards. It is the live table, so a field written into it is a global the chunk
+can see from its next line onward.
+[`load()`](/docs/standard-library/globals/load#choosing-the-environment) is where the choice is
+made.
+
+## Gotchas
+
+<Gotcha title="A nil answer did not mean the object had no environment">
+Every type was accepted, and a type with no environment to report was answered with `nil`
+rather than refused — so `nil` covered a table, a number, a boolean and a string, and nothing
+else. Code that read the result as *the environment, or nothing is attached* was reading a
+mistyped argument as a fact about the program.
+</Gotcha>
+
+<Gotcha title="What comes back is the table, not a copy of it">
+Writing a field into the result puts a global within reach of everything sharing that table,
+and clearing one takes a global away mid-run. Inspecting what a piece of code can reach and
+changing it were one keystroke apart, which is the strongest argument for holding a table you
+built yourself rather than fetching one you did not.
+</Gotcha>
+
+## See also
+
+- [`debug.setfenv()`](/docs/standard-library/debug/setfenv) — the writing direction, and what to write in place of it
+- [`getfenv()`](/docs/standard-library/globals/getfenv#what-a-function-environment-is) — the basic library's narrower version, and where environments are explained
+- [`debug.getupvalue()`](/docs/standard-library/debug/getupvalue#how-an-upvalue-is-addressed) — where a Lua function's environment is found now, under the name `_ENV`
+- [`debug.getuservalue()`](/docs/standard-library/debug/getuservalue#what-a-user-value-is) — where a full userdata's environment went
+- [`load()`](/docs/standard-library/globals/load#choosing-the-environment) — giving a chunk its table when it is compiled, which is where the decision is made now
+- [`_G`](/docs/standard-library/globals/_g) — the one global environment a state has, in place of a table per thread

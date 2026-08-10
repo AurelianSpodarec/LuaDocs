@@ -1,8 +1,144 @@
 ---
 title: debug.getmetatable()
-description: ""
+description: Read the metatable attached to a value, whatever its type, with no __metatable field standing in front of the answer.
+lua-compat: debug.getmetatable
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.getmetatable
 ---
 
-{/* Not yet written. */}
+Hands back the metatable attached to a value, or `nil` when it has none. It asks the same
+question [`getmetatable()`](/docs/standard-library/globals/getmetatable) asks, with one
+difference that is the reason this call exists: a `__metatable` field is not looked for, so
+what comes back is the metatable itself rather than the stand-in its author offered.
+
+<RunnableExample code={`local ledger = setmetatable({ entries = 3 }, { __metatable = "sealed", schema_version = 2 })\n\nprint(getmetatable(ledger))\nprint(type(debug.getmetatable(ledger)))\nprint(debug.getmetatable(ledger).schema_version)\nprint(ledger.entries)\n-- Expected output:\n-- sealed\n-- table\n-- 2\n-- 3`} />
+
+## Syntax
+
+```lua
+debug.getmetatable(value)
+```
+
+<Parameters>
+  <Param name="value">The value to look at. Any value is accepted, `nil` and a number among them; a value with no metatable is answered rather than refused.</Param>
+</Parameters>
+
+<Returns>
+  <Return type="table">The metatable attached to the value — the table itself, not a copy of it and not anything standing in for it.</Return>
+  <Return type="nil">When the value has no metatable.</Return>
+</Returns>
+
+<Errors>
+
+- Raises when called with no argument at all. An argument of `nil` is a value like any other and is answered; nothing at all is a mistake and is refused.
+
+</Errors>
+
+## Description
+
+A metatable is an ordinary table attached to a value, whose fields decide how that value
+behaves under certain operations. Which fields do what belongs to the
+[metatables guide](/docs/guides/how-metatables-work); this call is the reading that reports
+what is really attached.
+
+Which values have one to hand back is the ordinary rule, unchanged here: a table and a full
+userdata carry their own, while every other type has a single metatable covering the whole
+type.
+[`getmetatable()`](/docs/standard-library/globals/getmetatable#which-values-have-a-metatable-to-read)
+sets that out; the consequence worth keeping in mind on this page is that
+`debug.getmetatable(42)` is a question about numbers rather than about the number `42`, and
+that a string answers with a real table because the string library installed one for the type.
+
+Reading is a plain read. No metamethod runs to produce the answer — not one belonging to the
+value, and not one belonging to the metatable's own metatable — and nothing is copied on the
+way out. What arrives is the live table, shared with every value that metatable serves, so a
+write into it is not a private edit.
+
+One value comes back and it is the metatable or `nil`, with nothing in between.
+[`getmetatable()`](/docs/standard-library/globals/getmetatable) can answer with a string, a
+number, `false` or a table that has nothing to do with the value's behaviour, because a
+`__metatable` field can hold any of those; here `nil` and *no metatable* mean each other.
+
+## What a protected metatable does not hide
+
+A metatable holding a field named `__metatable` is *protected*, and protection is aimed
+squarely at the pair of calls in the basic library.
+[`getmetatable()`](/docs/standard-library/globals/getmetatable#when-a-metatable-is-protected)
+hands back the field's value instead of the metatable, and
+[`setmetatable()`](/docs/standard-library/globals/setmetatable#when-the-metatable-cannot-be-changed)
+raises rather than replacing anything. Between them the metatable is out of ordinary code's
+way.
+
+Neither half of that reaches this library. This call reads the field the value actually
+carries and never looks for `__metatable` at all, and
+[`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) replaces a protected
+metatable as readily as any other. So protection is a statement about what callers are
+invited to depend on, not a barrier: it keeps a metatable out of the way of code that has no
+business in it, and code that means to look can look.
+
+That is what makes this the call to reach for while working out why something behaves as it
+does. A value whose metatable is sealed answers the ordinary question with a name or a token,
+which is exactly enough to be told *do not ask* and not enough to see the `__index` chain a
+lookup is going through. It is also why what comes back is worth reading and not worth
+building on — see the Gotchas.
+
+## Examples
+
+### What each kind of value answers
+
+<RunnableExample code={`print(debug.getmetatable(42))\nprint(type(debug.getmetatable("a label")))\nprint(debug.getmetatable({}))\nprint(debug.getmetatable(print))\n-- Expected output:\n-- nil\n-- table\n-- nil\n-- nil`} />
+
+Numbers, plain tables and functions have nothing attached until something attaches it. The
+string is the one that surprises: the string library gives the type a metatable when it is
+loaded, so a string answers with a real table while a number answers `nil`.
+
+### Every string answers with one table
+
+<RunnableExample code={`print(debug.getmetatable("cocoa") == debug.getmetatable("flour"))\nprint(debug.getmetatable("cocoa").__index == string)\nprint(("cocoa"):upper())\n-- Expected output:\n-- true\n-- true\n-- COCOA`} />
+
+There is one metatable for the whole type, and its `__index` is the `string` library table —
+which is what makes the third line work at all. A method call on a string is an indexing miss
+followed by an ordinary `__index` lookup.
+
+### Asking runs none of the value's own code
+
+<RunnableExample code={`local guarded = setmetatable({}, setmetatable({}, { __index = function() error("looked") end }))\n\nprint(type(debug.getmetatable(guarded)))\nprint(select("#", debug.getmetatable(42)))\nprint(select("#", debug.getmetatable({})))\n-- Expected output:\n-- table\n-- 1\n-- 1`} />
+
+The metatable here has a metatable of its own whose `__index` raises, and nothing raises: the
+answer is fetched rather than computed. The counts are the second half of the same point —
+one value comes back whether there is a metatable to report or not.
+
+## Gotchas
+
+<Gotcha title="What comes back is live, and usually shared">
+This hands over the metatable rather than a description of it, and one metatable commonly
+serves many values. Writing a field into the result therefore changes the behaviour of
+everything using it at once — and for a string, that is every string in the program. A table
+or a full userdata can be given a metatable of its own instead, which is how one value comes
+to behave differently from its neighbours; for a value of any other type there is no such
+thing to give it.
+</Gotcha>
+
+<Gotcha title="A sealed metatable is nobody's interface">
+A `__metatable` field is the author saying that what is behind it may change. Reading it here
+is fine while working out what a program is doing, and code left behind that indexes a
+metatable somebody sealed is code written against something that was never promised — a
+rebuild of that library can move every field in it without anything announcing that it has.
+</Gotcha>
+
+<Gotcha title="A number's metatable is not that number's">
+For every type but tables and full userdata the answer describes the type, so
+`debug.getmetatable(1)` and `debug.getmetatable(99)` are the same question and answer with the
+same table. There is no per-value attachment to read there and none to make; see
+[one metatable for a whole type](/docs/standard-library/debug/setmetatable#one-metatable-for-a-whole-type)
+for what that means when writing.
+</Gotcha>
+
+## See also
+
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable) — the ordinary reading, which a `__metatable` field stands in front of
+- [`debug.setmetatable()`](/docs/standard-library/debug/setmetatable) — the writing direction, which goes past the same protection
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — attaching a metatable to a table, and the call protection refuses
+- [`rawget()`](/docs/standard-library/globals/rawget) — reading a field with no `__index` consulted, which is the same kind of step past a metatable
+- [`debug.getregistry()`](/docs/standard-library/debug/getregistry) — where the metatables a C library shares between its objects are usually kept
+- [`type()`](/docs/standard-library/globals/type) — the name of a value's type, which no metatable can change and which needs no debug library to ask

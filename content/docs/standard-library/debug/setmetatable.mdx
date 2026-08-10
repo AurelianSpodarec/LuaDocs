@@ -1,8 +1,158 @@
 ---
 title: debug.setmetatable()
-description: ""
+description: Attach a metatable to a value of any type — a number, a string, a function — and to a table whose metatable is sealed.
+lua-compat: debug.setmetatable
 entry-type: function
 source: https://www.lua.org/manual/5.5/manual.html#pdf-debug.setmetatable
 ---
 
-{/* Not yet written. */}
+Attaches a metatable to a value, or removes the one it has. What sets it apart from
+[`setmetatable()`](/docs/standard-library/globals/setmetatable) is what puts it in this
+library: it takes a value of any type rather than a table alone, and a `__metatable` field
+does not stop it.
+
+<RunnableExample code={`local number_methods = { rounded = function(self) return math.floor(self) end }\nlocal previous = debug.getmetatable(0)\ndebug.setmetatable(0, { __index = number_methods })\n\nprint((3.7):rounded())\nprint((99).rounded ~= nil)\n\ndebug.setmetatable(0, previous)\nprint(debug.getmetatable(1))\n-- Expected output:\n-- 3\n-- true\n-- nil`} />
+
+The metatable went on the *number type*, not on the zero it was named through, which is why
+`99` picked up the method too — and why the last two lines put back what was there before.
+
+## Syntax
+
+```lua
+debug.setmetatable(value, table)
+```
+
+<Parameters>
+  <Param name="value">The value to attach to. Any value is accepted, whatever its type.</Param>
+  <Param name="table">The metatable to attach, or `nil` to remove whatever is attached now. The argument has to be there — see the Errors list.</Param>
+</Parameters>
+
+<Returns>
+  <Only before="5.2">
+    <Return type="boolean">`true`. It reports nothing about what happened: the same `true` comes back for a table, for a number, for an attachment and for a removal alike.</Return>
+  </Only>
+  <Only since="5.2">
+    <Return type="any">The value handed in — the first argument itself, whatever its type, carrying whatever this call just did to it.</Return>
+  </Only>
+</Returns>
+
+<Errors>
+
+- Raises when `table` is neither a table nor `nil`.
+- Raises when the call is missing its second argument. An argument of `nil` means *remove the metatable* and is carried out; no argument at all is a mistake and is refused.
+- Nothing is checked about `value`. Every type is accepted, `nil` among them, so a first argument that is not what the caller meant is acted on rather than reported.
+
+</Errors>
+
+## Description
+
+The basic library's [`setmetatable()`](/docs/standard-library/globals/setmetatable) takes a
+table and refuses everything else, and refuses even a table whose current metatable is
+protected. This call has neither restriction. What it does with the metatable once it has it
+is the same work, and a metatable attached from here is an ordinary metatable — nothing
+afterwards can tell it apart from one the other call attached.
+
+For a table or a full userdata the attachment belongs to that one value, and works the way it
+does everywhere else — one metatable per value, so a second call discards whatever the first
+attached and takes its fields with it. For a value of any other type the attachment belongs to
+the type, which is the next section and the reason this call needs care.
+
+A second argument of `nil` removes the metatable rather than attaching an empty one, and
+leaving the argument out is refused. The two are usually interchangeable in Lua and here they
+are not: a variable that turned out empty reads as `nil`, quietly strips a metatable, and the
+call reports nothing that would tell the caller apart from a deliberate removal.
+
+Nothing about the first argument is checked, so there is no failing case to test for and the
+answer reports nothing about what happened. Reading the metatable back with
+[`debug.getmetatable()`](/docs/standard-library/debug/getmetatable) is what confirms where it
+landed, which matters most for the types the next section is about.
+
+## One metatable for a whole type
+
+Tables and full userdata carry their own metatables. Every other type — numbers, strings,
+booleans, functions, threads, light userdata, and `nil` — has one metatable for the entire
+type, and this is the call that reaches it.
+[`getmetatable()`](/docs/standard-library/globals/getmetatable#which-values-have-a-metatable-to-read)
+sets out the arrangement; what belongs here is what happens when it is written to.
+
+Naming a value of such a type does not attach anything to that value. Writing through `0`
+gives every number in the program the metatable, `true` reaches every boolean, and a thread
+reaches every thread — including ones created later, and ones created by code that has never
+heard of the change. A coroutine is worth singling out because it looks like an object with
+an identity of its own and is not one of the two types that carry an individual metatable.
+
+There is nothing that undoes this and no history kept, so the way to make such a change
+survivable is to read the current metatable with
+[`debug.getmetatable()`](/docs/standard-library/debug/getmetatable) first and write it back
+afterwards, exactly as the example at the top of the page does. Passing `nil` is a removal
+rather than a restoration: it is only the right thing to put back when there was nothing there
+to begin with.
+
+The reach is worth stating plainly, because it is easy to reach for this call while chasing a
+problem and leave the interpreter altered. Giving numbers an `__index` changes what
+`(1).anything` does everywhere; giving strings one replaces the arrangement that makes
+`("cocoa"):upper()` work; giving `nil` one gives a metatable to the absence of a value.
+
+## Examples
+
+### A table keeps its metatable to itself
+
+<RunnableExample code={`local first_plate = {}\nlocal second_plate = {}\ndebug.setmetatable(first_plate, { __tostring = function() return "plate one" end })\n\nprint(tostring(first_plate))\nprint(debug.getmetatable(second_plate))\nprint(getmetatable(first_plate) ~= nil)\n-- Expected output:\n-- plate one\n-- nil\n-- true`} />
+
+The two tables were made the same way and only one of them changed. The third line is the
+other half of the point: the metatable this call attached is an ordinary one, and the ordinary
+reading finds it.
+
+### Replacing a metatable that is sealed
+
+<RunnableExample code={`local sealed = setmetatable({ id = 7 }, { __metatable = "sealed" })\nlocal ordinary = pcall(setmetatable, sealed, { note = "replaced" })\nlocal through_debug = pcall(debug.setmetatable, sealed, { note = "replaced" })\n\nprint(ordinary)\nprint(through_debug)\nprint(debug.getmetatable(sealed).note)\nprint(sealed.id)\n-- Expected output:\n-- false\n-- true\n-- replaced\n-- 7`} />
+
+The same write, refused by one call and carried out by the other. Both are wrapped in
+[`pcall()`](/docs/standard-library/globals/pcall) so that the refusal does not stop the
+example; the table's own fields are untouched by any of it.
+
+<Only since="5.2">
+
+### The value comes back
+
+<RunnableExample code={`local totals = {}\nlocal same = debug.setmetatable(totals, { __index = function() return 0 end })\n\nprint(same == totals)\nprint(same.anything_at_all)\nprint(select("#", debug.setmetatable(totals, nil)))\n-- Expected output:\n-- true\n-- 0\n-- 1`} />
+
+What comes back is the first argument itself, not a copy of it and not the metatable, so the
+call can be written where its result is wanted. One value comes back, and it comes back
+whatever the first argument's type was.
+
+</Only>
+
+## Gotchas
+
+<Gotcha title="Naming one number changes every number">
+The first argument selects a value only for tables and full userdata. For anything else it
+selects a *type*, and the change is felt by every value of that type in the state — every
+coroutine, every string, every boolean, in code that never asked for it. See
+[One metatable for a whole type](#one-metatable-for-a-whole-type).
+</Gotcha>
+
+<Gotcha title="No second argument is not the same as nil">
+An explicit `nil` removes the metatable and is carried out; leaving the argument off raises.
+The trap is a helper passing a metatable through from its own caller — when that value arrives
+empty, the call strips the metatable rather than leaving it alone.
+
+<RunnableExample code={`local basket = {}\nlocal with_nothing = pcall(debug.setmetatable, basket)\nlocal with_nil = pcall(debug.setmetatable, basket, nil)\n\nprint(with_nothing)\nprint(with_nil)\n-- Expected output:\n-- false\n-- true`} />
+</Gotcha>
+
+<Gotcha title="Sealing a metatable does not seal it against this">
+Attaching a metatable that carries a `__metatable` field protects it from
+[`setmetatable()`](/docs/standard-library/globals/setmetatable#when-the-metatable-cannot-be-changed)
+and from [`getmetatable()`](/docs/standard-library/globals/getmetatable#when-a-metatable-is-protected),
+and from neither of the two in this library. A library that seals a metatable is telling ordinary
+callers to keep out; it is not making the metatable unreachable, and nothing it can write
+would.
+</Gotcha>
+
+## See also
+
+- [`setmetatable()`](/docs/standard-library/globals/setmetatable) — the ordinary attachment, for a table whose metatable is not sealed
+- [`debug.getmetatable()`](/docs/standard-library/debug/getmetatable#what-a-protected-metatable-does-not-hide) — the reading direction, which goes past the same protection
+- [`getmetatable()`](/docs/standard-library/globals/getmetatable#which-values-have-a-metatable-to-read) — which values carry a metatable of their own and which share one per type
+- [`rawset()`](/docs/standard-library/globals/rawset) — writing a field with no `__newindex` consulted, which is the same kind of step past a metatable
+- [`debug.setuservalue()`](/docs/standard-library/debug/setuservalue) — the other thing that can be written onto a full userdata from Lua

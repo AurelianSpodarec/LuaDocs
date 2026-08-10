@@ -1,0 +1,6 @@
+{
+  "support": { "lua": { "version_added": "5.1" } },
+  "changed_in": {
+    "5.4": "A typed line that fails is reported with its error turned into text the way `tostring()` would turn it, so an error object of any type is reported and a `__tostring` field on it is consulted. Earlier versions can report only an error object that is already a string or a number."
+  }
+}
