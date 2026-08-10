@@ -56,11 +56,17 @@
           font-size="68" font-weight="400" fill="#ffffff" text-anchor="middle">Lua</text>
   </g>
 
-  <!-- LuaDocs' own wordmark -->
+  <!-- LuaDocs' own wordmark.
+
+       `LuaDocs`, not `luadocs`. The codebase already draws this line — 21 human-facing uses
+       are camel-case (site title, nav, prose) and every lowercase one is a machine identifier:
+       localStorage keys, DOM ids, the worker's output buffer, the domain. MDN's lowercase
+       wordmark works because `mdn` is an initialism; `Lua` is a proper noun that Lua.org
+       always capitalises, and lowercasing it beside their own mark reads as a mistake. -->
   <text x="660" y="196"
         font-family="'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace"
         font-size="92" font-weight="600" letter-spacing="-1"
-        fill="#f4f6fa" dominant-baseline="central">luadocs</text>
+        fill="#f4f6fa" dominant-baseline="central">LuaDocs</text>
 
   <!-- Version range. `y` clears the wordmark's box, which reaches 250. -->
   <text x="664" y="284"
