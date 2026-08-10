@@ -4,6 +4,8 @@ import { pageSchema } from 'fumadocs-core/source/schema';
 import { defineDocs } from 'fumadocs-mdx/macro';
 import { z } from 'zod';
 import { docsRoute } from './shared';
+import { exportHeader, resolveExportText } from './exportText';
+import { DEFAULT_VERSION } from '@/compat/schema';
 
 // `defineDocs` is a build-time macro, so its arguments must be statically
 // analyzable — the schema has to be written inline rather than imported.
@@ -49,10 +51,25 @@ export const source = loader({
   plugins: [lucideIconsPlugin()],
 });
 
+/**
+ * An entry as text, for `llms.txt`, `llms-full.txt` and the `.md` route.
+ *
+ * The processed markdown is passed through `resolveExportText` rather than served raw.
+ * Raw, it carries both halves of every `<Only>` pair adjacent and unlabelled — so an
+ * entry states a version-specific fact and then states its opposite — and it carries every
+ * example as an entity-escaped JSX attribute. See `src/lib/exportText.ts`.
+ */
 export async function getLLMText(page: (typeof source)['$inferPage']) {
+  const header = exportHeader(page.data.title, page.url, DEFAULT_VERSION);
+
+  // An unwritten entry has no body to resolve. Say so, and point at the manual passage
+  // the scaffold already recorded, rather than exporting a `Not yet written` comment.
+  if ((page.data.description ?? '').trim() === '') {
+    const manual = page.data.source ? `\n\nThe reference manual documents it at ${page.data.source}.` : '';
+    return `# ${page.data.title} (${page.url})\n\nThis entry has not been written yet.${manual}`;
+  }
+
   const processed = await page.data.getText('processed');
 
-  return `# ${page.data.title} (${page.url})
-
-${processed}`;
+  return `${header}\n\n${resolveExportText(processed, DEFAULT_VERSION)}`;
 }
