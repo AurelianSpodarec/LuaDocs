@@ -81,3 +81,33 @@ version at all.
 - The same reasoning extends to any other language-wide anachronism that later turns up
   in a type name — goto, integer division, bitwise operators. The rule is the shape:
   language-wide facts get one site-wide disclosure, never a per-entry delta.
+
+## Amendment — 2026-08-10, on parameters declaring types
+
+[ADR 0013](0013-the-body-of-a-reference-entry.md) gives `<Param>` a `type` field. Two
+sentences above are now wrong, and the mechanism is now due somewhere it could not reach.
+
+**What is wrong.** The claim that `<Return type>` "is the only place on an entry where a
+type is declared as data rather than written into prose" held when it was written and does
+not hold now. So does the sentence following it: a parameter described as "an integer
+position" was prose *because there was nowhere else to put it*, not because a parameter's
+type belongs in prose.
+
+**What follows.** Rule 3 said the gap is disclosed by the renderer rather than by the
+author, and placeability was the argument for it. Parameters are now placeable, and several
+of the canonical names ADR 0013 fixes — `first`, `last`, `position`, `count` — will declare
+`integer` on entries whose returns declare nothing of the kind. `string.sub` is the plain
+case: it returns a `string`, so `Returns.tsx` finds no `integer`, renders no note, and a
+reader on 5.1 is left with two parameters typed `integer` and no disclosure anywhere on the
+page.
+
+So `NumericTypeNote` places itself above the **Parameters** list on the same test
+`Returns.tsx` already applies to returns, and an entry whose parameters and returns both
+name `integer` shows it once, above the first of the two lists. One note per entry, not one
+per list — it discloses a fact about Lua, and repeating it under two headings would say
+twice on one page what this ADR exists to stop saying three hundred times across the site.
+
+**What does not change.** Rules 1 and 2 are untouched: the type field is base content
+written against the default version, and `integer` is not weakened to `number` to
+accommodate 5.1 and 5.2. The argument for both is about the word in the field, and it does
+not care which of the two lists the field sits in.
