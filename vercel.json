@@ -1,0 +1,350 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/docs/introduction",
+      "destination": "/docs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/faq",
+      "destination": "/docs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/governance",
+      "destination": "/docs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/contribution-guide",
+      "destination": "/docs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string",
+      "destination": "/docs/standard-library/string",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table",
+      "destination": "/docs/standard-library/table",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math",
+      "destination": "/docs/standard-library/math",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/coroutine",
+      "destination": "/docs/standard-library/coroutine",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/io",
+      "destination": "/docs/standard-library/io",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/os",
+      "destination": "/docs/standard-library/os",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/package",
+      "destination": "/docs/standard-library/package",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/debug",
+      "destination": "/docs/standard-library/debug",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/utf8",
+      "destination": "/docs/standard-library/utf8",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/setmetatable",
+      "destination": "/docs/standard-library/globals/setmetatable",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/getmetatable",
+      "destination": "/docs/standard-library/globals/getmetatable",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/rawset",
+      "destination": "/docs/standard-library/globals/rawset",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/rawget",
+      "destination": "/docs/standard-library/globals/rawget",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/pairs",
+      "destination": "/docs/standard-library/globals/pairs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/next",
+      "destination": "/docs/standard-library/globals/next",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/byte",
+      "destination": "/docs/standard-library/string/byte",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/char",
+      "destination": "/docs/standard-library/string/char",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/dump",
+      "destination": "/docs/standard-library/string/dump",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/find",
+      "destination": "/docs/standard-library/string/find",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/format",
+      "destination": "/docs/standard-library/string/format",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/gmatch",
+      "destination": "/docs/standard-library/string/gmatch",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/gsub",
+      "destination": "/docs/standard-library/string/gsub",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/len",
+      "destination": "/docs/standard-library/string/len",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/lower",
+      "destination": "/docs/standard-library/string/lower",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/match",
+      "destination": "/docs/standard-library/string/match",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/pack",
+      "destination": "/docs/standard-library/string/pack",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/packsize",
+      "destination": "/docs/standard-library/string/packsize",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/rep",
+      "destination": "/docs/standard-library/string/rep",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/reverse",
+      "destination": "/docs/standard-library/string/reverse",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/sub",
+      "destination": "/docs/standard-library/string/sub",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/unpack",
+      "destination": "/docs/standard-library/string/unpack",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/string/upper",
+      "destination": "/docs/standard-library/string/upper",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/concat",
+      "destination": "/docs/standard-library/table/concat",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/insert",
+      "destination": "/docs/standard-library/table/insert",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/move",
+      "destination": "/docs/standard-library/table/move",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/pack",
+      "destination": "/docs/standard-library/table/pack",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/remove",
+      "destination": "/docs/standard-library/table/remove",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/sort",
+      "destination": "/docs/standard-library/table/sort",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/table/unpack",
+      "destination": "/docs/standard-library/table/unpack",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/abs",
+      "destination": "/docs/standard-library/math/abs",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/acos",
+      "destination": "/docs/standard-library/math/acos",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/asin",
+      "destination": "/docs/standard-library/math/asin",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/atan",
+      "destination": "/docs/standard-library/math/atan",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/ceil",
+      "destination": "/docs/standard-library/math/ceil",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/cos",
+      "destination": "/docs/standard-library/math/cos",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/deg",
+      "destination": "/docs/standard-library/math/deg",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/exp",
+      "destination": "/docs/standard-library/math/exp",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/floor",
+      "destination": "/docs/standard-library/math/floor",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/fmod",
+      "destination": "/docs/standard-library/math/fmod",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/huge",
+      "destination": "/docs/standard-library/math/huge",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/log",
+      "destination": "/docs/standard-library/math/log",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/max",
+      "destination": "/docs/standard-library/math/max",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/maxinteger",
+      "destination": "/docs/standard-library/math/maxinteger",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/min",
+      "destination": "/docs/standard-library/math/min",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/mininteger",
+      "destination": "/docs/standard-library/math/mininteger",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/modf",
+      "destination": "/docs/standard-library/math/modf",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/pi",
+      "destination": "/docs/standard-library/math/pi",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/rad",
+      "destination": "/docs/standard-library/math/rad",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/random",
+      "destination": "/docs/standard-library/math/random",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/sin",
+      "destination": "/docs/standard-library/math/sin",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/sqrt",
+      "destination": "/docs/standard-library/math/sqrt",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/tan",
+      "destination": "/docs/standard-library/math/tan",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/tointeger",
+      "destination": "/docs/standard-library/math/tointeger",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/type",
+      "destination": "/docs/standard-library/math/type",
+      "permanent": true
+    },
+    {
+      "source": "/docs/functions/math/ult",
+      "destination": "/docs/standard-library/math/ult",
+      "permanent": true
+    }
+  ]
+}

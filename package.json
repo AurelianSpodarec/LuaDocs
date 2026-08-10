@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "content:scaffold": "tsx scripts/scaffold-content.ts",
+    "redirects:generate": "tsx scripts/generate-vercel-json.ts",
+    "redirects:check": "tsx scripts/check-build-output.ts",
     "types:check": "tsc --noEmit"
   },
   "dependencies": {
