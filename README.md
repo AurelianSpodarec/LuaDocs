@@ -44,9 +44,8 @@ Stubs are excluded from the sitemap and carry `noindex`, so an unwritten page is
 never advertised.
 
 Wasmoon ships a single Lua (5.4), so an example viewed at another selected version says so rather
-than pretending. Per-version runtimes are
-[a parked spike](docs/_DEPRECATED/plans/2026-08-04-per-version-lua-spike.md); the upstream project
-is the place to help.
+than pretending. Per-version runtimes are a parked spike; the upstream project is the place to
+help.
 
 ## Development
 
@@ -62,21 +61,6 @@ npm run dev
 
 Built on TanStack Start, prerendered to static HTML, with Fumadocs providing the content
 pipeline. The UI currently uses Fumadocs's theme; a bespoke one is planned.
-
-## The record
-
-Separate from the documentation this site publishes, `docs/` holds how the project thinks — its
-decisions, the conventions entries are written to, and what building taught us.
-
-**It is being rebuilt.** As of 2026-08-10 it had reached 97,000 words in which decisions,
-findings and open questions had grown into each other, so all of it was deprecated in one move
-and none of it has been replaced yet.
-
-- [docs/_DEPRECATED/](docs/_DEPRECATED/) — the whole previous record, kept rather than deleted,
-  because its evidence is what makes its replacements believable. **Not authoritative.**
-
-Comments in `src/` still cite `docs/adr/…` paths that now live under `docs/_DEPRECATED/adr/`.
-They are repointed once the rebuilt decisions are numbered.
 
 ## Licence
 
