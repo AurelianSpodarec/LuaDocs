@@ -12,7 +12,8 @@
     "content:scaffold": "tsx scripts/scaffold-content.ts",
     "redirects:generate": "tsx scripts/generate-vercel-json.ts",
     "redirects:check": "tsx scripts/check-build-output.ts",
-    "types:check": "tsc --noEmit"
+    "types:check": "tsc --noEmit",
+    "claude:vatras": "claude --safe-mode --plugin-dir ../../vatras"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
